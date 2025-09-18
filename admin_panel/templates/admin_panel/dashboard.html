@@ -225,32 +225,32 @@
         <div class="admin-actions">
             <h2><i class="fas fa-cogs"></i> Administrative Actions</h2>
             <div class="actions-grid">
-                <a href="#" class="action-item" onclick="alert('User management interface - Create, edit, and manage user accounts')">
+                <a href="{% url 'admin_panel:user_management' %}" class="action-item">
                     <i class="fas fa-user-plus"></i>
                     <h4>User Management</h4>
                     <p>Create, edit, and manage user accounts</p>
                 </a>
-                <a href="#" class="action-item" onclick="alert('Facility management interface - Manage healthcare facilities')">
+                <a href="{% url 'admin_panel:facility_management' %}" class="action-item">
                     <i class="fas fa-building"></i>
                     <h4>Facility Management</h4>
                     <p>Manage healthcare facilities and settings</p>
                 </a>
-                <a href="#" class="action-item" onclick="alert('System configuration interface - Configure system settings')">
+                <a href="{% url 'admin_panel:settings' %}" class="action-item">
                     <i class="fas fa-cog"></i>
                     <h4>System Configuration</h4>
                     <p>Configure system settings and preferences</p>
                 </a>
-                <a href="#" class="action-item" onclick="alert('Audit logs interface - View system activity logs')">
+                <a href="{% url 'admin_panel:system_logs' %}" class="action-item">
                     <i class="fas fa-file-alt"></i>
                     <h4>Audit Logs</h4>
                     <p>View system activity and audit logs</p>
                 </a>
-                <a href="#" class="action-item" onclick="alert('Backup management interface - Manage system backups')">
-                    <i class="fas fa-database"></i>
-                    <h4>Backup Management</h4>
-                    <p>Manage system backups and data recovery</p>
+                <a href="/system-status/" class="action-item">
+                    <i class="fas fa-heartbeat"></i>
+                    <h4>System Status</h4>
+                    <p>Check system health and connectivity</p>
                 </a>
-                <a href="#" class="action-item" onclick="alert('Security settings interface - Configure security policies')">
+                <a href="{% url 'admin_panel:permissions_dashboard' %}" class="action-item">
                     <i class="fas fa-lock"></i>
                     <h4>Security Settings</h4>
                     <p>Configure security policies and access controls</p>
@@ -279,7 +279,7 @@
             <a href="/worklist/" class="btn back-btn">
                 <i class="fas fa-arrow-left"></i> Back to Dashboard
             </a>
-            <a href="#" class="btn" onclick="alert('System maintenance tools coming soon')">
+            <a href="{% url 'admin_panel:system_logs' %}" class="btn">
                 <i class="fas fa-tools"></i> System Maintenance
             </a>
         </div>

@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management - Admin Panel - Noctis Pro PACS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-users me-2"></i>User Management</h2>
+        <div>
+            <a href="{% url 'admin_panel:user_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>Add New User
+            </a>
+            <a href="{% url 'admin_panel:dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="card bg-dark text-white mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control bg-dark text-white border-secondary" 
+                           name="search" value="{{ request.GET.search }}" placeholder="Search users...">
+                </div>
+                <div class="col-md-3">
+                    <select name="role" class="form-select bg-dark text-white border-secondary">
+                        <option value="">All Roles</option>
+                        <option value="admin" {% if request.GET.role == 'admin' %}selected{% endif %}>Admin</option>
+                        <option value="radiologist" {% if request.GET.role == 'radiologist' %}selected{% endif %}>Radiologist</option>
+                        <option value="technologist" {% if request.GET.role == 'technologist' %}selected{% endif %}>Technologist</option>
+                        <option value="physician" {% if request.GET.role == 'physician' %}selected{% endif %}>Physician</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="facility" class="form-select bg-dark text-white border-secondary">
+                        <option value="">All Facilities</option>
+                        {% for facility in facilities %}
+                        <option value="{{ facility.id }}" {% if request.GET.facility == facility.id|stringformat:"s" %}selected{% endif %}>
+                            {{ facility.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="card bg-dark text-white">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-dark table-striped">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Facility</th>
+                            <th>Status</th>
+                            <th>Last Login</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.get_full_name|default:user.username }}</td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>
+                                <span class="badge bg-{% if user.role == 'admin' %}danger{% elif user.role == 'radiologist' %}primary{% else %}secondary{% endif %}">
+                                    {{ user.get_role_display|default:user.role }}
+                                </span>
+                            </td>
+                            <td>{{ user.facility.name|default:"-" }}</td>
+                            <td>
+                                <span class="badge bg-{% if user.is_active %}success{% else %}secondary{% endif %}">
+                                    {% if user.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            </td>
+                            <td>{{ user.last_login|date:"M d, Y H:i"|default:"Never" }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'admin_panel:user_edit' user.id %}" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% if user != request.user %}
+                                    <button class="btn btn-outline-danger btn-sm" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">No users found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if users.has_other_pages %}
+            <nav aria-label="User pagination">
+                <ul class="pagination justify-content-center">
+                    {% if users.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link bg-dark text-white border-secondary" href="?page={{ users.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">Previous</a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for num in users.paginator.page_range %}
+                        {% if users.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link bg-primary border-primary">{{ num }}</span>
+                            </li>
+                        {% elif num > users.number|add:'-3' and num < users.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link bg-dark text-white border-secondary" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if users.has_next %}
+                        <li class="page-item">
+                            <a class="page-link bg-dark text-white border-secondary" href="?page={{ users.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">Next</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function deleteUser(userId, username) {
+    if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+        fetch(`/admin-panel/users/delete/${userId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrf-token]').getAttribute('content'),
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deleting user: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Error deleting user: ' + error.message);
+        });
+    }
+}
+</script>
+{% endblock %}

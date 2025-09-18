@@ -25,7 +25,7 @@ import os
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6t@n5q8r7y#3e$6u9i%m&o^2d1f0g')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 # Internet and network configuration
 DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'localhost')
