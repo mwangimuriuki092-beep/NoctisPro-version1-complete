@@ -582,9 +582,8 @@ def upload_study(request):
 					from ai_analysis.models import AIModel, AIAnalysis
 					# Check if there are active AI models for this modality
 					ai_models = AIModel.objects.filter(
-						modalities__icontains=modality_code,
-						is_active=True,
-						status='ready'
+						modality=modality_code,
+						is_active=True
 					)
 					
 					if ai_models.exists():
