@@ -208,8 +208,13 @@ main() {
     
     echo
     log "🎉 NoctisPro PACS deployed successfully with Docker and Tailscale!"
-    log "🔗 Your medical imaging system is now publicly accessible via your Tailnet"
-    log "🌐 All services are now available on the public network through Tailscale"
+    log "🔗 Your medical imaging system is now accessible via your Tailnet"
+    log "🌐 Services are available through secure Tailscale network"
+    
+    echo
+    info "Alternative Deployment Options:"
+    echo "• For internet access with HTTPS: ./deploy_internet_https.sh"
+    echo "• For local development: ./deploy_noctispro.sh"
     
     echo
     info "Next Steps:"

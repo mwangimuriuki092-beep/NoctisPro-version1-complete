@@ -1,6 +1,6 @@
 
 services:
-  # Tailscale sidecar for secure networking
+  # Tailscale sidecar (optional - can be disabled for internet-only access)
   tailscale:
     image: tailscale/tailscale:latest
     container_name: noctis_tailscale
@@ -21,6 +21,8 @@ services:
       - net.ipv6.conf.all.forwarding=1
     restart: unless-stopped
     network_mode: host
+    profiles:
+      - tailscale  # Optional profile for Tailscale
 
   # PostgreSQL Database
   db:
@@ -34,31 +36,33 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
     ports:
-      - "5432:5432"  # Public access through tailnet
+      - "127.0.0.1:5432:5432"  # Internal access only for security
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U noctis_user -d noctis_pro"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    network_mode: "service:tailscale"  # Share network with Tailscale for public access
+    networks:
+      - noctis_internal
 
   # Redis for caching and message broker
   redis:
     image: redis:7-alpine
     container_name: noctis_redis
-    command: redis-server --appendonly yes --bind 0.0.0.0 --protected-mode no
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secure_password}
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"  # Public access through tailnet
+      - "127.0.0.1:6379:6379"  # Internal access only for security
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-redis_secure_password}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    network_mode: "service:tailscale"  # Share network with Tailscale for public access
+    networks:
+      - noctis_internal
 
   # Django Web Application
   web:
@@ -77,24 +81,27 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
       - DB_HOST=db
       - DB_PORT=5432
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - TAILNET_HOSTNAME=${TAILNET_HOSTNAME:-noctispro}
-      - USE_TAILNET=true
-      - ALLOWED_HOSTS=${TAILNET_HOSTNAME:-noctispro},localhost,127.0.0.1,*.ts.net,100.*
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+      - USE_HTTPS=${USE_HTTPS:-true}
+      - INTERNET_ACCESS=true
+      - ALLOWED_HOSTS=${DOMAIN_NAME:-localhost},www.${DOMAIN_NAME:-localhost},localhost,127.0.0.1
     volumes:
       - .:/app
       - media_files:/app/media
       - static_files:/app/staticfiles
-    network_mode: "service:tailscale"  # Share network with Tailscale
+    expose:
+      - "8080"
+    networks:
+      - noctis_internal
+      - noctis_public
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      tailscale:
-        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health/"]
       interval: 30s
@@ -126,9 +133,9 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
       - DB_HOST=db
       - DB_PORT=5432
-      - REDIS_URL=redis://redis:6379/0
-      - TAILNET_HOSTNAME=${TAILNET_HOSTNAME:-noctispro}
-      - USE_TAILNET=true
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+      - INTERNET_ACCESS=true
     volumes:
       - .:/app
       - media_files:/app/media
@@ -139,10 +146,9 @@ services:
         condition: service_healthy
       web:
         condition: service_healthy
-      tailscale:
-        condition: service_started
     restart: unless-stopped
-    network_mode: "service:tailscale"  # Share network with Tailscale for public access
+    networks:
+      - noctis_internal
     command: python manage.py process_ai_analyses --continuous
 
   # DICOM Receiver Service
@@ -162,43 +168,66 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
       - DB_HOST=db
       - DB_PORT=5432
-      - REDIS_URL=redis://redis:6379/0
-      - TAILNET_HOSTNAME=${TAILNET_HOSTNAME:-noctispro}
-      - USE_TAILNET=true
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+      - INTERNET_ACCESS=true
     volumes:
       - .:/app
       - media_files:/app/media
     ports:
-      - "11112:11112"  # Public DICOM port through tailnet
+      - "11112:11112"  # Public DICOM port for internet access
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      tailscale:
-        condition: service_started
     restart: unless-stopped
-    network_mode: "service:tailscale"  # Share network with Tailscale for public access
+    networks:
+      - noctis_internal
+      - noctis_public
     command: python dicom_receiver.py --port 11112 --aet NOCTIS_SCP
 
-  # Nginx for production (optional) - Public access through tailnet
+  # Nginx for HTTPS internet access
   nginx:
     image: nginx:alpine
     container_name: noctis_nginx
     ports:
-      - "80:80"    # Public HTTP access through tailnet
-      - "443:443"  # Public HTTPS access through tailnet
+      - "80:80"    # HTTP port for Let's Encrypt challenges and redirect
+      - "443:443"  # HTTPS port for secure internet access
     volumes:
+      - ./deployment/nginx/sites-available/noctis-internet.conf:/etc/nginx/conf.d/default.conf:ro
       - ./deployment/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - static_files:/var/www/static:ro
       - media_files:/var/www/media:ro
+      - letsencrypt_certs:/etc/letsencrypt:ro
+      - letsencrypt_www:/var/www/certbot:ro
     depends_on:
       - web
-      - tailscale
     restart: unless-stopped
-    network_mode: "service:tailscale"  # Share network with Tailscale for public access
+    networks:
+      - noctis_public
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+
+  # Certbot for SSL certificates
+  certbot:
+    image: certbot/certbot:latest
+    container_name: noctis_certbot
+    volumes:
+      - letsencrypt_certs:/etc/letsencrypt
+      - letsencrypt_www:/var/www/certbot
+    depends_on:
+      - nginx
     profiles:
-      - production
+      - ssl
+    command: certonly --webroot --webroot-path=/var/www/certbot --email ${ADMIN_EMAIL:-admin@${DOMAIN_NAME:-localhost}} --agree-tos --no-eff-email -d ${DOMAIN_NAME:-localhost} -d www.${DOMAIN_NAME:-localhost}
+
+networks:
+  noctis_internal:
+    driver: bridge
+    internal: true
+  noctis_public:
+    driver: bridge
 
 volumes:
   postgres_data:
@@ -210,4 +239,8 @@ volumes:
   static_files:
     driver: local
   tailscale_data:
+    driver: local
+  letsencrypt_certs:
+    driver: local
+  letsencrypt_www:
     driver: local
