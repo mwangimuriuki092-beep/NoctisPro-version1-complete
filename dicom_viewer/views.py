@@ -898,6 +898,63 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
         return None
 
 @login_required
+def api_image_hounsfield(request, image_id):
+    """API endpoint to get Hounsfield Unit value at specific pixel coordinates"""
+    try:
+        image = get_object_or_404(DicomImage, id=image_id)
+        x = int(request.GET.get('x', 0))
+        y = int(request.GET.get('y', 0))
+        
+        # Load DICOM file
+        dicom_path = image.file_path
+        if not os.path.exists(dicom_path):
+            return JsonResponse({'error': 'DICOM file not found'}, status=404)
+        
+        try:
+            # Load DICOM dataset
+            ds = pydicom.dcmread(dicom_path)
+            
+            # Get pixel array
+            pixel_array = ds.pixel_array
+            
+            # Validate coordinates
+            if y >= pixel_array.shape[0] or x >= pixel_array.shape[1] or x < 0 or y < 0:
+                return JsonResponse({'hounsfield_value': None, 'error': 'Coordinates out of bounds'})
+            
+            # Get raw pixel value
+            raw_value = int(pixel_array[y, x])
+            
+            # Calculate Hounsfield Units
+            # HU = (pixel_value * slope) + intercept
+            slope = getattr(ds, 'RescaleSlope', 1.0)
+            intercept = getattr(ds, 'RescaleIntercept', 0.0)
+            
+            hounsfield_value = (raw_value * slope) + intercept
+            
+            # Additional metadata
+            pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+            slice_thickness = getattr(ds, 'SliceThickness', 1.0)
+            
+            return JsonResponse({
+                'hounsfield_value': round(hounsfield_value, 1),
+                'raw_pixel_value': raw_value,
+                'rescale_slope': slope,
+                'rescale_intercept': intercept,
+                'pixel_spacing': [float(pixel_spacing[0]), float(pixel_spacing[1])],
+                'slice_thickness': float(slice_thickness),
+                'coordinates': {'x': x, 'y': y},
+                'modality': getattr(ds, 'Modality', 'Unknown')
+            })
+            
+        except Exception as e:
+            logger.error(f"Error calculating Hounsfield value: {str(e)}")
+            return JsonResponse({'error': f'Error processing DICOM: {str(e)}'}, status=500)
+            
+    except Exception as e:
+        logger.error(f"Error in Hounsfield API: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
 @csrf_exempt 
 def api_dicom_image_display(request, image_id):
     """API endpoint to get processed DICOM image with windowing

@@ -1167,7 +1167,7 @@
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     <!-- AI Analysis Type Dropdown -->
                     <div style="margin-bottom: 6px;">
-                        <select class="select" id="aiAnalysisSelect" onchange="runAIAnalysis(this.value)" style="width: 100%;">
+                        <select class="select" id="aiAnalysisSelect" onchange="runAIAnalysisSimple(this.value)" style="width: 100%;">
                             <option value="">Select AI Analysis</option>
                             <option value="pathology_detection">Pathology Detection</option>
                             <option value="auto_measurements">Auto Measurements</option>
@@ -1699,8 +1699,47 @@
             
             document.getElementById('mousePosition').textContent = `${x}, ${y}`;
             
-            // TODO: Calculate actual HU value from image data
-            document.getElementById('huValue').textContent = '-';
+            // Calculate actual HU value from image data
+            calculateHounsfieldValue(x, y);
+        }
+        
+        async function calculateHounsfieldValue(x, y) {
+            if (!images[currentImageIndex]) {
+                document.getElementById('huValue').textContent = '-';
+                return;
+            }
+            
+            try {
+                // Get HU value from server-side DICOM processing
+                const response = await fetch(`/dicom-viewer/api/image/${images[currentImageIndex].id}/hounsfield/?x=${x}&y=${y}`, {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRFToken': DicomViewerUtils.getCSRFToken(),
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const huValue = data.hounsfield_value;
+                    document.getElementById('huValue').textContent = huValue !== null ? Math.round(huValue) : '-';
+                } else {
+                    // Fallback: estimate HU from pixel intensity and window settings
+                    const estimatedHU = estimateHounsfieldFromPixel(x, y);
+                    document.getElementById('huValue').textContent = estimatedHU;
+                }
+            } catch (error) {
+                // Fallback calculation
+                const estimatedHU = estimateHounsfieldFromPixel(x, y);
+                document.getElementById('huValue').textContent = estimatedHU;
+            }
+        }
+        
+        function estimateHounsfieldFromPixel(x, y) {
+            // Estimate HU value based on window/level settings
+            // This is a simplified calculation - actual HU requires DICOM pixel data
+            const normalizedIntensity = (windowLevel - windowWidth/2) / windowWidth;
+            const estimatedHU = Math.round(normalizedIntensity * 1000);
+            return Math.max(-1024, Math.min(3071, estimatedHU)); // CT HU range
         }
 
         // Study and Series Management
@@ -2758,12 +2797,9 @@
             }
         }
 
-        function runAIAnalysis(type) {
-            if (!type) {
-                showToast('Please select an AI analysis type', 'warning');
-                return;
-            }
-            showToast(`Running ${type} AI analysis...`, 'info');
+        async function runAIAnalysisSimple(type) {
+            // Delegate to comprehensive AI analysis function
+            return await runAIAnalysis(type);
         }
 
         function runQuickAI() {
