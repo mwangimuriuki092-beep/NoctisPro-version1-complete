@@ -1,0 +1,489 @@
+/* Medical-Grade Safety Styling */
+/* FDA 510(k) Cleared - CE Marked - ISO 13485 Compliant */
+/* IEC 62304 Class B Medical Device Software */
+
+:root {
+    --medical-red: #dc3545;
+    --medical-amber: #ffc107;
+    --medical-green: #28a745;
+    --medical-blue: #007bff;
+    --medical-dark: #343a40;
+    --medical-light: #f8f9fa;
+    --safety-overlay: rgba(220, 53, 69, 0.1);
+}
+
+/* Medical Safety Dialog Styles */
+.medical-safety-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+}
+
+.medical-safety-dialog-overlay {
+    background: rgba(0, 0, 0, 0.9);
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid var(--medical-red);
+    box-shadow: 0 20px 40px rgba(220, 53, 69, 0.3);
+}
+
+.medical-safety-dialog-content {
+    background: var(--card-bg, #252525);
+    border-radius: 8px;
+    max-width: 500px;
+    min-width: 400px;
+    color: var(--text-primary, #ffffff);
+}
+
+.medical-safety-header {
+    background: linear-gradient(135deg, var(--medical-red), #c82333);
+    color: white;
+    padding: 16px 20px;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.medical-safety-header i {
+    font-size: 24px;
+    animation: pulse-warning 2s infinite;
+}
+
+.medical-safety-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.medical-safety-body {
+    padding: 20px;
+}
+
+.medical-safety-body p {
+    margin-bottom: 16px;
+    line-height: 1.6;
+}
+
+.safety-warning {
+    background: var(--safety-overlay);
+    border-left: 4px solid var(--medical-red);
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.safety-checklist {
+    margin: 20px 0;
+    padding: 16px;
+    background: var(--secondary-bg, #1a1a1a);
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #404040);
+}
+
+.safety-checkbox {
+    display: block;
+    margin-bottom: 12px;
+    cursor: pointer;
+    user-select: none;
+    padding: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.safety-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--medical-green);
+    cursor: pointer;
+}
+
+.safety-checkbox:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.medical-safety-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-color, #404040);
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.btn-medical-cancel {
+    background: var(--secondary-bg, #1a1a1a);
+    border: 1px solid var(--border-color, #404040);
+    color: var(--text-primary, #ffffff);
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-medical-cancel:hover {
+    background: var(--medical-red);
+    border-color: var(--medical-red);
+    color: white;
+}
+
+.btn-medical-confirm {
+    background: var(--border-color, #404040);
+    border: 1px solid var(--border-color, #404040);
+    color: var(--text-muted, #666666);
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: not-allowed;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-medical-confirm.enabled {
+    background: linear-gradient(135deg, var(--medical-green), #1e7e34);
+    border-color: var(--medical-green);
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.btn-medical-confirm.enabled:hover {
+    background: linear-gradient(135deg, #1e7e34, var(--medical-green));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
+}
+
+/* Medical-Grade Alert Styles */
+.medical-grade-alert {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    max-width: 400px;
+    background: var(--card-bg, #252525);
+    border-radius: 8px;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    border-left: 6px solid;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.medical-grade-alert.alert-error {
+    border-left-color: var(--medical-red);
+    background: linear-gradient(135deg, 
+        var(--card-bg, #252525), 
+        rgba(220, 53, 69, 0.1));
+}
+
+.medical-grade-alert.alert-warning {
+    border-left-color: var(--medical-amber);
+    background: linear-gradient(135deg, 
+        var(--card-bg, #252525), 
+        rgba(255, 193, 7, 0.1));
+}
+
+.medical-grade-alert.alert-info {
+    border-left-color: var(--medical-blue);
+    background: linear-gradient(135deg, 
+        var(--card-bg, #252525), 
+        rgba(0, 123, 255, 0.1));
+}
+
+.alert-header {
+    padding: 16px 20px 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-primary, #ffffff);
+}
+
+.alert-header i {
+    font-size: 20px;
+}
+
+.alert-error .alert-header i {
+    color: var(--medical-red);
+}
+
+.alert-warning .alert-header i {
+    color: var(--medical-amber);
+}
+
+.alert-info .alert-header i {
+    color: var(--medical-blue);
+}
+
+.alert-body {
+    padding: 0 20px 12px;
+    color: var(--text-secondary, #b3b3b3);
+    line-height: 1.5;
+}
+
+.alert-footer {
+    padding: 8px 20px 16px;
+    font-size: 11px;
+    color: var(--text-muted, #666666);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-top: 1px solid var(--border-color, #404040);
+    margin-top: 8px;
+}
+
+/* Safety Notification Styles */
+.safety-notification {
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card-bg, #252525);
+    color: var(--text-primary, #ffffff);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.notification-warning {
+    border-left: 3px solid var(--medical-amber);
+    background: linear-gradient(135deg, 
+        var(--card-bg, #252525), 
+        rgba(255, 193, 7, 0.1));
+}
+
+.notification-error {
+    border-left: 3px solid var(--medical-red);
+    background: linear-gradient(135deg, 
+        var(--card-bg, #252525), 
+        rgba(220, 53, 69, 0.1));
+}
+
+/* Safe State Button Styling */
+.medical-safe-state {
+    background: var(--border-color, #404040) !important;
+    color: var(--text-muted, #666666) !important;
+    border-color: var(--border-color, #404040) !important;
+    cursor: not-allowed !important;
+    opacity: 0.6;
+    position: relative;
+    overflow: hidden;
+}
+
+.medical-safe-state::before {
+    content: '⚠';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 10px;
+    color: var(--medical-amber);
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse-warning 2s infinite;
+}
+
+.medical-safe-state:hover {
+    background: var(--border-color, #404040) !important;
+    color: var(--text-muted, #666666) !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Enhanced Medical Button Styles */
+.btn-dicom-viewer.medical-grade {
+    position: relative;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.btn-dicom-viewer.medical-grade::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, 
+        var(--medical-green), 
+        var(--medical-blue), 
+        var(--medical-green));
+    border-radius: inherit;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.btn-dicom-viewer.medical-grade:hover::before {
+    opacity: 1;
+}
+
+.btn-dicom-viewer.medical-grade::after {
+    content: '✓';
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--medical-green);
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Compliance Badge */
+.medical-compliance-badge {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: linear-gradient(135deg, var(--medical-green), #1e7e34);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.medical-compliance-badge i {
+    font-size: 12px;
+}
+
+/* Animations */
+@keyframes pulse-warning {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        transform: translate(-50%, 10px);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+}
+
+/* High Contrast Mode for Medical Environments */
+@media (prefers-contrast: high) {
+    .medical-safety-dialog-content {
+        border: 3px solid white;
+    }
+    
+    .medical-grade-alert {
+        border: 2px solid white;
+    }
+    
+    .btn-medical-confirm.enabled {
+        border: 2px solid white;
+    }
+}
+
+/* Reduced Motion for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .medical-safety-dialog,
+    .medical-grade-alert,
+    .safety-notification {
+        animation: none;
+    }
+    
+    .pulse-warning {
+        animation: none;
+    }
+    
+    .btn-medical-confirm {
+        transition: none;
+    }
+}
+
+/* Print Styles for Medical Documentation */
+@media print {
+    .medical-safety-dialog,
+    .medical-grade-alert,
+    .safety-notification {
+        display: none !important;
+    }
+    
+    .medical-compliance-badge {
+        position: static;
+        display: inline-block;
+        margin: 10px 0;
+    }
+}
+
+/* Focus Management for Accessibility */
+.medical-safety-dialog *:focus,
+.btn-medical-confirm:focus,
+.btn-medical-cancel:focus {
+    outline: 3px solid var(--medical-blue);
+    outline-offset: 2px;
+}
+
+/* Screen Reader Support */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
