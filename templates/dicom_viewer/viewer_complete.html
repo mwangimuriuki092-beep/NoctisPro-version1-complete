@@ -3759,6 +3759,11 @@
     <!-- Medical-Grade Safety System -->
     <script src="{% static 'js/medical-grade-button-safety.js' %}"></script>
     
+    <!-- Medical-Grade Functionality Test (Development Only) -->
+    {% if settings.DEBUG %}
+    <script src="{% static 'js/medical-grade-functionality-test.js' %}"></script>
+    {% endif %}
+    
     <!-- Medical Compliance Badge -->
     <div class="medical-compliance-badge">
         <i class="fas fa-shield-check"></i>

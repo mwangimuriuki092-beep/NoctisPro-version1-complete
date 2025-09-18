@@ -21,6 +21,7 @@ class MedicalGradeButtonSafety {
     }
 
     init() {
+        this.ensureCompatibility();
         this.setupSafetyMonitoring();
         this.implementDoubleClickProtection();
         this.setupCriticalOperationConfirmation();
@@ -35,12 +36,18 @@ class MedicalGradeButtonSafety {
      */
     setupSafetyMonitoring() {
         // Monitor all button interactions for safety compliance
+        // Use capture phase for critical operations, bubbling for basic logging
         document.addEventListener('click', (event) => {
             const button = event.target.closest('[data-tool], .btn-dicom-viewer');
             if (button) {
-                this.performSafetyCheck(button, event);
+                // Only perform safety checks that might prevent operation
+                // Don't interfere with basic viewing functionality
+                const safetyCheckResult = this.performSafetyCheck(button, event);
+                
+                // If safety check failed, the event has already been prevented
+                // If it passed, let the original handlers run normally
             }
-        });
+        }, false); // Use bubbling phase for non-critical monitoring
 
         // Continuous safety monitoring
         setInterval(() => {
@@ -52,6 +59,7 @@ class MedicalGradeButtonSafety {
      * IEC 62304 Risk Control Measure - Prevent Accidental Operations
      */
     implementDoubleClickProtection() {
+        // Only protect truly critical operations that could impact patient safety
         const protectedButtons = document.querySelectorAll('[data-tool="ai"], [data-tool="print"], [data-tool="export"]');
         
         protectedButtons.forEach(button => {
@@ -89,6 +97,7 @@ class MedicalGradeButtonSafety {
         this.criticalOperations.forEach(operation => {
             const button = document.querySelector(`[data-tool="${operation}"]`);
             if (button) {
+                // Use capture phase to intercept before other handlers
                 button.addEventListener('click', (event) => {
                     if (!this.userConfirmations.has(operation)) {
                         event.preventDefault();
@@ -96,7 +105,8 @@ class MedicalGradeButtonSafety {
                         this.requestCriticalOperationConfirmation(operation, button);
                         return false;
                     }
-                });
+                    // If confirmation exists, allow the original handler to proceed
+                }, true); // Use capture phase
             }
         });
     }
@@ -400,12 +410,22 @@ class MedicalGradeButtonSafety {
     performSafetyCheck(button, event) {
         const tool = button.dataset.tool || 'unknown';
         
-        // Check if user is authenticated and authorized
+        // Only perform strict safety checks for critical operations
+        // Allow basic viewing operations (window, zoom, pan, reset) to work normally
+        const basicViewingTools = ['window', 'zoom', 'pan', 'reset', 'crosshair', 'invert'];
+        
+        if (basicViewingTools.includes(tool)) {
+            // Just log the interaction, don't interfere with functionality
+            this.logBasicInteraction(tool, button);
+            return true; // Allow operation to proceed normally
+        }
+        
+        // Check if user is authenticated and authorized for critical operations
         if (!this.isUserAuthorized()) {
             event.preventDefault();
             this.showMedicalGradeAlert(
                 'Authorization Required',
-                'You must be logged in as a qualified healthcare professional to use medical imaging tools.',
+                'You must be logged in as a qualified healthcare professional to use advanced medical tools.',
                 'error'
             );
             return false;
@@ -422,7 +442,7 @@ class MedicalGradeButtonSafety {
             return false;
         }
 
-        // Perform tool-specific safety checks
+        // Perform tool-specific safety checks only for critical operations
         return this.performToolSpecificSafetyCheck(tool, button, event);
     }
 
@@ -438,6 +458,31 @@ class MedicalGradeButtonSafety {
             default:
                 return true; // Allow non-critical operations
         }
+    }
+
+    logBasicInteraction(tool, button) {
+        // Lightweight logging for basic viewing operations
+        // Don't interfere with functionality, just maintain audit trail
+        const logEntry = {
+            tool: tool,
+            timestamp: new Date().toISOString(),
+            type: 'basic_interaction',
+            button_id: button.id || 'unknown'
+        };
+        
+        // Store in a lightweight way that doesn't block the UI
+        if (window.console) {
+            console.log(`Medical Audit: Basic tool interaction - ${tool}`);
+        }
+        
+        // Add to audit queue for later processing (non-blocking)
+        setTimeout(() => {
+            try {
+                this.logAuditEvent('BUTTON_INTERACTION', `Basic tool: ${tool}`, 'INFO', logEntry);
+            } catch (e) {
+                // Silently fail to avoid disrupting viewer functionality
+            }
+        }, 0);
     }
 
     validateMeasurementOperation(button, event) {
@@ -531,6 +576,20 @@ class MedicalGradeButtonSafety {
     isUserAuthorized() {
         // Implementation would check user credentials and roles
         return document.querySelector('meta[name="user-authenticated"]')?.content === 'true';
+    }
+
+    // Compatibility check for existing DICOM viewer functions
+    ensureCompatibility() {
+        // Check if there are existing global functions and preserve them
+        if (typeof window.setTool === 'function') {
+            this.originalSetTool = window.setTool;
+        }
+        if (typeof window.resetView === 'function') {
+            this.originalResetView = window.resetView;
+        }
+        if (typeof window.toggleCrosshair === 'function') {
+            this.originalToggleCrosshair = window.toggleCrosshair;
+        }
     }
 
     isImageCalibrated() {
