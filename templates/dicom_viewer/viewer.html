@@ -802,6 +802,94 @@
             background: #00b8d4;
             border-color: #00b8d4;
         }
+
+        /* Dialog Styles */
+        .print-dialog-overlay, .export-dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .print-dialog, .export-dialog {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .print-dialog-header, .export-dialog-header {
+            background: var(--header-bg);
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .print-dialog-header h4, .export-dialog-header h4 {
+            margin: 0;
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-close:hover {
+            color: var(--text-primary);
+        }
+
+        .print-dialog-body, .export-dialog-body {
+            padding: 20px;
+        }
+
+        .print-option, .export-option {
+            margin-bottom: 15px;
+        }
+
+        .print-option label, .export-option label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .print-option small, .export-option small {
+            display: block;
+            margin-left: 24px;
+            margin-top: 4px;
+            color: var(--text-muted);
+        }
+
+        .print-dialog-footer, .export-dialog-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
     </style>
 </head>
 <body>
@@ -2519,12 +2607,125 @@
             }
         }
 
-        function exportSeries() {
+        async function exportSeries() {
             if (!images || images.length === 0) {
                 showToast('No series loaded', 'warning');
                 return;
             }
-            showToast('Series export functionality implemented', 'info');
+            
+            if (!currentSeries) {
+                showToast('No series metadata available', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Preparing series export...');
+                
+                // Create export options dialog
+                const exportDialog = document.createElement('div');
+                exportDialog.className = 'export-dialog-overlay';
+                exportDialog.innerHTML = `
+                    <div class="export-dialog">
+                        <div class="export-dialog-header">
+                            <h4><i class="fas fa-download me-2"></i>Export DICOM Series</h4>
+                            <button onclick="closeExportDialog()" class="btn-close">×</button>
+                        </div>
+                        <div class="export-dialog-body">
+                            <div class="export-option">
+                                <label><input type="radio" name="exportFormat" value="dicom" checked> Original DICOM Files</label>
+                                <small class="text-muted">Export original DICOM files with all metadata</small>
+                            </div>
+                            <div class="export-option">
+                                <label><input type="radio" name="exportFormat" value="png"> PNG Images</label>
+                                <small class="text-muted">Export as PNG images with current window/level</small>
+                            </div>
+                            <div class="export-option">
+                                <label><input type="radio" name="exportFormat" value="jpeg"> JPEG Images</label>
+                                <small class="text-muted">Export as JPEG images (compressed)</small>
+                            </div>
+                            <div class="export-option">
+                                <label><input type="checkbox" id="includeMetadata" checked> Include Metadata File</label>
+                                <small class="text-muted">Export study/series information as JSON</small>
+                            </div>
+                            <div class="export-option">
+                                <label><input type="checkbox" id="includeMeasurementsExport" ${measurements.length > 0 ? 'checked' : ''}> Include Measurements</label>
+                                <small class="text-muted">Export measurement data (${measurements.length} measurements)</small>
+                            </div>
+                        </div>
+                        <div class="export-dialog-footer">
+                            <button onclick="executeSeriesExport()" class="btn btn-primary">
+                                <i class="fas fa-download me-1"></i>Export Series
+                            </button>
+                            <button onclick="closeExportDialog()" class="btn btn-outline-secondary">Cancel</button>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(exportDialog);
+                hideLoading();
+                
+            } catch (error) {
+                hideLoading();
+                showToast(`Export preparation failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function closeExportDialog() {
+            const dialog = document.querySelector('.export-dialog-overlay');
+            if (dialog) dialog.remove();
+        }
+        
+        async function executeSeriesExport() {
+            const format = document.querySelector('input[name="exportFormat"]:checked')?.value;
+            const includeMetadata = document.getElementById('includeMetadata')?.checked;
+            const includeMeasurementsExport = document.getElementById('includeMeasurementsExport')?.checked;
+            
+            try {
+                showLoading('Exporting series...');
+                
+                const exportRequest = {
+                    series_id: currentSeries.id,
+                    format: format,
+                    include_metadata: includeMetadata,
+                    include_measurements: includeMeasurementsExport,
+                    measurements: measurements,
+                    annotations: annotations,
+                    window_width: windowWidth,
+                    window_level: windowLevel
+                };
+                
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/export/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': DicomViewerUtils.getCSRFToken(),
+                    },
+                    body: JSON.stringify(exportRequest)
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `series_${currentSeries.id}_export.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showToast('Series exported successfully', 'success');
+                    closeExportDialog();
+                } else {
+                    throw new Error(`Export failed: ${response.statusText}`);
+                }
+                
+            } catch (error) {
+                showToast(`Series export failed: ${error.message}`, 'error');
+            } finally {
+                hideLoading();
+            }
         }
 
         function printCurrentImage() {
@@ -2802,12 +3003,59 @@
             return await runAIAnalysis(type);
         }
 
-        function runQuickAI() {
-            showToast('Running quick AI scan...', 'info');
+        async function runQuickAI() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Running quick AI analysis...');
+                
+                const response = await fetch(`/ai-analysis/api/quick-scan/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': DicomViewerUtils.getCSRFToken(),
+                    },
+                    body: JSON.stringify({
+                        series_id: currentSeries.id,
+                        analysis_type: 'quick_scan',
+                        parameters: {
+                            window_width: windowWidth,
+                            window_level: windowLevel,
+                            current_slice: currentImageIndex
+                        }
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    displayAIResults(result, 'quick_scan');
+                    showToast('Quick AI analysis completed', 'success');
+                } else {
+                    throw new Error(`Quick AI failed: ${response.statusText}`);
+                }
+                
+            } catch (error) {
+                showToast(`Quick AI analysis failed: ${error.message}`, 'error');
+            } finally {
+                hideLoading();
+            }
         }
 
         function showAIResults() {
-            showToast('AI results panel opened', 'info');
+            const aiResultsPanel = document.getElementById('aiResultsPanel');
+            if (aiResultsPanel) {
+                aiResultsPanel.scrollIntoView({ behavior: 'smooth' });
+                aiResultsPanel.style.border = '2px solid var(--accent-color)';
+                setTimeout(() => {
+                    aiResultsPanel.style.border = '1px solid var(--border-color)';
+                }, 2000);
+                showToast('AI results panel focused', 'info');
+            } else {
+                showToast('No AI results available yet. Run an AI analysis first.', 'warning');
+            }
         }
 
         function exportCurrentImage() {
