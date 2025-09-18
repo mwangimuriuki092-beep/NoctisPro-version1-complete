@@ -1,0 +1,363 @@
+/**
+ * WebSocket UI Styles for NoctisPro PACS
+ * Real-time chat and notifications styling
+ */
+
+/* Connection Status Indicator */
+.connection-status {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+.connection-status.connected {
+    background: #00ff88;
+    color: #000;
+}
+
+.connection-status.disconnected {
+    background: #ff4444;
+    color: #fff;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Notifications Container */
+.notifications-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 350px;
+}
+
+.notification {
+    background: var(--card-surface, #252525);
+    border: 1px solid var(--border-color, #404040);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    padding: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease-out;
+    position: relative;
+    overflow: hidden;
+}
+
+.notification::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--accent-color, #00d4ff);
+}
+
+.notification-info::before {
+    background: #00d4ff;
+}
+
+.notification-success::before {
+    background: #00ff88;
+}
+
+.notification-warning::before {
+    background: #ffaa00;
+}
+
+.notification-error::before {
+    background: #ff4444;
+}
+
+.notification-content {
+    color: var(--text-primary, #ffffff);
+}
+
+.notification-content strong {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.notification-content p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text-secondary, #b3b3b3);
+}
+
+.notification-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--text-muted, #666666);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.notification-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary, #ffffff);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Typing Indicators */
+.typing-indicators {
+    padding: 10px 15px;
+    background: var(--secondary-bg, #1a1a1a);
+    border-top: 1px solid var(--border-color, #404040);
+    min-height: 40px;
+}
+
+.typing-indicator {
+    color: var(--text-muted, #666666);
+    font-style: italic;
+    font-size: 12px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.typing-indicator::after {
+    content: '';
+    animation: dots 1.5s infinite;
+}
+
+@keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Chat Message Enhancements */
+.message {
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    background: var(--card-surface, #252525);
+    border-radius: 8px;
+    border-left: 3px solid var(--accent-color, #00d4ff);
+    animation: messageSlideIn 0.3s ease-out;
+}
+
+.message.own-message {
+    border-left-color: #00ff88;
+    background: rgba(0, 255, 136, 0.1);
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.message-header strong {
+    color: var(--accent-color, #00d4ff);
+    font-size: 14px;
+}
+
+.message-time {
+    color: var(--text-muted, #666666);
+    font-size: 11px;
+}
+
+.message-content {
+    color: var(--text-primary, #ffffff);
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
+.message-reactions {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.message-reaction {
+    background: rgba(0, 212, 255, 0.2);
+    border: 1px solid var(--accent-color, #00d4ff);
+    border-radius: 12px;
+    padding: 2px 6px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.message-reaction:hover {
+    background: rgba(0, 212, 255, 0.3);
+}
+
+.message-reaction.own-reaction {
+    background: rgba(0, 255, 136, 0.3);
+    border-color: #00ff88;
+}
+
+@keyframes messageSlideIn {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* WebSocket Status Banner */
+.websocket-status-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #ff4444;
+    color: white;
+    text-align: center;
+    padding: 10px;
+    z-index: 10000;
+    transform: translateY(-100%);
+    transition: transform 0.3s ease;
+}
+
+.websocket-status-banner.show {
+    transform: translateY(0);
+}
+
+.websocket-status-banner.reconnecting {
+    background: #ffaa00;
+}
+
+.websocket-status-banner.connected {
+    background: #00ff88;
+    color: #000;
+}
+
+/* Online Users List */
+.online-users {
+    background: var(--secondary-bg, #1a1a1a);
+    border-left: 1px solid var(--border-color, #404040);
+    padding: 15px;
+    min-width: 200px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+.online-users h3 {
+    color: var(--text-primary, #ffffff);
+    font-size: 16px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color, #404040);
+}
+
+.online-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    color: var(--text-secondary, #b3b3b3);
+    font-size: 14px;
+}
+
+.online-user::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: #00ff88;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.online-user.away::before {
+    background: #ffaa00;
+}
+
+.online-user.offline::before {
+    background: #666666;
+}
+
+/* Message Input Enhancements */
+.message-input-container {
+    position: relative;
+}
+
+.message-input-container.typing::after {
+    content: 'Typing...';
+    position: absolute;
+    top: -20px;
+    left: 10px;
+    font-size: 11px;
+    color: var(--text-muted, #666666);
+    font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .notifications-container {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+    }
+    
+    .online-users {
+        display: none;
+    }
+    
+    .connection-status {
+        top: 5px;
+        right: 5px;
+        font-size: 10px;
+        padding: 3px 8px;
+    }
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+    .notification {
+        background: #1a1a1a;
+        border-color: #333;
+    }
+    
+    .message {
+        background: #1a1a1a;
+    }
+}

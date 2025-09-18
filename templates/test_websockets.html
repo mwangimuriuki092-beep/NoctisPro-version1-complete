@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+
+{% block title %}WebSocket Test - Noctis Pro PACS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card bg-dark text-white">
+                <div class="card-header">
+                    <h4><i class="fas fa-wifi me-2"></i>WebSocket Connection Test</h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Connection Status:</label>
+                        <div id="ws-status" class="badge bg-warning">Disconnected</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Protocol:</label>
+                        <div id="ws-protocol" class="text-muted">Not connected</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">WebSocket URL:</label>
+                        <div id="ws-url" class="text-muted small">Not connected</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <button id="connect-btn" class="btn btn-primary me-2">Connect</button>
+                        <button id="disconnect-btn" class="btn btn-secondary me-2" disabled>Disconnect</button>
+                        <button id="test-notification-btn" class="btn btn-success" disabled>Test Notification</button>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="test-message" class="form-label">Test Message:</label>
+                        <div class="input-group">
+                            <input type="text" id="test-message" class="form-control bg-dark text-white border-secondary" 
+                                   placeholder="Enter test message..." value="Hello from WebSocket test!">
+                            <button id="send-test-btn" class="btn btn-primary" disabled>Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card bg-dark text-white">
+                <div class="card-header">
+                    <h5><i class="fas fa-list me-2"></i>Connection Log</h5>
+                    <button id="clear-log-btn" class="btn btn-sm btn-outline-light float-end">Clear</button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="connection-log" class="p-3" style="height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px;">
+                        <div class="text-muted">Connection log will appear here...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card bg-dark text-white">
+                <div class="card-header">
+                    <h5><i class="fas fa-bell me-2"></i>Received Messages</h5>
+                    <button id="clear-messages-btn" class="btn btn-sm btn-outline-light float-end">Clear</button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="received-messages" class="p-3" style="min-height: 200px; max-height: 400px; overflow-y: auto;">
+                        <div class="text-muted">Received messages will appear here...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let testSocket = null;
+    const wsStatus = document.getElementById('ws-status');
+    const wsProtocol = document.getElementById('ws-protocol');
+    const wsUrl = document.getElementById('ws-url');
+    const connectBtn = document.getElementById('connect-btn');
+    const disconnectBtn = document.getElementById('disconnect-btn');
+    const testNotificationBtn = document.getElementById('test-notification-btn');
+    const sendTestBtn = document.getElementById('send-test-btn');
+    const testMessage = document.getElementById('test-message');
+    const connectionLog = document.getElementById('connection-log');
+    const receivedMessages = document.getElementById('received-messages');
+    const clearLogBtn = document.getElementById('clear-log-btn');
+    const clearMessagesBtn = document.getElementById('clear-messages-btn');
+    
+    function log(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry text-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'}`;
+        logEntry.innerHTML = `<span class="text-muted">[${timestamp}]</span> ${message}`;
+        connectionLog.appendChild(logEntry);
+        connectionLog.scrollTop = connectionLog.scrollHeight;
+    }
+    
+    function displayMessage(data) {
+        const timestamp = new Date().toLocaleTimeString();
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'border-bottom pb-2 mb-2';
+        messageDiv.innerHTML = `
+            <div class="d-flex justify-content-between">
+                <strong class="text-primary">${data.type || 'message'}</strong>
+                <small class="text-muted">${timestamp}</small>
+            </div>
+            <div class="mt-1">${JSON.stringify(data, null, 2)}</div>
+        `;
+        receivedMessages.appendChild(messageDiv);
+        receivedMessages.scrollTop = receivedMessages.scrollHeight;
+    }
+    
+    function updateStatus(status, isConnected) {
+        wsStatus.textContent = status;
+        wsStatus.className = `badge bg-${isConnected ? 'success' : 'danger'}`;
+        connectBtn.disabled = isConnected;
+        disconnectBtn.disabled = !isConnected;
+        testNotificationBtn.disabled = !isConnected;
+        sendTestBtn.disabled = !isConnected;
+    }
+    
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        const userId = document.body.getAttribute('data-user-id');
+        
+        if (!userId) {
+            log('Error: User ID not found. Please log in.', 'error');
+            return;
+        }
+        
+        const url = `${protocol}//${host}/ws/notifications/${userId}/`;
+        
+        log(`Attempting to connect to: ${url}`);
+        wsProtocol.textContent = protocol.toUpperCase();
+        wsUrl.textContent = url;
+        
+        testSocket = new WebSocket(url);
+        
+        testSocket.onopen = function(event) {
+            log('WebSocket connected successfully!', 'success');
+            updateStatus('Connected', true);
+        };
+        
+        testSocket.onmessage = function(event) {
+            log('Message received', 'success');
+            try {
+                const data = JSON.parse(event.data);
+                displayMessage(data);
+            } catch (e) {
+                displayMessage({ raw: event.data, error: 'Invalid JSON' });
+            }
+        };
+        
+        testSocket.onclose = function(event) {
+            log(`WebSocket closed: ${event.code} - ${event.reason || 'No reason provided'}`, 'error');
+            updateStatus('Disconnected', false);
+        };
+        
+        testSocket.onerror = function(error) {
+            log('WebSocket error occurred', 'error');
+            console.error('WebSocket error:', error);
+        };
+    }
+    
+    function disconnectWebSocket() {
+        if (testSocket) {
+            testSocket.close();
+            log('WebSocket disconnected by user', 'info');
+        }
+    }
+    
+    function sendTestMessage() {
+        if (testSocket && testSocket.readyState === WebSocket.OPEN) {
+            const message = testMessage.value.trim();
+            if (message) {
+                const data = {
+                    type: 'test',
+                    message: message,
+                    timestamp: new Date().toISOString()
+                };
+                testSocket.send(JSON.stringify(data));
+                log(`Sent test message: ${message}`, 'success');
+            }
+        } else {
+            log('WebSocket not connected', 'error');
+        }
+    }
+    
+    function sendTestNotification() {
+        // This would typically be done via an API call to trigger a server-side notification
+        fetch('/api/test-notification/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrf-token]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                type: 'test',
+                message: 'This is a test notification from the WebSocket test page'
+            })
+        }).then(response => {
+            if (response.ok) {
+                log('Test notification sent successfully', 'success');
+            } else {
+                log('Failed to send test notification', 'error');
+            }
+        }).catch(error => {
+            log('Error sending test notification: ' + error.message, 'error');
+        });
+    }
+    
+    // Event listeners
+    connectBtn.addEventListener('click', connectWebSocket);
+    disconnectBtn.addEventListener('click', disconnectWebSocket);
+    sendTestBtn.addEventListener('click', sendTestMessage);
+    testNotificationBtn.addEventListener('click', sendTestNotification);
+    
+    testMessage.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendTestMessage();
+        }
+    });
+    
+    clearLogBtn.addEventListener('click', function() {
+        connectionLog.innerHTML = '<div class="text-muted">Connection log cleared...</div>';
+    });
+    
+    clearMessagesBtn.addEventListener('click', function() {
+        receivedMessages.innerHTML = '<div class="text-muted">Messages cleared...</div>';
+    });
+    
+    // Auto-connect if user is logged in
+    if (document.body.getAttribute('data-user-id')) {
+        log('Auto-connecting WebSocket...', 'info');
+        setTimeout(connectWebSocket, 1000);
+    } else {
+        log('User not logged in - please log in to test WebSocket', 'error');
+    }
+});
+</script>
+{% endblock %}

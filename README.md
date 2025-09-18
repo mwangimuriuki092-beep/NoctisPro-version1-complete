@@ -2,31 +2,64 @@
 
 A comprehensive Django-based Picture Archiving and Communication System (PACS) for medical imaging with AI analysis capabilities.
 
-## Quick Deployment (Ubuntu Server 24.04)
+## 🚀 Deployment Options
 
-### One-Command Deployment
+NoctisPro PACS offers multiple deployment configurations to suit different needs:
 
-#### Native Deployment (Tailscale + Systemd)
+### 1. 🌐 Internet Access with HTTPS (Recommended for Production)
+**Best for**: Production environments, multi-location access, DICOM device integration
+```bash
+export DOMAIN_NAME="pacs.yourdomain.com"
+export ADMIN_EMAIL="admin@yourdomain.com"
+./deploy_internet_https.sh
+```
+- ✅ Public internet access via HTTPS
+- ✅ Let's Encrypt SSL certificates
+- ✅ Production-grade security
+- ✅ DICOM device connectivity
+- ✅ Multi-user access from anywhere
+
+### 2. 🔒 Private Network via Tailscale
+**Best for**: Secure private networks, remote teams, VPN-like access
+```bash
+export TAILSCALE_AUTH_KEY="your-tailscale-key"
+export TAILNET_HOSTNAME="noctispro"
+./deploy_docker_tailscale.sh
+```
+- ✅ Zero-trust network access
+- ✅ End-to-end encryption
+- ✅ No public IP required
+- ✅ Easy multi-device access
+- ✅ Built-in authentication
+
+### 3. 🏠 Local Development
+**Best for**: Development, testing, single-machine setups
 ```bash
 ./deploy_noctispro.sh
 ```
+- ✅ Quick local setup
+- ✅ Development-friendly
+- ✅ No external dependencies
+- ✅ Ideal for testing
 
-With custom hostname:
+## Quick Deployment (Ubuntu Server 24.04)
+
+### Internet HTTPS Deployment
 ```bash
-TAILNET_HOSTNAME=my-pacs ./deploy_noctispro.sh
+# Set your domain and email
+export DOMAIN_NAME="pacs.yourdomain.com"
+export ADMIN_EMAIL="admin@yourdomain.com"
+
+# Deploy with HTTPS
+./deploy_internet_https.sh
 ```
 
-With Tailscale auth key for automated setup:
+### Tailscale Private Network Deployment
 ```bash
-TAILSCALE_AUTH_KEY=your_auth_key TAILNET_HOSTNAME=noctispro ./deploy_noctispro.sh
-```
+# With Tailscale auth key for automated setup
+TAILSCALE_AUTH_KEY=your_auth_key TAILNET_HOSTNAME=noctispro ./deploy_docker_tailscale.sh
 
-#### Docker Deployment (Tailscale + Containers)
-```bash
-# Quick Docker deployment
-./deploy_docker_tailscale.sh
-
-# Or manually with Docker Compose
+# Or manual Docker deployment
 cp .env.docker .env
 # Edit .env with your Tailscale auth key
 docker-compose up -d

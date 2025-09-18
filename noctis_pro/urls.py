@@ -25,6 +25,8 @@ from worklist import views as worklist_views  # ENABLED
 from django.views.generic.base import RedirectView
 from . import views
 from . import health as health_views
+from system_status_view import system_status
+from django.shortcuts import render
 
 def home_redirect(request):
     """Redirect home page to login for fresh authentication"""
@@ -59,7 +61,9 @@ urlpatterns = [
     path('admin-panel/', include('admin_panel.urls')),
     path('chat/', include('chat.urls')),
     path('notifications/', include('notifications.urls')),
-    path('ai/', include('ai_analysis.urls'))
+    path('ai/', include('ai_analysis.urls')),
+    path('system-status/', system_status, name='system_status'),
+    path('dicom-test/', lambda request: render(request, 'dicom_viewer_test.html'), name='dicom_test')
 ]
 
 # Serve media files during development and production (for ngrok deployment)

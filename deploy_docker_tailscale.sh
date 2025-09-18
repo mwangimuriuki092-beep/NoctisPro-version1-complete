@@ -83,9 +83,9 @@ setup_environment() {
         log "Creating .env file..."
         
         cat > .env << EOF
-# NoctisPro PACS Docker Configuration with Tailscale
+# NoctisPro PACS Docker Configuration with Tailscale - Public Network Access
 
-# Tailscale Configuration
+# Tailscale Configuration for Public Access
 TAILSCALE_AUTH_KEY=${TAILSCALE_AUTH_KEY}
 TAILNET_HOSTNAME=${TAILNET_HOSTNAME}
 
@@ -99,14 +99,22 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 # Build Configuration
 BUILD_TARGET=production
 
-# Security Settings
-ALLOWED_HOSTS=${TAILNET_HOSTNAME},localhost,127.0.0.1,*.ts.net,100.*
+# Network Configuration - Public Access through Tailnet
+NETWORK_MODE=public
+USE_TAILNET=true
+
+# Security Settings - Public Network Compatible
+ALLOWED_HOSTS=${TAILNET_HOSTNAME},*.ts.net,100.*,*
 
 # AI Configuration
 ENABLE_AI_PROCESSING=true
 
 # Logging Level
 LOG_LEVEL=INFO
+
+# Public Access Configuration
+PUBLIC_NETWORK_ACCESS=true
+TAILNET_PUBLIC_MODE=true
 EOF
         
         log "Environment file created successfully!"
@@ -156,15 +164,18 @@ show_access_info() {
     TAILSCALE_IP=$(docker exec noctis_tailscale tailscale ip -4 2>/dev/null || echo "")
     
     echo
-    info "=== Access Information ==="
+    info "=== Public Network Access Information ==="
     if [[ -n "$TAILSCALE_IP" ]]; then
-        echo -e "${GREEN}🌐 Application URL: http://$TAILSCALE_IP:8080${NC}"
-        echo -e "${GREEN}🌐 Hostname URL: http://$TAILNET_HOSTNAME:8080${NC}"
+        echo -e "${GREEN}🌐 Public Application URL: http://$TAILSCALE_IP:8080${NC}"
+        echo -e "${GREEN}🌐 Public Hostname URL: http://$TAILNET_HOSTNAME:8080${NC}"
         echo -e "${GREEN}👤 Admin Login: admin / admin123${NC}"
-        echo -e "${GREEN}📊 Admin Panel: http://$TAILSCALE_IP:8080/admin/${NC}"
-        echo -e "${GREEN}🏥 Worklist: http://$TAILSCALE_IP:8080/worklist/${NC}"
-        echo -e "${GREEN}🤖 AI Dashboard: http://$TAILSCALE_IP:8080/ai/${NC}"
-        echo -e "${GREEN}🔬 DICOM Viewer: http://$TAILSCALE_IP:8080/dicom-viewer/${NC}"
+        echo -e "${GREEN}📊 Public Admin Panel: http://$TAILSCALE_IP:8080/admin/${NC}"
+        echo -e "${GREEN}🏥 Public Worklist: http://$TAILSCALE_IP:8080/worklist/${NC}"
+        echo -e "${GREEN}🤖 Public AI Dashboard: http://$TAILSCALE_IP:8080/ai/${NC}"
+        echo -e "${GREEN}🔬 Public DICOM Viewer: http://$TAILSCALE_IP:8080/dicom-viewer/${NC}"
+        echo -e "${GREEN}🗄️  Public Database: $TAILSCALE_IP:5432${NC}"
+        echo -e "${GREEN}🔄 Public Redis: $TAILSCALE_IP:6379${NC}"
+        echo -e "${GREEN}🏥 Public DICOM Port: $TAILSCALE_IP:11112${NC}"
     else
         echo -e "${YELLOW}⚠️  Tailscale IP not available yet. Services may still be starting.${NC}"
         echo -e "${BLUE}ℹ️  Check status: docker exec noctis_tailscale tailscale status${NC}"
@@ -198,14 +209,22 @@ main() {
     echo
     log "🎉 NoctisPro PACS deployed successfully with Docker and Tailscale!"
     log "🔗 Your medical imaging system is now accessible via your Tailnet"
+    log "🌐 Services are available through secure Tailscale network"
+    
+    echo
+    info "Alternative Deployment Options:"
+    echo "• For internet access with HTTPS: ./deploy_internet_https.sh"
+    echo "• For local development: ./deploy_noctispro.sh"
     
     echo
     info "Next Steps:"
     echo "1. Wait for Tailscale authentication if needed"
-    echo "2. Access the application via the URLs shown above"
+    echo "2. Access the application via the public URLs shown above"
     echo "3. Login with admin / admin123"
     echo "4. Upload DICOM studies to test AI analysis"
     echo "5. Check AI dashboard at /ai/"
+    echo "6. Connect external DICOM devices to public DICOM port"
+    echo "7. Access database and Redis from external applications if needed"
     
     if [[ -z "$TAILSCALE_AUTH_KEY" ]]; then
         echo

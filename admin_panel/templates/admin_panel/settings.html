@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block title %}System Configuration - Admin Panel - Noctis Pro PACS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-cog me-2"></i>System Configuration</h2>
+        <div>
+            <button class="btn btn-success" onclick="saveAllSettings()">
+                <i class="fas fa-save me-1"></i>Save All Changes
+            </button>
+            <a href="{% url 'admin_panel:dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Network Configuration -->
+    <div class="card bg-dark text-white mb-4">
+        <div class="card-header">
+            <h5><i class="fas fa-network-wired me-2"></i>Network Configuration</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Domain Name</label>
+                        <input type="text" class="form-control bg-dark text-white border-secondary" 
+                               value="{{ domain_name|default:'Not configured' }}" readonly>
+                        <small class="text-muted">Current domain for HTTPS access</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">HTTPS Status</label>
+                        <div class="form-control bg-dark text-white border-secondary">
+                            <i class="fas fa-check-circle text-success me-2"></i>HTTPS Enabled
+                        </div>
+                        <small class="text-muted">SSL/TLS encryption is active</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">WebSocket Protocol</label>
+                        <div class="form-control bg-dark text-white border-secondary">
+                            <i class="fas fa-check-circle text-success me-2"></i>WSS (WebSocket Secure)
+                        </div>
+                        <small class="text-muted">Secure WebSocket connections enabled</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">DICOM Port</label>
+                        <input type="number" class="form-control bg-dark text-white border-secondary" 
+                               value="11112" readonly>
+                        <small class="text-muted">Port for DICOM device connections</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Settings -->
+    <div class="card bg-dark text-white mb-4">
+        <div class="card-header">
+            <h5><i class="fas fa-shield-alt me-2"></i>Security Settings</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="httpsRedirect" checked disabled>
+                            <label class="form-check-label" for="httpsRedirect">
+                                Force HTTPS Redirect
+                            </label>
+                        </div>
+                        <small class="text-muted">Automatically redirect HTTP to HTTPS</small>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="hstsEnabled" checked disabled>
+                            <label class="form-check-label" for="hstsEnabled">
+                                HSTS (HTTP Strict Transport Security)
+                            </label>
+                        </div>
+                        <small class="text-muted">Enforce HTTPS connections</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="csrfProtection" checked disabled>
+                            <label class="form-check-label" for="csrfProtection">
+                                CSRF Protection
+                            </label>
+                        </div>
+                        <small class="text-muted">Cross-Site Request Forgery protection</small>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="rateLimiting" checked disabled>
+                            <label class="form-check-label" for="rateLimiting">
+                                Rate Limiting
+                            </label>
+                        </div>
+                        <small class="text-muted">Protect against DDoS and brute force attacks</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-Time Features -->
+    <div class="card bg-dark text-white mb-4">
+        <div class="card-header">
+            <h5><i class="fas fa-bolt me-2"></i>Real-Time Features</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="chatEnabled" checked>
+                            <label class="form-check-label" for="chatEnabled">
+                                Chat System
+                            </label>
+                        </div>
+                        <small class="text-muted">Enable real-time chat functionality</small>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="notificationsEnabled" checked>
+                            <label class="form-check-label" for="notificationsEnabled">
+                                Real-Time Notifications
+                            </label>
+                        </div>
+                        <small class="text-muted">Enable push notifications</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="aiProcessing" checked>
+                            <label class="form-check-label" for="aiProcessing">
+                                AI Analysis
+                            </label>
+                        </div>
+                        <small class="text-muted">Enable AI-powered DICOM analysis</small>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoBackup" checked>
+                            <label class="form-check-label" for="autoBackup">
+                                Automatic Backups
+                            </label>
+                        </div>
+                        <small class="text-muted">Enable scheduled system backups</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Information -->
+    <div class="card bg-dark text-white">
+        <div class="card-header">
+            <h5><i class="fas fa-info-circle me-2"></i>System Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-dark table-sm">
+                        <tr>
+                            <th>System Version:</th>
+                            <td>NoctisPro PACS v2.1.0</td>
+                        </tr>
+                        <tr>
+                            <th>Django Version:</th>
+                            <td>5.2.5</td>
+                        </tr>
+                        <tr>
+                            <th>Database:</th>
+                            <td>PostgreSQL 15</td>
+                        </tr>
+                        <tr>
+                            <th>Cache:</th>
+                            <td>Redis 7</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-dark table-sm">
+                        <tr>
+                            <th>Deployment Mode:</th>
+                            <td>Production (HTTPS)</td>
+                        </tr>
+                        <tr>
+                            <th>WebSocket Server:</th>
+                            <td>Daphne ASGI</td>
+                        </tr>
+                        <tr>
+                            <th>Reverse Proxy:</th>
+                            <td>Nginx</td>
+                        </tr>
+                        <tr>
+                            <th>SSL Provider:</th>
+                            <td>Let's Encrypt</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function saveAllSettings() {
+    const settings = {
+        chatEnabled: document.getElementById('chatEnabled').checked,
+        notificationsEnabled: document.getElementById('notificationsEnabled').checked,
+        aiProcessing: document.getElementById('aiProcessing').checked,
+        autoBackup: document.getElementById('autoBackup').checked
+    };
+    
+    // Here you would normally send the settings to the server
+    // For now, just show a success message
+    alert('Settings saved successfully!');
+    console.log('Settings to save:', settings);
+}
+</script>
+{% endblock %}

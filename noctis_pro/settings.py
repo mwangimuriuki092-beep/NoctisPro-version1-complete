@@ -25,30 +25,39 @@ import os
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6t@n5q8r7y#3e$6u9i%m&o^2d1f0g')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-# Tailscale detection for automatic configuration
+# Internet and network configuration
+DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'localhost')
+USE_HTTPS = os.environ.get('USE_HTTPS', 'true').lower() == 'true'
+INTERNET_ACCESS = os.environ.get('INTERNET_ACCESS', 'false').lower() == 'true'
+
+# Tailscale configuration (optional)
 TAILSCALE_HOSTNAME = os.environ.get('TAILNET_HOSTNAME', 'noctispro')
-IS_TAILNET = True  # Always use Tailnet
+IS_TAILNET = os.environ.get('USE_TAILNET', 'false').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+# Configure allowed hosts for internet access
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 
-# Add Tailscale and deployment specific hosts
+# Add internet domain hosts
 ALLOWED_HOSTS.extend([
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
-    TAILSCALE_HOSTNAME,
-    '*.ts.net',  # Tailscale MagicDNS
-    '100.*',     # Tailscale IP range
+    DOMAIN_NAME,
+    f'www.{DOMAIN_NAME}',
 ])
 
-# Add Tailscale hostname if different from default
-if TAILSCALE_HOSTNAME != 'noctispro':
-    ALLOWED_HOSTS.append(TAILSCALE_HOSTNAME)
+# Add Tailscale hosts if enabled
+if IS_TAILNET:
+    ALLOWED_HOSTS.extend([
+        TAILSCALE_HOSTNAME,
+        '*.ts.net',  # Tailscale MagicDNS
+        '100.*',     # Tailscale IP range
+    ])
 
 # Remove duplicates and empty strings
-ALLOWED_HOSTS = list(filter(None, list(set(ALLOWED_HOSTS))))
+ALLOWED_HOSTS = list(filter(lambda x: x and x.strip(), list(set(ALLOWED_HOSTS))))
 
 
 # Application definition
@@ -111,22 +120,36 @@ ASGI_APPLICATION = 'noctis_pro.asgi.application'  # Re-enabled for Daphne
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Redis configuration for channels - Disabled for now to fix login
-# CHANNEL_LAYERS = {
-#     'default': {
-#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#         'CONFIG': {
-#             "hosts": [('127.0.0.1', 6379)],
-#         },
-#     },
-# }
-
-# Use in-memory channel layer for now
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
+# Channel layers configuration for WebSocket support
+if INTERNET_ACCESS:
+    # Use Redis for production internet deployment
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [(os.environ.get('REDIS_HOST', 'redis'), 6379)],
+                "password": os.environ.get('REDIS_PASSWORD', 'redis_secure_password'),
+            },
+        },
+    }
+elif IS_TAILNET:
+    # Use Redis for Tailnet deployment
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [('redis', 6379)],
+                "password": os.environ.get('REDIS_PASSWORD', 'redis_secure_password'),
+            },
+        },
+    }
+else:
+    # Use in-memory channel layer for development
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
 # Celery Configuration - Disabled for now to fix login
 # CELERY_BROKER_URL = 'redis://localhost:6379'
@@ -205,7 +228,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS settings for ngrok and deployment
+# CORS settings for internet access
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -215,24 +238,32 @@ CORS_ALLOWED_ORIGINS = [
     "https://127.0.0.1:8000",
 ]
 
-# Tailnet CORS configuration
-CORS_ALLOWED_ORIGINS.extend([
-    f"http://{TAILSCALE_HOSTNAME}:8080",
-    f"http://{TAILSCALE_HOSTNAME}",
-    "http://100.*:8080",  # Tailscale IP range
-])
+# Add internet domain CORS origins
+if DOMAIN_NAME != 'localhost':
+    CORS_ALLOWED_ORIGINS.extend([
+        f"https://{DOMAIN_NAME}",
+        f"https://www.{DOMAIN_NAME}",
+        f"http://{DOMAIN_NAME}",
+        f"http://www.{DOMAIN_NAME}",
+    ])
 
-# Add Tailnet support dynamically  
-CORS_ALLOW_ALL_ORIGINS = DEBUG or IS_TAILNET  # Allow all origins in debug mode or when using Tailnet
+# Add Tailnet CORS configuration if enabled
+if IS_TAILNET:
+    CORS_ALLOWED_ORIGINS.extend([
+        f"http://{TAILSCALE_HOSTNAME}:8080",
+        f"http://{TAILSCALE_HOSTNAME}",
+        "http://100.*:8080",  # Tailscale IP range
+        "http://100.*",       # All Tailscale IPs
+        "http://*.ts.net",    # Tailscale MagicDNS
+        "https://*.ts.net",   # Tailscale MagicDNS HTTPS
+    ])
 
+# Enable CORS for development or controlled access
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all origins in debug mode
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF trusted origins - Tailnet support
+# CSRF trusted origins for internet access
 CSRF_TRUSTED_ORIGINS = [
-    f"http://{TAILSCALE_HOSTNAME}",
-    f"http://{TAILSCALE_HOSTNAME}:8080",
-    "http://*.ts.net",  # Tailscale MagicDNS
-    "http://100.*",     # Tailscale IP range
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://localhost:80",
@@ -242,6 +273,28 @@ CSRF_TRUSTED_ORIGINS = [
     "https://localhost:8000",
     "https://127.0.0.1:8000",
 ]
+
+# Add internet domain CSRF trusted origins
+if DOMAIN_NAME != 'localhost':
+    CSRF_TRUSTED_ORIGINS.extend([
+        f"https://{DOMAIN_NAME}",
+        f"https://www.{DOMAIN_NAME}",
+        f"http://{DOMAIN_NAME}",
+        f"http://www.{DOMAIN_NAME}",
+    ])
+
+# Add Tailscale CSRF trusted origins if enabled
+if IS_TAILNET:
+    CSRF_TRUSTED_ORIGINS.extend([
+        f"http://{TAILSCALE_HOSTNAME}",
+        f"http://{TAILSCALE_HOSTNAME}:8080",
+        f"https://{TAILSCALE_HOSTNAME}",
+        f"https://{TAILSCALE_HOSTNAME}:8080",
+        "http://*.ts.net",    # Tailscale MagicDNS
+        "https://*.ts.net",   # Tailscale MagicDNS HTTPS
+        "http://100.*",       # Tailscale IP range
+        "https://100.*",      # Tailscale IP range HTTPS
+    ])
 
 # Tailnet configuration complete - no additional URLs needed
 
@@ -267,25 +320,48 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batc
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batches
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 15000  # Support for up to 5000 images with metadata
 
-# Security settings
+# Security settings for internet access
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'SAMEORIGIN' if DEBUG or IS_TAILNET else 'DENY'  # Allow embedding for Tailnet
+X_FRAME_OPTIONS = 'SAMEORIGIN' if DEBUG else 'DENY'
 
-# Tailnet-specific security adjustments
-if IS_TAILNET and not DEBUG:
-    # Tailnet is secure by default, but adjust for HTTP over private network
-    SECURE_SSL_REDIRECT = False  # No SSL required on private Tailnet
+# Internet security settings
+if INTERNET_ACCESS and USE_HTTPS and not DEBUG:
+    # Production security for internet access
+    SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True  # HTTPS required for cookies
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Strict'  # Strict for internet security
+    CSRF_COOKIE_SAMESITE = 'Strict'
+    
+    # Additional security headers
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+    SECURE_CONTENT_SECURITY_POLICY = {
+        'default-src': ["'self'"],
+        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'img-src': ["'self'", "data:", "https:"],
+        'font-src': ["'self'", "data:"],
+        'connect-src': ["'self'"],
+        'frame-ancestors': ["'none'"],
+    }
+elif IS_TAILNET and not DEBUG:
+    # Tailnet provides secure transport, adjust for HTTP over private network
+    SECURE_SSL_REDIRECT = False  # No SSL required on Tailnet (encrypted by default)
     SESSION_COOKIE_SECURE = False  # HTTP is secure over Tailnet
     CSRF_COOKIE_SECURE = False
-    # Keep other security features
     SESSION_COOKIE_HTTPONLY = True
     CSRF_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     CSRF_COOKIE_SAMESITE = 'Lax'
 
-# Production security enhancements for public deployments
-if not DEBUG and not IS_TAILNET:
+# Legacy production security settings (kept for compatibility)
+if not DEBUG and not IS_TAILNET and not INTERNET_ACCESS:
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
     SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -385,18 +461,28 @@ if not DEBUG:
     # Cache static file serving
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 
-# Tailnet-specific settings for better performance
-if IS_TAILNET:
-    # Optimize for private network usage
+# Network-specific settings optimization
+if IS_TAILNET or INTERNET_ACCESS:
+    # Optimize for network usage
     USE_TZ = True
     
 print(f"🚀 Noctis Pro PACS Settings Loaded:")
 print(f"   • Debug Mode: {DEBUG}")
+print(f"   • Internet Access: {INTERNET_ACCESS}")
+print(f"   • HTTPS Enabled: {USE_HTTPS}")
+print(f"   • Domain Name: {DOMAIN_NAME}")
 print(f"   • Tailnet Mode: {IS_TAILNET}")
-print(f"   • Tailnet Hostname: {TAILSCALE_HOSTNAME}")
+if IS_TAILNET:
+    print(f"   • Tailnet Hostname: {TAILSCALE_HOSTNAME}")
 print(f"   • Allowed Hosts: {len(ALLOWED_HOSTS)} configured")
 print(f"   • Database: {DATABASES['default']['ENGINE'].split('.')[-1]}")
 print(f"   • Security: {'Development' if DEBUG else 'Production'} profile")
+if INTERNET_ACCESS:
+    print(f"   • Network Mode: Internet Access via HTTPS")
+elif IS_TAILNET:
+    print(f"   • Network Mode: Private Tailnet")
+else:
+    print(f"   • Network Mode: Local/Private")
 
 
 # Tailnet proxy configuration
