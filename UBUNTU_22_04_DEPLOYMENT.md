@@ -11,7 +11,7 @@ This guide provides step-by-step instructions for deploying NoctisPro PACS on Ub
 
 ## Quick Deployment (Recommended)
 
-### Tailnet Deployment (Secure Private Network)
+### Tailscale Deployment (Secure Tailnet)
 
 ```bash
 # Clone the repository

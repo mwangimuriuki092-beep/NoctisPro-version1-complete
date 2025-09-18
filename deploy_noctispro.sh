@@ -75,7 +75,7 @@ detect_package_manager() {
 # Install and configure Tailscale
 setup_tailscale() {
     
-    log "Setting up Tailscale for secure networking..."
+    log "Setting up Tailscale for secure Tailnet networking..."
     
     # Check if Tailscale is already installed
     if command -v tailscale >/dev/null 2>&1; then
@@ -593,7 +593,7 @@ main() {
     setup_virtual_environment
     install_python_requirements
     
-    log "=== Phase 3: Tailscale Network Setup ==="
+    log "=== Phase 3: Tailscale Setup (Tailnet Network) ==="
     setup_tailscale
     
     log "=== Phase 4: Django Configuration ==="
