@@ -188,3 +188,66 @@ def user_api_info(request):
             'is_facility_user': user.is_facility_user(),
         }
     })
+
+@login_required
+@csrf_exempt
+def extend_session(request):
+    """Extend user session to prevent timeout"""
+    if request.method == 'POST':
+        try:
+            # Update session expiry
+            request.session.set_expiry(1800)  # 30 minutes from now
+            
+            # Update session record
+            try:
+                session = UserSession.objects.get(
+                    user=request.user,
+                    session_key=request.session.session_key,
+                    is_active=True
+                )
+                session.login_time = timezone.now()  # Update activity time
+                session.save()
+            except UserSession.DoesNotExist:
+                # Create new session record if missing
+                UserSession.objects.create(
+                    user=request.user,
+                    session_key=request.session.session_key,
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    is_active=True
+                )
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Session extended successfully',
+                'expires_at': (timezone.now() + timezone.timedelta(seconds=1800)).isoformat()
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+def session_status(request):
+    """Check session status and validity"""
+    try:
+        session_age = request.session.get_expiry_age()
+        session_expires = request.session.get_expiry_date()
+        
+        return JsonResponse({
+            'valid': True,
+            'authenticated': True,
+            'user_id': request.user.id,
+            'username': request.user.username,
+            'session_age': session_age,
+            'expires_at': session_expires.isoformat() if session_expires else None,
+            'expires_in_seconds': session_age
+        })
+    except Exception as e:
+        return JsonResponse({
+            'valid': False,
+            'error': str(e)
+        }, status=500)
