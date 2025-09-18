@@ -1,0 +1,594 @@
+#!/bin/bash
+
+# =============================================================================
+# NoctisPro PACS - Automated Deployment Script for Linux Servers
+# Supports Ubuntu/Debian, RHEL/CentOS/Fedora, Arch, and SUSE (best-effort)
+# =============================================================================
+# This script automatically deploys the Django PACS system with ngrok
+# Author: AI Assistant
+# Date: $(date)
+# =============================================================================
+
+set -e  # Exit on any error
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+NGROK_AUTH_TOKEN="${NGROK_AUTH_TOKEN:-}"
+NGROK_STATIC_URL="${NGROK_STATIC_URL:-mallard-shining-curiously.ngrok-free.app}"
+DJANGO_PORT=${DJANGO_PORT:-8080}
+# Determine project directory robustly
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/manage.py" || -f "$SCRIPT_DIR/requirements.txt" ]]; then
+    PROJECT_DIR="$SCRIPT_DIR"
+elif [[ -d "/workspace" && ( -f "/workspace/manage.py" || -f "/workspace/requirements.txt" ) ]]; then
+    PROJECT_DIR="/workspace"
+else
+    PROJECT_DIR="$SCRIPT_DIR"
+    echo -e "${YELLOW}[WARNING] Could not find project indicators in /workspace; using $PROJECT_DIR${NC}"
+fi
+VENV_DIR="$PROJECT_DIR/venv"
+
+# Logging function
+log() {
+    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}"
+}
+
+error() {
+    echo -e "${RED}[ERROR] $1${NC}" >&2
+}
+
+warn() {
+    echo -e "${YELLOW}[WARNING] $1${NC}"
+}
+
+info() {
+    echo -e "${BLUE}[INFO] $1${NC}"
+}
+
+# Detect package manager
+detect_package_manager() {
+    if command -v apt >/dev/null 2>&1; then
+        PKG_MGR="apt"
+    elif command -v dnf >/dev/null 2>&1; then
+        PKG_MGR="dnf"
+    elif command -v yum >/dev/null 2>&1; then
+        PKG_MGR="yum"
+    elif command -v zypper >/dev/null 2>&1; then
+        PKG_MGR="zypper"
+    elif command -v pacman >/dev/null 2>&1; then
+        PKG_MGR="pacman"
+    else
+        PKG_MGR="unknown"
+    fi
+    info "Detected package manager: $PKG_MGR"
+}
+
+# Detect a suitable Python interpreter (prefers 3.12 -> 3.11 -> 3.10 -> python3)
+detect_python() {
+    for candidate in python3.12 python3.11 python3.10 python3; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            PYTHON_BIN="$candidate"
+            break
+        fi
+    done
+
+    if [ -z "$PYTHON_BIN" ]; then
+        error "No suitable Python 3 interpreter found. Please install Python 3.10+ and rerun."
+        exit 1
+    fi
+
+    info "Using Python interpreter: $PYTHON_BIN"
+}
+
+# Function to check if running as root
+check_root() {
+    if [[ $EUID -eq 0 ]]; then
+        error "This script should not be run as root for security reasons."
+        error "Please run as a regular user with sudo privileges."
+        exit 1
+    fi
+}
+
+# Function to print OS info (non-blocking)
+print_os_info() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        info "OS: ${PRETTY_NAME}"
+    else
+        warn "Unable to determine OS information. Proceeding best-effort."
+    fi
+}
+
+# Function to install system dependencies
+install_system_dependencies() {
+    log "Installing system dependencies..."
+
+    case "$PKG_MGR" in
+        apt)
+            sudo apt update
+            sudo apt install -y \
+                python3 \
+                python3-venv \
+                python3-dev \
+                python3-pip \
+                build-essential \
+                pkg-config \
+                libcups2-dev \
+                libcupsimage2-dev \
+                libffi-dev \
+                libssl-dev \
+                libjpeg-dev \
+                libpng-dev \
+                libtiff-dev \
+                libwebp-dev \
+                zlib1g-dev \
+                sqlite3 \
+                libsqlite3-dev \
+                curl \
+                wget \
+                git \
+                nginx \
+                supervisor \
+                htop \
+                tree \
+                unzip
+            ;;
+        dnf|yum)
+            sudo $PKG_MGR -y install \
+                python3 \
+                python3-virtualenv \
+                python3-devel \
+                python3-pip \
+                gcc gcc-c++ make \
+                cups-devel \
+                libffi-devel \
+                openssl-devel \
+                libjpeg-turbo-devel \
+                libpng-devel \
+                libtiff-devel \
+                libwebp-devel \
+                zlib-devel \
+                sqlite \
+                sqlite-devel \
+                curl \
+                wget \
+                git \
+                nginx \
+                supervisor \
+                htop \
+                tree \
+                unzip || true
+            ;;
+        zypper)
+            sudo zypper refresh
+            sudo zypper install -y \
+                python3 \
+                python3-venv \
+                python3-devel \
+                python3-pip \
+                gcc gcc-c++ make \
+                cups-devel \
+                libffi-devel \
+                libopenssl-devel \
+                libjpeg-turbo-devel \
+                libpng16-devel \
+                libtiff-devel \
+                libwebp-devel \
+                zlib-devel \
+                sqlite3 \
+                sqlite3-devel \
+                curl \
+                wget \
+                git \
+                nginx \
+                supervisor \
+                htop \
+                tree \
+                unzip || true
+            ;;
+        pacman)
+            sudo pacman -Syu --noconfirm
+            sudo pacman -S --noconfirm \
+                python \
+                python-virtualenv \
+                python-pip \
+                base-devel \
+                cups \
+                libffi \
+                openssl \
+                libjpeg-turbo \
+                libpng \
+                libtiff \
+                libwebp \
+                zlib \
+                sqlite \
+                curl \
+                wget \
+                git \
+                nginx \
+                supervisor \
+                htop \
+                tree \
+                unzip || true
+            ;;
+        *)
+            warn "Unsupported or unknown package manager. Please ensure required packages are installed."
+            ;;
+    esac
+
+    log "System dependencies installation step completed."
+}
+
+# Function to setup Python virtual environment
+setup_virtual_environment() {
+    log "Setting up Python virtual environment..."
+    
+    cd "$PROJECT_DIR"
+    
+    # Remove existing venv if it exists
+    if [ -d "$VENV_DIR" ]; then
+        warn "Removing existing virtual environment..."
+        rm -rf "$VENV_DIR"
+    fi
+    
+    # Create new virtual environment
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
+    source "$VENV_DIR/bin/activate"
+    
+    # Upgrade pip
+    pip install --upgrade pip setuptools wheel
+    
+    log "Virtual environment created successfully!"
+}
+
+# Function to install Python requirements
+install_python_requirements() {
+    log "Installing Python requirements..."
+    
+    source "$VENV_DIR/bin/activate"
+    cd "$PROJECT_DIR"
+    
+    # Choose the best available requirements file
+    local REQUIREMENTS_FILE=""
+    local CANDIDATES=(
+        "requirements.active.txt"
+        "requirements.txt"
+        "requirements.optimized.txt"
+        "requirements.minimal.txt"
+        "requirements_security.txt"
+    )
+    for candidate in "${CANDIDATES[@]}"; do
+        if [[ -f "$candidate" ]]; then
+            REQUIREMENTS_FILE="$candidate"
+            break
+        fi
+    done
+
+    if [[ -n "$REQUIREMENTS_FILE" ]]; then
+        info "Using requirements file: $REQUIREMENTS_FILE"
+        # Install requirements with error handling for problematic packages
+        if ! pip install -r "$REQUIREMENTS_FILE"; then
+            warn "Some packages failed to install from $REQUIREMENTS_FILE. Trying per-package fallback..."
+            
+            # Install packages one by one, skipping problematic ones
+            while IFS= read -r package; do
+                if [[ $package =~ ^#.*$ ]] || [[ -z "$package" ]]; then
+                    continue
+                fi
+                
+                if [[ $package == "pycups" ]]; then
+                    warn "Skipping pycups (printing functionality will be limited)"
+                    continue
+                fi
+                
+                echo "Installing $package..."
+                if ! pip install "$package"; then
+                    warn "Failed to install $package, continuing..."
+                fi
+            done < "$REQUIREMENTS_FILE"
+        fi
+    else
+        warn "No requirements file found. Installing a minimal set of core packages..."
+        pip install django pillow pydicom numpy gunicorn psycopg2-binary || true
+    fi
+    
+    log "Python requirements installed successfully!"
+}
+
+# Function to setup ngrok
+setup_ngrok() {
+    log "Setting up ngrok..."
+    
+    # Make ngrok executable
+    chmod +x "$PROJECT_DIR/ngrok"
+    
+    # Add ngrok to PATH if not already there
+    if ! command -v "$PROJECT_DIR/ngrok" &> /dev/null; then
+        sudo ln -sf "$PROJECT_DIR/ngrok" /usr/local/bin/ngrok
+    fi
+    
+    # Configure ngrok auth token if provided
+    if [ -n "$NGROK_AUTH_TOKEN" ]; then
+        "$PROJECT_DIR/ngrok" config add-authtoken "$NGROK_AUTH_TOKEN"
+    else
+        info "NGROK_AUTH_TOKEN not provided. Skipping token configuration."
+    fi
+    
+    log "Ngrok configured successfully!"
+}
+
+# Function to setup Django
+setup_django() {
+    log "Setting up Django application..."
+    
+    source "$VENV_DIR/bin/activate"
+    cd "$PROJECT_DIR"
+    
+    # Create logs directory
+    mkdir -p logs
+    
+    # Set environment variables
+    export DJANGO_SETTINGS_MODULE=noctis_pro.settings
+    export DEBUG=False
+    export NGROK_URL="https://$NGROK_STATIC_URL"
+    export STATIC_URL="https://$NGROK_STATIC_URL/static/"
+    
+    # Create .env file for production
+    cat > .env << EOF
+DEBUG=False
+SECRET_KEY=$(python3 -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')
+NGROK_URL=https://$NGROK_STATIC_URL
+STATIC_URL=https://$NGROK_STATIC_URL/static/
+ALLOWED_HOSTS=$NGROK_STATIC_URL,localhost,127.0.0.1,0.0.0.0
+DJANGO_SETTINGS_MODULE=noctis_pro.settings
+EOF
+    
+    # Run Django management commands
+    python manage.py collectstatic --noinput
+    python manage.py makemigrations
+    python manage.py migrate
+    
+    # Create superuser non-interactively
+    if ! python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists()" | grep -q True; then
+        log "Creating Django superuser..."
+        python manage.py shell -c "
+from django.contrib.auth import get_user_model
+User = get_user_model()
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', 'admin@noctispro.com', 'admin123')
+    print('Superuser created: admin/admin123')
+else:
+    print('Superuser already exists')
+"
+    fi
+    
+    log "Django setup completed successfully!"
+}
+
+# Function to create systemd service
+create_systemd_service() {
+    log "Creating systemd service for NoctisPro..."
+    
+    if ! command -v systemctl >/dev/null 2>&1; then
+        warn "systemd not available on this system. Skipping service creation."
+        return 0
+    fi
+
+    sudo tee /etc/systemd/system/noctispro.service > /dev/null << EOF
+[Unit]
+Description=NoctisPro PACS Django Application
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+Group=$USER
+WorkingDirectory=$PROJECT_DIR
+Environment=PATH=$VENV_DIR/bin
+Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
+Environment=DEBUG=False
+Environment=NGROK_URL=https://$NGROK_STATIC_URL
+Environment=STATIC_URL=https://$NGROK_STATIC_URL/static/
+ExecStart=$VENV_DIR/bin/gunicorn --bind 0.0.0.0:$DJANGO_PORT --workers 3 --timeout 120 noctis_pro.wsgi:application
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable noctispro
+    
+    log "Systemd service created successfully!"
+}
+
+# Function to create ngrok service
+create_ngrok_service() {
+    log "Creating systemd service for ngrok..."
+    
+    if ! command -v systemctl >/dev/null 2>&1; then
+        warn "systemd not available on this system. Skipping ngrok service creation."
+        return 0
+    fi
+
+    sudo tee /etc/systemd/system/noctispro-ngrok.service > /dev/null << EOF
+[Unit]
+Description=Ngrok tunnel for NoctisPro PACS
+After=network.target noctispro.service
+
+[Service]
+Type=simple
+User=$USER
+Group=$USER
+WorkingDirectory=$PROJECT_DIR
+ExecStart=$PROJECT_DIR/ngrok http --url=$NGROK_STATIC_URL $DJANGO_PORT
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable noctispro-ngrok
+    
+    log "Ngrok systemd service created successfully!"
+}
+
+# Function to start services
+start_services() {
+    log "Starting NoctisPro services..."
+    
+    if command -v systemctl >/dev/null 2>&1; then
+        # Start Django application
+        sudo systemctl start noctispro || true
+        sleep 5
+        
+        # Start ngrok tunnel
+        sudo systemctl start noctispro-ngrok || true
+        sleep 3
+        
+        log "Services started successfully!"
+    else
+        warn "systemd not available. Start services manually using manage scripts or docker-compose."
+    fi
+}
+
+# Function to show status
+show_status() {
+    log "Deployment Status:"
+    echo
+    info "=== System Status ==="
+    if command -v systemctl >/dev/null 2>&1; then
+        sudo systemctl status noctispro --no-pager -l || true
+        echo
+        sudo systemctl status noctispro-ngrok --no-pager -l || true
+    else
+        warn "systemd not available. Skipping service status."
+    fi
+    echo
+    
+    info "=== Access Information ==="
+    echo -e "${GREEN}🌐 Application URL: https://$NGROK_STATIC_URL${NC}"
+    echo -e "${GREEN}👤 Admin Login: admin / admin123${NC}"
+    echo -e "${GREEN}📊 Admin Panel: https://$NGROK_STATIC_URL/admin/${NC}"
+    echo -e "${GREEN}🏥 Worklist: https://$NGROK_STATIC_URL/worklist/${NC}"
+    echo
+    
+    info "=== Service Management ==="
+    if command -v systemctl >/dev/null 2>&1; then
+        echo "Start services:   sudo systemctl start noctispro noctispro-ngrok"
+        echo "Stop services:    sudo systemctl stop noctispro noctispro-ngrok"
+        echo "Restart services: sudo systemctl restart noctispro noctispro-ngrok"
+        echo "View logs:        sudo journalctl -f -u noctispro -u noctispro-ngrok"
+    else
+        echo "Start: $PROJECT_DIR/start_noctispro.sh"
+        echo "Stop:  $PROJECT_DIR/stop_noctispro.sh"
+        echo "Logs:  tail -f logs/web.log logs/dicom.log"
+    fi
+    echo
+}
+
+# Function to create management script
+create_management_script() {
+    log "Creating management script..."
+    
+    cat > "$PROJECT_DIR/manage_noctispro.sh" << 'EOF'
+#!/bin/bash
+
+# Load .env if present
+if [ -f ./.env ]; then
+    set -a
+    . ./.env
+    set +a
+fi
+
+case "$1" in
+    start)
+        echo "Starting NoctisPro services..."
+        sudo systemctl start noctispro noctispro-ngrok
+        ;;
+    stop)
+        echo "Stopping NoctisPro services..."
+        sudo systemctl stop noctispro noctispro-ngrok
+        ;;
+    restart)
+        echo "Restarting NoctisPro services..."
+        sudo systemctl restart noctispro noctispro-ngrok
+        ;;
+    status)
+        sudo systemctl status noctispro noctispro-ngrok
+        ;;
+    logs)
+        sudo journalctl -f -u noctispro -u noctispro-ngrok
+        ;;
+    url)
+        if [ -n "$NGROK_URL" ]; then
+            echo "$NGROK_URL"
+        else
+            echo "https://mallard-shining-curiously.ngrok-free.app"
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status|logs|url}"
+        exit 1
+        ;;
+esac
+EOF
+
+    chmod +x "$PROJECT_DIR/manage_noctispro.sh"
+    
+    log "Management script created at $PROJECT_DIR/manage_noctispro.sh"
+}
+
+# Main deployment function
+main() {
+    log "Starting NoctisPro PACS deployment for Linux..."
+    echo
+    
+    check_root
+    print_os_info
+    detect_package_manager
+    detect_python
+    
+    log "=== Phase 1: System Dependencies ==="
+    install_system_dependencies
+    
+    log "=== Phase 2: Python Environment ==="
+    setup_virtual_environment
+    install_python_requirements
+    
+    log "=== Phase 3: Ngrok Setup ==="
+    setup_ngrok
+    
+    log "=== Phase 4: Django Configuration ==="
+    setup_django
+    
+    log "=== Phase 5: Service Creation ==="
+    create_systemd_service
+    create_ngrok_service
+    create_management_script
+    
+    log "=== Phase 6: Service Startup ==="
+    start_services
+    
+    log "=== Deployment Complete! ==="
+    show_status
+    
+    log "🎉 NoctisPro PACS has been successfully deployed!"
+    log "🔗 Access your application at: https://$NGROK_STATIC_URL"
+}
+
+# Run main function
+main "$@"

@@ -1,0 +1,42 @@
+# Core Django
+Django==5.2.6
+Pillow
+django-widget-tweaks
+python-dotenv
+
+# Production server
+gunicorn
+whitenoise
+
+# Database
+psycopg2-binary
+dj-database-url
+
+# Redis and caching
+redis
+django-redis
+
+# API
+djangorestframework
+django-cors-headers
+
+# DICOM processing (minimal)
+pydicom
+pynetdicom
+highdicom
+
+# Image processing and scientific computing (required by DICOM viewer)
+numpy
+scipy
+opencv-python
+scikit-image
+matplotlib
+
+# Utilities
+python-magic
+requests
+urllib3
+qrcode
+
+# Extensions
+django-extensions

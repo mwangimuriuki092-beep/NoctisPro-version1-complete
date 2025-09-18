@@ -1,0 +1,39 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          noctispro
+# Required-Start:    $network $remote_fs $syslog
+# Required-Stop:     $network $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: NoctisPro Masterpiece Medical Imaging System
+# Description:       Starts NoctisPro Masterpiece Django application with all features
+### END INIT INFO
+
+# Change to the project directory dynamically
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
+cd "$PROJECT_DIR"
+
+case "$1" in
+    start)
+        echo "Starting NoctisPro Masterpiece service..."
+        "$PROJECT_DIR"/deploy_masterpiece_bulletproof.sh start
+        ;;
+    stop)
+        echo "Stopping NoctisPro Masterpiece service..."
+        "$PROJECT_DIR"/deploy_masterpiece_bulletproof.sh stop
+        ;;
+    restart)
+        echo "Restarting NoctisPro Masterpiece service..."
+        "$PROJECT_DIR"/deploy_masterpiece_bulletproof.sh restart
+        ;;
+    status)
+        "$PROJECT_DIR"/deploy_masterpiece_bulletproof.sh status
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+
+exit 0
