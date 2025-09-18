@@ -27,13 +27,16 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-# Tailscale detection for automatic configuration
+# Tailscale configuration for public network access
 TAILSCALE_HOSTNAME = os.environ.get('TAILNET_HOSTNAME', 'noctispro')
 IS_TAILNET = True  # Always use Tailnet
+PUBLIC_NETWORK_ACCESS = os.environ.get('PUBLIC_NETWORK_ACCESS', 'true').lower() == 'true'
+TAILNET_PUBLIC_MODE = os.environ.get('TAILNET_PUBLIC_MODE', 'true').lower() == 'true'
 
+# Configure allowed hosts for public network access through Tailnet
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
-# Add Tailscale and deployment specific hosts
+# Add Tailscale and public network hosts
 ALLOWED_HOSTS.extend([
     'localhost',
     '127.0.0.1',
@@ -41,14 +44,15 @@ ALLOWED_HOSTS.extend([
     TAILSCALE_HOSTNAME,
     '*.ts.net',  # Tailscale MagicDNS
     '100.*',     # Tailscale IP range
+    '*',         # Allow all hosts for public access through tailnet
 ])
 
 # Add Tailscale hostname if different from default
 if TAILSCALE_HOSTNAME != 'noctispro':
     ALLOWED_HOSTS.append(TAILSCALE_HOSTNAME)
 
-# Remove duplicates and empty strings
-ALLOWED_HOSTS = list(filter(None, list(set(ALLOWED_HOSTS))))
+# Remove duplicates and empty strings, but keep wildcard for public access
+ALLOWED_HOSTS = list(filter(lambda x: x is not None and x != '', list(set(ALLOWED_HOSTS))))
 
 
 # Application definition
@@ -205,7 +209,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS settings for ngrok and deployment
+# CORS settings for public network access through Tailnet
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -215,24 +219,31 @@ CORS_ALLOWED_ORIGINS = [
     "https://127.0.0.1:8000",
 ]
 
-# Tailnet CORS configuration
+# Tailnet CORS configuration for public access
 CORS_ALLOWED_ORIGINS.extend([
     f"http://{TAILSCALE_HOSTNAME}:8080",
     f"http://{TAILSCALE_HOSTNAME}",
     "http://100.*:8080",  # Tailscale IP range
+    "http://100.*",       # All Tailscale IPs
+    "http://*.ts.net",    # Tailscale MagicDNS
+    "https://*.ts.net",   # Tailscale MagicDNS HTTPS
 ])
 
-# Add Tailnet support dynamically  
-CORS_ALLOW_ALL_ORIGINS = DEBUG or IS_TAILNET  # Allow all origins in debug mode or when using Tailnet
+# Enable public network access through Tailnet
+CORS_ALLOW_ALL_ORIGINS = DEBUG or IS_TAILNET or PUBLIC_NETWORK_ACCESS  # Allow all origins for public access
 
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF trusted origins - Tailnet support
+# CSRF trusted origins - Public network access through Tailnet
 CSRF_TRUSTED_ORIGINS = [
     f"http://{TAILSCALE_HOSTNAME}",
     f"http://{TAILSCALE_HOSTNAME}:8080",
-    "http://*.ts.net",  # Tailscale MagicDNS
-    "http://100.*",     # Tailscale IP range
+    f"https://{TAILSCALE_HOSTNAME}",
+    f"https://{TAILSCALE_HOSTNAME}:8080",
+    "http://*.ts.net",    # Tailscale MagicDNS
+    "https://*.ts.net",   # Tailscale MagicDNS HTTPS
+    "http://100.*",       # Tailscale IP range
+    "https://100.*",      # Tailscale IP range HTTPS
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://localhost:80",
@@ -267,21 +278,21 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batc
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batches
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 15000  # Support for up to 5000 images with metadata
 
-# Security settings
+# Security settings for public network access through Tailnet
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'SAMEORIGIN' if DEBUG or IS_TAILNET else 'DENY'  # Allow embedding for Tailnet
+X_FRAME_OPTIONS = 'SAMEORIGIN' if DEBUG or IS_TAILNET or PUBLIC_NETWORK_ACCESS else 'DENY'  # Allow embedding for public Tailnet access
 
-# Tailnet-specific security adjustments
-if IS_TAILNET and not DEBUG:
-    # Tailnet is secure by default, but adjust for HTTP over private network
-    SECURE_SSL_REDIRECT = False  # No SSL required on private Tailnet
+# Public network security adjustments for Tailnet
+if (IS_TAILNET or PUBLIC_NETWORK_ACCESS) and not DEBUG:
+    # Tailnet provides secure transport, adjust for public HTTP access over secure network
+    SECURE_SSL_REDIRECT = False  # No SSL required on Tailnet (encrypted by default)
     SESSION_COOKIE_SECURE = False  # HTTP is secure over Tailnet
     CSRF_COOKIE_SECURE = False
-    # Keep other security features
+    # Keep other security features for public access
     SESSION_COOKIE_HTTPONLY = True
     CSRF_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SAMESITE = 'Lax'  # More permissive for public access
     CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Production security enhancements for public deployments
@@ -385,18 +396,21 @@ if not DEBUG:
     # Cache static file serving
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 
-# Tailnet-specific settings for better performance
-if IS_TAILNET:
-    # Optimize for private network usage
+# Tailnet-specific settings for public network performance
+if IS_TAILNET or PUBLIC_NETWORK_ACCESS:
+    # Optimize for public network usage through Tailnet
     USE_TZ = True
     
 print(f"🚀 Noctis Pro PACS Settings Loaded:")
 print(f"   • Debug Mode: {DEBUG}")
 print(f"   • Tailnet Mode: {IS_TAILNET}")
+print(f"   • Public Network Access: {PUBLIC_NETWORK_ACCESS}")
+print(f"   • Tailnet Public Mode: {TAILNET_PUBLIC_MODE}")
 print(f"   • Tailnet Hostname: {TAILSCALE_HOSTNAME}")
 print(f"   • Allowed Hosts: {len(ALLOWED_HOSTS)} configured")
 print(f"   • Database: {DATABASES['default']['ENGINE'].split('.')[-1]}")
 print(f"   • Security: {'Development' if DEBUG else 'Production'} profile")
+print(f"   • Network Mode: {'Public via Tailnet' if PUBLIC_NETWORK_ACCESS else 'Private Tailnet'}")
 
 
 # Tailnet proxy configuration

@@ -34,29 +34,31 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
     ports:
-      - "127.0.0.1:5432:5432"  # Only local access
+      - "5432:5432"  # Public access through tailnet
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U noctis_user -d noctis_pro"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    network_mode: "service:tailscale"  # Share network with Tailscale for public access
 
   # Redis for caching and message broker
   redis:
     image: redis:7-alpine
     container_name: noctis_redis
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --bind 0.0.0.0 --protected-mode no
     volumes:
       - redis_data:/data
     ports:
-      - "127.0.0.1:6379:6379"  # Only local access
+      - "6379:6379"  # Public access through tailnet
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    network_mode: "service:tailscale"  # Share network with Tailscale for public access
 
   # Django Web Application
   web:
@@ -137,7 +139,10 @@ services:
         condition: service_healthy
       web:
         condition: service_healthy
+      tailscale:
+        condition: service_started
     restart: unless-stopped
+    network_mode: "service:tailscale"  # Share network with Tailscale for public access
     command: python manage.py process_ai_analyses --continuous
 
   # DICOM Receiver Service
@@ -158,33 +163,40 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
+      - TAILNET_HOSTNAME=${TAILNET_HOSTNAME:-noctispro}
+      - USE_TAILNET=true
     volumes:
       - .:/app
       - media_files:/app/media
     ports:
-      - "11112:11112"
+      - "11112:11112"  # Public DICOM port through tailnet
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      tailscale:
+        condition: service_started
     restart: unless-stopped
+    network_mode: "service:tailscale"  # Share network with Tailscale for public access
     command: python dicom_receiver.py --port 11112 --aet NOCTIS_SCP
 
-  # Nginx for production (optional)
+  # Nginx for production (optional) - Public access through tailnet
   nginx:
     image: nginx:alpine
     container_name: noctis_nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:80"    # Public HTTP access through tailnet
+      - "443:443"  # Public HTTPS access through tailnet
     volumes:
       - ./deployment/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - static_files:/var/www/static:ro
       - media_files:/var/www/media:ro
     depends_on:
       - web
+      - tailscale
     restart: unless-stopped
+    network_mode: "service:tailscale"  # Share network with Tailscale for public access
     profiles:
       - production
 
