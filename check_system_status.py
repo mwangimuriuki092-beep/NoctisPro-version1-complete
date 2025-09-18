@@ -141,21 +141,19 @@ def check_network_config():
     secret_key = getattr(settings, 'SECRET_KEY', '')
     print_status("Secret Key", len(secret_key) > 20, f"{'Configured' if len(secret_key) > 20 else 'Default/Weak'}")
     
-    # Check ngrok/tailscale
-    ngrok_url = os.environ.get('NGROK_URL', '')
-    use_tailnet = os.environ.get('USE_TAILNET', 'false').lower() == 'true'
-    
-    if use_tailnet:
-        try:
-            result = subprocess.run(['tailscale', 'status'], capture_output=True, text=True, timeout=5)
-            tailscale_running = result.returncode == 0
-            print_status("Tailscale", tailscale_running, "Connected" if tailscale_running else "Not connected")
-        except:
-            print_status("Tailscale", False, "Not installed or not running")
-    elif ngrok_url:
-        print_status("Ngrok", True, f"URL: {ngrok_url}")
-    else:
-        print_status("Network Access", False, "Neither Tailscale nor Ngrok configured")
+    # Check Tailscale (only network option)
+    try:
+        result = subprocess.run(['tailscale', 'status'], capture_output=True, text=True, timeout=5)
+        tailscale_running = result.returncode == 0
+        if tailscale_running:
+            # Get Tailscale IP
+            ip_result = subprocess.run(['tailscale', 'ip', '-4'], capture_output=True, text=True, timeout=5)
+            tailscale_ip = ip_result.stdout.strip() if ip_result.returncode == 0 else "Unknown"
+            print_status("Tailscale", True, f"Connected - IP: {tailscale_ip}")
+        else:
+            print_status("Tailscale", False, "Not connected")
+    except:
+        print_status("Tailscale", False, "Not installed or not running")
     
     return True
 
@@ -189,7 +187,7 @@ def check_services():
     print("\n⚙️  SYSTEM SERVICES")
     print("=" * 50)
     
-    services = ['noctispro', 'noctispro-ngrok', 'noctispro-ai']
+    services = ['noctispro', 'noctispro-ai', 'tailscaled']
     
     for service in services:
         try:
@@ -245,12 +243,15 @@ def main():
         print("\n🔧 Issues found - review the details above")
     
     print(f"\n🌐 Access the system:")
-    if os.environ.get('USE_TAILNET', 'false').lower() == 'true':
-        print("   • Tailnet: http://noctispro:8080 (or via Tailscale IP)")
-    elif os.environ.get('NGROK_URL'):
-        print(f"   • Ngrok: {os.environ.get('NGROK_URL')}")
-    else:
-        print("   • Local: http://localhost:8080")
+    try:
+        result = subprocess.run(['tailscale', 'ip', '-4'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            tailscale_ip = result.stdout.strip()
+            print(f"   • Tailnet IP: http://{tailscale_ip}:8080")
+        print("   • Tailnet Hostname: http://noctispro:8080")
+    except:
+        print("   • Tailnet: http://noctispro:8080 (check Tailscale status)")
+        print("   • Local fallback: http://localhost:8080")
     
     print("   • Admin: admin / (your password)")
     print("   • Worklist: /worklist/")

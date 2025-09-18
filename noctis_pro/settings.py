@@ -27,33 +27,25 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-# Ngrok detection for automatic configuration
-NGROK_URL = os.environ.get('NGROK_URL', '')
-IS_NGROK = bool(NGROK_URL) or any('ngrok' in host for host in os.environ.get('ALLOWED_HOSTS', '').split(','))
+# Tailscale detection for automatic configuration
+TAILSCALE_HOSTNAME = os.environ.get('TAILNET_HOSTNAME', 'noctispro')
+IS_TAILNET = True  # Always use Tailnet
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
-# Add ngrok and deployment specific hosts
+# Add Tailscale and deployment specific hosts
 ALLOWED_HOSTS.extend([
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
-    'noctispro',
-    'noctispro2.duckdns.org',
-    '*.duckdns.org',
-    '*.ngrok.io',
-    '*.ngrok-free.app',
-    '*.ngrok.app',
-    '3.222.223.4',
-    '172.30.0.2',
+    TAILSCALE_HOSTNAME,
+    '*.ts.net',  # Tailscale MagicDNS
+    '100.*',     # Tailscale IP range
 ])
 
-# Add specific ngrok URL if provided
-if NGROK_URL:
-    # Extract domain from full URL
-    import re
-    ngrok_domain = re.sub(r'^https?://', '', NGROK_URL.strip('/'))
-    ALLOWED_HOSTS.append(ngrok_domain)
+# Add Tailscale hostname if different from default
+if TAILSCALE_HOSTNAME != 'noctispro':
+    ALLOWED_HOSTS.append(TAILSCALE_HOSTNAME)
 
 # Remove duplicates and empty strings
 ALLOWED_HOSTS = list(filter(None, list(set(ALLOWED_HOSTS))))
@@ -223,28 +215,24 @@ CORS_ALLOWED_ORIGINS = [
     "https://127.0.0.1:8000",
 ]
 
-# Add specific ngrok URL to CORS if provided
-if NGROK_URL:
-    CORS_ALLOWED_ORIGINS.extend([
-        NGROK_URL,
-        NGROK_URL.replace('https://', 'http://') if NGROK_URL.startswith('https://') else NGROK_URL.replace('http://', 'https://')
-    ])
+# Tailnet CORS configuration
+CORS_ALLOWED_ORIGINS.extend([
+    f"http://{TAILSCALE_HOSTNAME}:8080",
+    f"http://{TAILSCALE_HOSTNAME}",
+    "http://100.*:8080",  # Tailscale IP range
+])
 
-# Add ngrok support dynamically
-CORS_ALLOW_ALL_ORIGINS = DEBUG or IS_NGROK  # Allow all origins in debug mode or when using ngrok
+# Add Tailnet support dynamically  
+CORS_ALLOW_ALL_ORIGINS = DEBUG or IS_TAILNET  # Allow all origins in debug mode or when using Tailnet
 
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF trusted origins - Fix for 403 errors and ngrok support
+# CSRF trusted origins - Tailnet support
 CSRF_TRUSTED_ORIGINS = [
-    "http://noctispro",
-    "https://noctispro", 
-    "https://*.ngrok.io",
-    "https://*.ngrok-free.app",
-    "https://*.ngrok.app",
-    "http://*.ngrok.io",
-    "http://*.ngrok-free.app", 
-    "http://*.ngrok.app",
+    f"http://{TAILSCALE_HOSTNAME}",
+    f"http://{TAILSCALE_HOSTNAME}:8080",
+    "http://*.ts.net",  # Tailscale MagicDNS
+    "http://100.*",     # Tailscale IP range
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://localhost:80",
@@ -253,16 +241,9 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1",
     "https://localhost:8000",
     "https://127.0.0.1:8000",
-    "https://*.duckdns.org",
-    "http://*.duckdns.org",
 ]
 
-# Add specific ngrok URL to CSRF trusted origins if provided
-if NGROK_URL:
-    CSRF_TRUSTED_ORIGINS.extend([
-        NGROK_URL,
-        NGROK_URL.replace('https://', 'http://') if NGROK_URL.startswith('https://') else NGROK_URL.replace('http://', 'https://')
-    ])
+# Tailnet configuration complete - no additional URLs needed
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
@@ -289,22 +270,22 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 15000  # Support for up to 5000 images with meta
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'SAMEORIGIN' if DEBUG or IS_NGROK else 'DENY'  # Allow embedding for ngrok
+X_FRAME_OPTIONS = 'SAMEORIGIN' if DEBUG or IS_TAILNET else 'DENY'  # Allow embedding for Tailnet
 
-# Ngrok-specific security adjustments
-if IS_NGROK:
-    # Disable some security features that interfere with ngrok
-    SECURE_SSL_REDIRECT = False
-    SESSION_COOKIE_SECURE = False
+# Tailnet-specific security adjustments
+if IS_TAILNET and not DEBUG:
+    # Tailnet is secure by default, but adjust for HTTP over private network
+    SECURE_SSL_REDIRECT = False  # No SSL required on private Tailnet
+    SESSION_COOKIE_SECURE = False  # HTTP is secure over Tailnet
     CSRF_COOKIE_SECURE = False
-    # But keep others for security
+    # Keep other security features
     SESSION_COOKIE_HTTPONLY = True
     CSRF_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     CSRF_COOKIE_SAMESITE = 'Lax'
 
-# Production security enhancements (only if not using ngrok)
-if not DEBUG and not IS_NGROK:
+# Production security enhancements for public deployments
+if not DEBUG and not IS_TAILNET:
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
     SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -404,22 +385,21 @@ if not DEBUG:
     # Cache static file serving
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 
-# Ngrok-specific settings for better performance
-if IS_NGROK:
-    # Already set above for all environments
-    # Disable some checks that can cause issues with ngrok
+# Tailnet-specific settings for better performance
+if IS_TAILNET:
+    # Optimize for private network usage
     USE_TZ = True
     
 print(f"🚀 Noctis Pro PACS Settings Loaded:")
 print(f"   • Debug Mode: {DEBUG}")
-print(f"   • Ngrok Mode: {IS_NGROK}")
-print(f"   • Ngrok URL: {NGROK_URL or 'Not set'}")
+print(f"   • Tailnet Mode: {IS_TAILNET}")
+print(f"   • Tailnet Hostname: {TAILSCALE_HOSTNAME}")
 print(f"   • Allowed Hosts: {len(ALLOWED_HOSTS)} configured")
 print(f"   • Database: {DATABASES['default']['ENGINE'].split('.')[-1]}")
 print(f"   • Security: {'Development' if DEBUG else 'Production'} profile")
 
 
-# Masterpiece overrides removed to allow dynamic configuration via environment and NGROK_URL
+# Tailnet proxy configuration
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # DICOM viewer masterpiece settings

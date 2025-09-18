@@ -6,26 +6,26 @@ A comprehensive Django-based Picture Archiving and Communication System (PACS) f
 
 ### One-Command Deployment
 
-#### Option 1: Ngrok Deployment (Default)
+#### Tailnet Deployment (Secure Private Network)
 ```bash
 ./deploy_noctispro.sh
 ```
 
-#### Option 2: Tailnet Deployment (Recommended for Production)
+With custom hostname:
 ```bash
-USE_TAILNET=true TAILNET_HOSTNAME=noctispro ./deploy_noctispro.sh
+TAILNET_HOSTNAME=my-pacs ./deploy_noctispro.sh
 ```
 
-Or with Tailscale auth key for automated setup:
+With Tailscale auth key for automated setup:
 ```bash
-USE_TAILNET=true TAILSCALE_AUTH_KEY=your_auth_key TAILNET_HOSTNAME=noctispro ./deploy_noctispro.sh
+TAILSCALE_AUTH_KEY=your_auth_key TAILNET_HOSTNAME=noctispro ./deploy_noctispro.sh
 ```
 
 The deployment script will automatically:
 - ✅ Install all system dependencies
 - ✅ Set up Python virtual environment
 - ✅ Install Python requirements (handling problematic packages)
-- ✅ Configure network access (ngrok or Tailscale)
+- ✅ Configure secure Tailscale network access
 - ✅ Set up Django database and migrations
 - ✅ Collect static files
 - ✅ Create admin superuser (admin/admin123)
@@ -34,17 +34,13 @@ The deployment script will automatically:
 
 ### Access Information
 
-#### Ngrok Deployment:
-- **Application URL**: https://mallard-shining-curiously.ngrok-free.app
-- **Admin Login**: admin / admin123
-- **Admin Panel**: https://mallard-shining-curiously.ngrok-free.app/admin/
-- **Worklist**: https://mallard-shining-curiously.ngrok-free.app/worklist/
-
-#### Tailnet Deployment:
+#### Tailnet Access (Secure Private Network):
 - **Application URL**: http://noctispro:8080 (or via Tailscale IP)
 - **Admin Login**: admin / admin123
 - **Admin Panel**: http://noctispro:8080/admin/
 - **Worklist**: http://noctispro:8080/worklist/
+- **AI Dashboard**: http://noctispro:8080/ai/
+- **DICOM Viewer**: http://noctispro:8080/dicom-viewer/
 
 ### Management Commands
 ```bash
@@ -57,10 +53,14 @@ The deployment script will automatically:
 ./manage_noctispro.sh url       # Show application URL
 
 # Or use systemctl directly
-sudo systemctl start noctispro noctispro-ngrok
-sudo systemctl stop noctispro noctispro-ngrok
-sudo systemctl restart noctispro noctispro-ngrok
-sudo journalctl -f -u noctispro -u noctispro-ngrok
+sudo systemctl start noctispro
+sudo systemctl stop noctispro
+sudo systemctl restart noctispro
+sudo journalctl -f -u noctispro
+
+# Tailscale management
+tailscale status
+tailscale ip -4
 ```
 
 ### AI Analysis Setup

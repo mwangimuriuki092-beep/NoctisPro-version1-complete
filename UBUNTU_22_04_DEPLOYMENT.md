@@ -11,7 +11,7 @@ This guide provides step-by-step instructions for deploying NoctisPro PACS on Ub
 
 ## Quick Deployment (Recommended)
 
-### Option 1: Ngrok Deployment (Development/Testing)
+### Tailnet Deployment (Secure Private Network)
 
 ```bash
 # Clone the repository
@@ -21,22 +21,14 @@ cd noctispro-pacs
 # Make deployment script executable
 chmod +x deploy_noctispro.sh
 
-# Run deployment
+# Run deployment (Tailscale will be automatically configured)
 ./deploy_noctispro.sh
-```
 
-### Option 2: Tailnet Deployment (Production)
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd noctispro-pacs
-
-# Deploy with Tailscale
-USE_TAILNET=true TAILNET_HOSTNAME=noctispro ./deploy_noctispro.sh
+# Or with custom hostname
+TAILNET_HOSTNAME=my-pacs ./deploy_noctispro.sh
 
 # Or with auth key for automated setup
-USE_TAILNET=true TAILSCALE_AUTH_KEY=your_auth_key TAILNET_HOSTNAME=noctispro ./deploy_noctispro.sh
+TAILSCALE_AUTH_KEY=your_auth_key TAILNET_HOSTNAME=noctispro ./deploy_noctispro.sh
 ```
 
 ## Manual Deployment Steps
@@ -122,30 +114,21 @@ python setup_ai_system.py
 python manage.py setup_working_ai_models
 ```
 
-### 5. Network Configuration
-
-#### Option A: Ngrok Setup (Development)
-
-```bash
-# Install ngrok
-curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-sudo apt update && sudo apt install ngrok
-
-# Configure ngrok (replace with your auth token)
-ngrok config add-authtoken YOUR_NGROK_AUTH_TOKEN
-```
-
-#### Option B: Tailscale Setup (Production)
+### 5. Tailscale Network Configuration
 
 ```bash
 # Install Tailscale
 curl -fsSL https://tailscale.com/install.sh | sh
 
-# Start Tailscale
+# Start Tailscale with hostname
 sudo tailscale up --hostname=noctispro
 
-# Follow authentication instructions
+# Or with auth key for automated setup
+# sudo tailscale up --authkey=YOUR_AUTH_KEY --hostname=noctispro
+
+# Verify connection
+tailscale status
+tailscale ip -4
 ```
 
 ### 6. Service Configuration
@@ -177,26 +160,6 @@ WantedBy=multi-user.target
 EOF
 ```
 
-#### Create Systemd Service for Ngrok (if using ngrok)
-
-```bash
-sudo tee /etc/systemd/system/noctispro-ngrok.service > /dev/null <<EOF
-[Unit]
-Description=Ngrok tunnel for NoctisPro PACS
-After=network.target noctispro.service
-
-[Service]
-Type=simple
-User=www-data
-Group=www-data
-ExecStart=/usr/local/bin/ngrok http --domain=your-domain.ngrok-free.app 8080
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-```
 
 #### Create Systemd Service for AI Processing
 
@@ -274,25 +237,21 @@ sudo systemctl daemon-reload
 sudo systemctl enable noctispro noctispro-ai
 sudo systemctl start noctispro noctispro-ai
 
-# If using ngrok
-sudo systemctl enable noctispro-ngrok
-sudo systemctl start noctispro-ngrok
-
 # Check status
 sudo systemctl status noctispro noctispro-ai
+
+# Verify Tailscale connection
+tailscale status
 ```
 
 ## Post-Deployment Configuration
 
 ### 1. Access the Application
 
-#### Ngrok Deployment:
-- URL: https://your-domain.ngrok-free.app
+#### Tailscale Access:
+- URL: http://noctispro:8080 (or your Tailscale IP)
 - Admin: admin / (password you set)
-
-#### Tailscale Deployment:
-- URL: http://noctispro:8080 (or Tailscale IP)
-- Admin: admin / (password you set)
+- Get IP: `tailscale ip -4`
 
 ### 2. Configure AI Analysis
 
@@ -323,7 +282,11 @@ sudo systemctl status noctispro noctispro-ai
 # View logs
 sudo journalctl -f -u noctispro
 sudo journalctl -f -u noctispro-ai
-sudo journalctl -f -u noctispro-ngrok
+
+# Tailscale management
+tailscale status
+tailscale ip -4
+sudo tailscale up --hostname=noctispro  # Reconnect if needed
 
 # Database management
 cd /opt/noctispro
