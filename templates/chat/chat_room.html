@@ -176,6 +176,10 @@
 {% endblock %}
 
 {% block content %}
+<script>
+    // Set chat room ID for WebSocket initialization
+    document.body.setAttribute('data-chat-room-id', '{{ room.id }}');
+</script>
 <div class="chat-room-container">
     <!-- Chat Header -->
     <div class="chat-header">
@@ -224,7 +228,7 @@
     <!-- Chat Body -->
     <div class="chat-body">
         <!-- Messages Container -->
-        <div class="messages-container" id="messagesContainer">
+        <div class="messages-container" id="messages-container">
             {% if messages %}
                 {% for message in messages %}
                 <div class="message-item">
@@ -282,6 +286,21 @@
                     <p>Be the first to start the conversation in this room!</p>
                 </div>
             {% endif %}
+        </div>
+        
+        <!-- Typing Indicators -->
+        <div id="typing-indicators" class="typing-indicators"></div>
+        
+        <!-- Message Input -->
+        <div class="message-input-container">
+            <div class="input-group">
+                <textarea id="message-input" class="form-control bg-dark text-white border-secondary" 
+                         placeholder="Type your message..." rows="1" 
+                         style="resize: none; max-height: 120px;"></textarea>
+                <button id="send-button" class="btn btn-primary" type="button">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
         </div>
 
         <!-- Participants Sidebar -->
@@ -368,10 +387,70 @@ document.addEventListener('DOMContentLoaded', function() {
     scrollToBottom();
 });
 
-// Simulate real-time message updates
-setInterval(function() {
-    // This would typically connect to WebSocket for real-time messages
-    console.log('Checking for new messages...');
-}, 5000);
+// WebSocket message handling
+document.addEventListener('DOMContentLoaded', function() {
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    let typingTimer;
+    let isTyping = false;
+    
+    // Send message function
+    function sendMessage() {
+        const message = messageInput.value.trim();
+        if (message && window.noctisWS) {
+            window.noctisWS.sendChatMessage(message);
+            messageInput.value = '';
+            autoResize();
+            
+            // Stop typing indicator
+            if (isTyping) {
+                window.noctisWS.sendTypingIndicator(false);
+                isTyping = false;
+            }
+        }
+    }
+    
+    // Auto-resize textarea
+    function autoResize() {
+        messageInput.style.height = 'auto';
+        messageInput.style.height = messageInput.scrollHeight + 'px';
+    }
+    
+    // Handle typing indicators
+    function handleTyping() {
+        if (!isTyping && window.noctisWS) {
+            window.noctisWS.sendTypingIndicator(true);
+            isTyping = true;
+        }
+        
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
+            if (isTyping && window.noctisWS) {
+                window.noctisWS.sendTypingIndicator(false);
+                isTyping = false;
+            }
+        }, 2000);
+    }
+    
+    // Event listeners
+    sendButton.addEventListener('click', sendMessage);
+    
+    messageInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        } else {
+            handleTyping();
+        }
+    });
+    
+    messageInput.addEventListener('input', function() {
+        autoResize();
+        handleTyping();
+    });
+    
+    // Focus on message input
+    messageInput.focus();
+});
 </script>
 {% endblock %}

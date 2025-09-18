@@ -120,22 +120,36 @@ ASGI_APPLICATION = 'noctis_pro.asgi.application'  # Re-enabled for Daphne
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Redis configuration for channels - Disabled for now to fix login
-# CHANNEL_LAYERS = {
-#     'default': {
-#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#         'CONFIG': {
-#             "hosts": [('127.0.0.1', 6379)],
-#         },
-#     },
-# }
-
-# Use in-memory channel layer for now
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
+# Channel layers configuration for WebSocket support
+if INTERNET_ACCESS:
+    # Use Redis for production internet deployment
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [(os.environ.get('REDIS_HOST', 'redis'), 6379)],
+                "password": os.environ.get('REDIS_PASSWORD', 'redis_secure_password'),
+            },
+        },
+    }
+elif IS_TAILNET:
+    # Use Redis for Tailnet deployment
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [('redis', 6379)],
+                "password": os.environ.get('REDIS_PASSWORD', 'redis_secure_password'),
+            },
+        },
+    }
+else:
+    # Use in-memory channel layer for development
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
 # Celery Configuration - Disabled for now to fix login
 # CELERY_BROKER_URL = 'redis://localhost:6379'

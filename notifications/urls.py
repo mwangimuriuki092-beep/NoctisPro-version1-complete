@@ -4,8 +4,9 @@ from . import views
 app_name = 'notifications'
 
 urlpatterns = [
-    path('', views.notification_list, name='notification_list'),
-    path('api/notifications/', views.api_notifications, name='api_notifications'),
-    path('api/unread-count/', views.api_unread_count, name='api_unread_count'),
-    path('mark-read/<int:notification_id>/', views.mark_read, name='mark_read'),
+    path('test-websockets/', views.test_websockets, name='test_websockets'),
+    path('list/', views.notifications_list, name='list'),
+    path('mark-read/<uuid:notification_id>/', views.mark_notification_read, name='mark_read'),
+    # API endpoints
+    path('api/test-notification/', views.test_notification_api, name='test_notification_api'),
 ]

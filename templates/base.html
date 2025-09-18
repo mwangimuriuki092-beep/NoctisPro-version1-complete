@@ -17,7 +17,9 @@
     <link rel="stylesheet" href="{% static 'css/noctis-dashboard-style.css' %}">
     <link href="{% static 'css/dicom-viewer-buttons.css' %}" rel="stylesheet">
     <link href="{% static 'css/enhanced-buttons.css' %}" rel="stylesheet">
+    <link href="{% static 'css/websocket-ui.css' %}" rel="stylesheet">
     <script src="{% static 'js/dicom-viewer-utils.js' %}" defer></script>
+    <script src="{% static 'js/websocket-client.js' %}" defer></script>
     <style>
         :root {
             /* Unified dark theme palette */
@@ -643,7 +645,13 @@
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body class="bg-medical">
+<body class="bg-medical" data-user-id="{% if user.is_authenticated %}{{ user.id }}{% endif %}">
+    <!-- Connection Status Indicator -->
+    <div id="connection-status" class="connection-status" style="display: none;">Connecting...</div>
+    
+    <!-- Notifications Container -->
+    <div id="notifications-container" class="notifications-container"></div>
+
 {% if not hide_navbar %}
     <nav class="top-navbar" role="navigation" aria-label="Main Navigation">
         <div class="nav-left">

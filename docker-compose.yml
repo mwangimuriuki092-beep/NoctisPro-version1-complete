@@ -114,7 +114,7 @@ services:
              python manage.py collectstatic --noinput &&
              python manage.py setup_working_ai_models &&
              python manage.py shell -c \"from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').delete(); User.objects.create_superuser('admin', 'admin@noctispro.com', 'admin123'); print('✅ Admin user created')\" &&
-             gunicorn noctis_pro.wsgi:application --bind 0.0.0.0:8080 --workers 4 --timeout 120"
+             daphne -b 0.0.0.0 -p 8080 noctis_pro.asgi:application"
 
   # AI Analysis Processor
   ai_processor:
