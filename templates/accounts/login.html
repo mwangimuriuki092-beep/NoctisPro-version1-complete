@@ -140,6 +140,13 @@
             font-size: 14px;
             transition: all 0.3s ease;
             position: relative;
+            /* Force reset of browser styling */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            /* Prevent autofill styling */
+            -webkit-box-shadow: 0 0 0px 1000px var(--secondary-bg) inset !important;
+            -webkit-text-fill-color: var(--text-primary) !important;
         }
 
         .form-control:focus {

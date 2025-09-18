@@ -1,5 +1,27 @@
 
 services:
+  # Tailscale sidecar for secure networking
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: noctis_tailscale
+    hostname: ${TAILNET_HOSTNAME:-noctispro}
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTH_KEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_ACCEPT_DNS=true
+    volumes:
+      - tailscale_data:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+    restart: unless-stopped
+    network_mode: host
+
   # PostgreSQL Database
   db:
     image: postgres:15-alpine
@@ -11,7 +33,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
-    # Do not bind Postgres to host to avoid port conflicts
+    ports:
+      - "127.0.0.1:5432:5432"  # Only local access
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U noctis_user -d noctis_pro"]
       interval: 10s
@@ -26,7 +49,8 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    # Do not bind Redis to host to avoid port conflicts
+    ports:
+      - "127.0.0.1:6379:6379"  # Only local access
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -54,38 +78,42 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - ALLOWED_HOSTS=*
+      - TAILNET_HOSTNAME=${TAILNET_HOSTNAME:-noctispro}
+      - USE_TAILNET=true
+      - ALLOWED_HOSTS=${TAILNET_HOSTNAME:-noctispro},localhost,127.0.0.1,*.ts.net,100.*
     volumes:
       - .:/app
       - media_files:/app/media
       - static_files:/app/staticfiles
-    ports:
-      - "8000:8000"
+    network_mode: "service:tailscale"  # Share network with Tailscale
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      tailscale:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
     restart: unless-stopped
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             python manage.py shell -c \"from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').delete(); User.objects.create_superuser('admin', 'admin@noctispro.com', 'NoctisAdmin2024!'); print('✅ Admin user created')\" &&
-             gunicorn noctis_pro.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
+             python manage.py setup_working_ai_models &&
+             python manage.py shell -c \"from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').delete(); User.objects.create_superuser('admin', 'admin@noctispro.com', 'admin123'); print('✅ Admin user created')\" &&
+             gunicorn noctis_pro.wsgi:application --bind 0.0.0.0:8080 --workers 4 --timeout 120"
 
-  # Celery Worker for background tasks
-  celery:
+  # AI Analysis Processor
+  ai_processor:
     build:
       context: .
       dockerfile: Dockerfile
       target: ${BUILD_TARGET:-production}
-    container_name: noctis_celery
+    container_name: noctis_ai_processor
     environment:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
@@ -97,8 +125,8 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - TAILNET_HOSTNAME=${TAILNET_HOSTNAME:-noctispro}
+      - USE_TAILNET=true
     volumes:
       - .:/app
       - media_files:/app/media
@@ -107,8 +135,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      web:
+        condition: service_healthy
     restart: unless-stopped
-    command: celery -A noctis_pro worker --loglevel=info
+    command: python manage.py process_ai_analyses --continuous
 
   # DICOM Receiver Service
   dicom_receiver:
@@ -166,4 +196,6 @@ volumes:
   media_files:
     driver: local
   static_files:
+    driver: local
+  tailscale_data:
     driver: local

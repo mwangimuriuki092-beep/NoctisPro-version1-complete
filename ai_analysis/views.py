@@ -816,50 +816,123 @@ def simulate_ai_analysis(analysis):
     }
 
 def generate_report_content(study, analyses, template):
-    """Generate report content from AI analyses"""
-    # Aggregate findings from all analyses
-    all_findings = []
-    all_abnormalities = []
-    confidence_scores = []
+    """Generate comprehensive report content from AI analyses"""
+    findings = []
+    technical_findings = []
+    quality_metrics = []
+    hu_analysis = []
+    image_statistics = []
+    recommendations = []
     
+    overall_confidence = 0.0
+    confidence_count = 0
+    
+    # Process each analysis result
     for analysis in analyses:
-        if analysis.findings:
-            all_findings.append(f"[{analysis.ai_model.name}] {analysis.findings}")
-        if analysis.abnormalities_detected:
-            all_abnormalities.extend(analysis.abnormalities_detected)
-        if analysis.confidence_score:
-            confidence_scores.append(analysis.confidence_score)
+        if analysis.results and analysis.status == 'completed':
+            results = analysis.results
+            analysis_type = results.get('analysis_type', 'unknown')
+            
+            # Add confidence to overall calculation
+            if 'confidence' in results:
+                overall_confidence += results['confidence']
+                confidence_count += 1
+            
+            # Process different types of analyses
+            if analysis_type == 'metadata_analysis':
+                technical_findings.extend(results.get('findings', []))
+                if 'technical_parameters' in results:
+                    tech_params = results['technical_parameters']
+                    technical_findings.append(f"Study Date: {tech_params.get('study_date', 'Unknown')}")
+                    technical_findings.append(f"Modality: {tech_params.get('modality', 'Unknown')}")
+                    if tech_params.get('body_part'):
+                        technical_findings.append(f"Body Part: {tech_params['body_part']}")
+            
+            elif analysis_type == 'image_statistics':
+                image_statistics.extend(results.get('findings', []))
+                if 'statistics' in results:
+                    stats = results['statistics']
+                    image_statistics.append(f"Images analyzed: {stats.get('images_analyzed', 0)}")
+                    image_statistics.append(f"Mean intensity: {stats.get('mean_intensity', 0):.1f}")
+                    image_statistics.append(f"Intensity range: {stats.get('min_value', 0):.0f} - {stats.get('max_value', 0):.0f}")
+            
+            elif analysis_type == 'hounsfield_analysis':
+                hu_analysis.extend(results.get('findings', []))
+                if 'hu_statistics' in results:
+                    hu_stats = results['hu_statistics']
+                    hu_analysis.append(f"HU range: {hu_stats.get('min_hu', 0):.0f} to {hu_stats.get('max_hu', 0):.0f}")
+                    hu_analysis.append(f"Mean HU: {hu_stats.get('mean_hu', 0):.1f}")
+                
+                if 'calibration_check' in results and results['calibration_check']:
+                    cal_check = results['calibration_check']
+                    if 'water_hu_deviation' in cal_check:
+                        deviation = cal_check['water_hu_deviation']
+                        if deviation > 5:
+                            hu_analysis.append(f"⚠️ Water HU calibration deviation: {deviation:.1f} HU")
+                        else:
+                            hu_analysis.append(f"✓ Water HU calibration within acceptable range")
+            
+            elif analysis_type == 'report_generation':
+                if 'clinical_observations' in results:
+                    findings.extend(results['clinical_observations'])
+                if 'recommendations' in results:
+                    recommendations.extend(results['recommendations'])
     
     # Calculate overall confidence
-    overall_confidence = np.mean(confidence_scores) if confidence_scores else 0.5
-    
-    # Generate findings section
-    findings_text = template.findings_template.format(
-        patient_name=study.patient.full_name,
-        study_date=study.study_date.strftime('%Y-%m-%d'),
-        modality=study.modality.name,
-        findings='; '.join(all_findings) if all_findings else 'No significant findings detected.'
-    )
-    
-    # Generate impression
-    if all_abnormalities:
-        impression_text = f"Abnormalities detected: {', '.join([str(a) for a in all_abnormalities])}"
+    if confidence_count > 0:
+        overall_confidence = overall_confidence / confidence_count
     else:
-        impression_text = "No acute abnormalities detected by AI analysis."
+        overall_confidence = 0.5
     
-    # Generate recommendations
-    recommendations_text = template.recommendations_template or "Recommend correlation with clinical findings."
+    # Build comprehensive findings using template format
+    template_vars = {
+        'clinical_info': study.clinical_info or 'Not provided',
+        'study_date': study.study_date.strftime('%Y-%m-%d') if study.study_date else 'Unknown',
+        'study_time': study.study_date.strftime('%H:%M:%S') if study.study_date else 'Unknown',
+        'modality': study.modality.code,
+        'body_part': study.body_part or 'Not specified',
+        'technical_findings': '\n'.join([f"• {tf}" for tf in technical_findings]) or 'Standard technique',
+        'quality_metrics': '\n'.join([f"• {qm}" for qm in image_statistics]) or 'Image quality adequate',
+        'hu_analysis': '\n'.join([f"• {hu}" for hu in hu_analysis]) or 'Not applicable',
+        'image_statistics': '\n'.join([f"• {stat}" for stat in image_statistics]) or 'Not analyzed',
+        'ai_findings': '\n'.join([f"• {finding}" for finding in findings]) or 'No specific findings noted',
+        'ai_impression': f"Automated analysis completed with {overall_confidence:.0%} confidence",
+        'ai_recommendations': '\n'.join([f"• {rec}" for rec in recommendations]) or '• Clinical correlation recommended\n• Radiologist review required',
+        'quality_assessment': f"Overall analysis confidence: {overall_confidence:.1%}"
+    }
     
-    # Add a professional nudge to encourage clinician review and research
-    research_nudge = ("Note: This AI-generated summary is for preliminary support only. "
-                      "Please review images directly, correlate clinically, and consult authoritative references. "
-                      "Consider reviewing current guidelines and differential diagnoses relevant to the findings.")
+    # Format the template content
+    try:
+        formatted_findings = template.template_content.format(**template_vars)
+    except (AttributeError, KeyError):
+        # Fallback if template formatting fails
+        formatted_findings = f"""AUTOMATED ANALYSIS REPORT
+
+STUDY INFORMATION:
+{template_vars['ai_findings']}
+
+TECHNICAL ASSESSMENT:
+{template_vars['technical_findings']}
+
+QUALITY METRICS:
+{template_vars['quality_metrics']}
+
+RECOMMENDATIONS:
+{template_vars['ai_recommendations']}
+
+CONFIDENCE: {overall_confidence:.1%}
+"""
     
     return {
-        'findings': findings_text + "\n\n" + research_nudge,
-        'impression': impression_text,
-        'recommendations': recommendations_text,
-        'confidence': overall_confidence
+        'findings': formatted_findings,
+        'impression': template_vars['ai_impression'],
+        'recommendations': template_vars['ai_recommendations'],
+        'confidence': overall_confidence,
+        'technical_findings': template_vars['technical_findings'],
+        'quality_metrics': template_vars['quality_metrics'],
+        'hu_analysis': template_vars['hu_analysis'],
+        'image_statistics': template_vars['image_statistics'],
+        'quality_assessment': template_vars['quality_assessment']
     }
 
 

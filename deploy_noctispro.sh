@@ -4,7 +4,7 @@
 # NoctisPro PACS - Automated Deployment Script for Linux Servers
 # Supports Ubuntu/Debian, RHEL/CentOS/Fedora, Arch, and SUSE (best-effort)
 # =============================================================================
-# This script automatically deploys the Django PACS system with ngrok
+# This script automatically deploys the Django PACS system with Tailscale
 # Author: AI Assistant
 # Date: $(date)
 # =============================================================================
@@ -19,9 +19,12 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-NGROK_AUTH_TOKEN="${NGROK_AUTH_TOKEN:-}"
-NGROK_STATIC_URL="${NGROK_STATIC_URL:-mallard-shining-curiously.ngrok-free.app}"
 DJANGO_PORT=${DJANGO_PORT:-8080}
+
+# Tailnet Configuration (Default and Only Option)
+USE_TAILNET="true"  # Always use Tailnet
+TAILNET_HOSTNAME="${TAILNET_HOSTNAME:-noctispro}"
+TAILSCALE_AUTH_KEY="${TAILSCALE_AUTH_KEY:-}"
 # Determine project directory robustly
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$SCRIPT_DIR/manage.py" || -f "$SCRIPT_DIR/requirements.txt" ]]; then
@@ -67,6 +70,72 @@ detect_package_manager() {
         PKG_MGR="unknown"
     fi
     info "Detected package manager: $PKG_MGR"
+}
+
+# Install and configure Tailscale
+setup_tailscale() {
+    
+    log "Setting up Tailscale for secure Tailnet networking..."
+    
+    # Check if Tailscale is already installed
+    if command -v tailscale >/dev/null 2>&1; then
+        info "Tailscale is already installed"
+    else
+        info "Installing Tailscale..."
+        
+        # Install Tailscale based on distro
+        case $PKG_MGR in
+            apt)
+                curl -fsSL https://tailscale.com/install.sh | sh
+                ;;
+            dnf|yum)
+                curl -fsSL https://tailscale.com/install.sh | sh
+                ;;
+            zypper)
+                curl -fsSL https://tailscale.com/install.sh | sh
+                ;;
+            pacman)
+                curl -fsSL https://tailscale.com/install.sh | sh
+                ;;
+            *)
+                warn "Unknown package manager. Please install Tailscale manually from https://tailscale.com/download"
+                return 1
+                ;;
+        esac
+    fi
+    
+    # Start Tailscale daemon
+    if ! systemctl is-active --quiet tailscaled; then
+        info "Starting Tailscale daemon..."
+        sudo systemctl enable --now tailscaled
+    fi
+    
+    # Authenticate with Tailscale if auth key is provided
+    if [[ -n "$TAILSCALE_AUTH_KEY" ]]; then
+        info "Authenticating with Tailscale using auth key..."
+        sudo tailscale up --authkey="$TAILSCALE_AUTH_KEY" --hostname="$TAILNET_HOSTNAME" --accept-routes
+    else
+        info "Please authenticate Tailscale manually:"
+        info "Run: sudo tailscale up --hostname=$TAILNET_HOSTNAME"
+        warn "Waiting for Tailscale authentication..."
+        
+        # Wait for Tailscale to be authenticated
+        while ! tailscale status >/dev/null 2>&1; do
+            echo -n "."
+            sleep 2
+        done
+        echo
+    fi
+    
+    # Get Tailscale IP
+    TAILSCALE_IP=$(tailscale ip -4)
+    if [[ -n "$TAILSCALE_IP" ]]; then
+        log "Tailscale configured successfully. IP: $TAILSCALE_IP"
+        info "Your NoctisPro PACS will be accessible at: http://$TAILSCALE_IP:$DJANGO_PORT"
+        info "Or via hostname: http://$TAILNET_HOSTNAME:$DJANGO_PORT"
+    else
+        warn "Could not determine Tailscale IP. Please check Tailscale status."
+    fi
 }
 
 # Detect a suitable Python interpreter (prefers 3.12 -> 3.11 -> 3.10 -> python3)
@@ -301,27 +370,6 @@ install_python_requirements() {
     log "Python requirements installed successfully!"
 }
 
-# Function to setup ngrok
-setup_ngrok() {
-    log "Setting up ngrok..."
-    
-    # Make ngrok executable
-    chmod +x "$PROJECT_DIR/ngrok"
-    
-    # Add ngrok to PATH if not already there
-    if ! command -v "$PROJECT_DIR/ngrok" &> /dev/null; then
-        sudo ln -sf "$PROJECT_DIR/ngrok" /usr/local/bin/ngrok
-    fi
-    
-    # Configure ngrok auth token if provided
-    if [ -n "$NGROK_AUTH_TOKEN" ]; then
-        "$PROJECT_DIR/ngrok" config add-authtoken "$NGROK_AUTH_TOKEN"
-    else
-        info "NGROK_AUTH_TOKEN not provided. Skipping token configuration."
-    fi
-    
-    log "Ngrok configured successfully!"
-}
 
 # Function to setup Django
 setup_django() {
@@ -333,20 +381,22 @@ setup_django() {
     # Create logs directory
     mkdir -p logs
     
-    # Set environment variables
+    # Set environment variables for Tailnet
     export DJANGO_SETTINGS_MODULE=noctis_pro.settings
     export DEBUG=False
-    export NGROK_URL="https://$NGROK_STATIC_URL"
-    export STATIC_URL="https://$NGROK_STATIC_URL/static/"
+    export TAILNET_HOSTNAME="$TAILNET_HOSTNAME"
+    
+    # Get Tailscale IP if available
+    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
     
     # Create .env file for production
     cat > .env << EOF
 DEBUG=False
 SECRET_KEY=$(python3 -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')
-NGROK_URL=https://$NGROK_STATIC_URL
-STATIC_URL=https://$NGROK_STATIC_URL/static/
-ALLOWED_HOSTS=$NGROK_STATIC_URL,localhost,127.0.0.1,0.0.0.0
+TAILNET_HOSTNAME=$TAILNET_HOSTNAME
+ALLOWED_HOSTS=$TAILNET_HOSTNAME,localhost,127.0.0.1,0.0.0.0,*.ts.net,100.*
 DJANGO_SETTINGS_MODULE=noctis_pro.settings
+USE_TAILNET=true
 EOF
     
     # Run Django management commands
@@ -411,40 +461,6 @@ EOF
     log "Systemd service created successfully!"
 }
 
-# Function to create ngrok service
-create_ngrok_service() {
-    log "Creating systemd service for ngrok..."
-    
-    if ! command -v systemctl >/dev/null 2>&1; then
-        warn "systemd not available on this system. Skipping ngrok service creation."
-        return 0
-    fi
-
-    sudo tee /etc/systemd/system/noctispro-ngrok.service > /dev/null << EOF
-[Unit]
-Description=Ngrok tunnel for NoctisPro PACS
-After=network.target noctispro.service
-
-[Service]
-Type=simple
-User=$USER
-Group=$USER
-WorkingDirectory=$PROJECT_DIR
-ExecStart=$PROJECT_DIR/ngrok http --url=$NGROK_STATIC_URL $DJANGO_PORT
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    sudo systemctl daemon-reload
-    sudo systemctl enable noctispro-ngrok
-    
-    log "Ngrok systemd service created successfully!"
-}
 
 # Function to start services
 start_services() {
@@ -455,9 +471,7 @@ start_services() {
         sudo systemctl start noctispro || true
         sleep 5
         
-        # Start ngrok tunnel
-        sudo systemctl start noctispro-ngrok || true
-        sleep 3
+        # Tailnet only - no ngrok service needed
         
         log "Services started successfully!"
     else
@@ -473,25 +487,35 @@ show_status() {
     if command -v systemctl >/dev/null 2>&1; then
         sudo systemctl status noctispro --no-pager -l || true
         echo
-        sudo systemctl status noctispro-ngrok --no-pager -l || true
+        tailscale status || true
     else
         warn "systemd not available. Skipping service status."
     fi
     echo
     
     info "=== Access Information ==="
-    echo -e "${GREEN}🌐 Application URL: https://$NGROK_STATIC_URL${NC}"
-    echo -e "${GREEN}👤 Admin Login: admin / admin123${NC}"
-    echo -e "${GREEN}📊 Admin Panel: https://$NGROK_STATIC_URL/admin/${NC}"
-    echo -e "${GREEN}🏥 Worklist: https://$NGROK_STATIC_URL/worklist/${NC}"
+    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
+    if [[ -n "$TAILSCALE_IP" ]]; then
+        echo -e "${GREEN}🌐 Application URL: http://$TAILSCALE_IP:$DJANGO_PORT${NC}"
+        echo -e "${GREEN}🌐 Hostname URL: http://$TAILNET_HOSTNAME:$DJANGO_PORT${NC}"
+        echo -e "${GREEN}👤 Admin Login: admin / admin123${NC}"
+        echo -e "${GREEN}📊 Admin Panel: http://$TAILSCALE_IP:$DJANGO_PORT/admin/${NC}"
+        echo -e "${GREEN}🏥 Worklist: http://$TAILSCALE_IP:$DJANGO_PORT/worklist/${NC}"
+        echo -e "${GREEN}🤖 AI Dashboard: http://$TAILSCALE_IP:$DJANGO_PORT/ai/${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Tailscale IP not available. Check Tailscale status.${NC}"
+        echo -e "${BLUE}ℹ️  Run: tailscale status${NC}"
+    fi
     echo
     
     info "=== Service Management ==="
     if command -v systemctl >/dev/null 2>&1; then
-        echo "Start services:   sudo systemctl start noctispro noctispro-ngrok"
-        echo "Stop services:    sudo systemctl stop noctispro noctispro-ngrok"
-        echo "Restart services: sudo systemctl restart noctispro noctispro-ngrok"
-        echo "View logs:        sudo journalctl -f -u noctispro -u noctispro-ngrok"
+        echo "Start services:   sudo systemctl start noctispro"
+        echo "Stop services:    sudo systemctl stop noctispro"
+        echo "Restart services: sudo systemctl restart noctispro"
+        echo "View logs:        sudo journalctl -f -u noctispro"
+        echo "Tailscale status: tailscale status"
+        echo "Tailscale IP:     tailscale ip -4"
     else
         echo "Start: $PROJECT_DIR/start_noctispro.sh"
         echo "Stop:  $PROJECT_DIR/stop_noctispro.sh"
@@ -569,15 +593,14 @@ main() {
     setup_virtual_environment
     install_python_requirements
     
-    log "=== Phase 3: Ngrok Setup ==="
-    setup_ngrok
+    log "=== Phase 3: Tailscale Setup (Tailnet Network) ==="
+    setup_tailscale
     
     log "=== Phase 4: Django Configuration ==="
     setup_django
     
     log "=== Phase 5: Service Creation ==="
     create_systemd_service
-    create_ngrok_service
     create_management_script
     
     log "=== Phase 6: Service Startup ==="
@@ -587,7 +610,14 @@ main() {
     show_status
     
     log "🎉 NoctisPro PACS has been successfully deployed!"
-    log "🔗 Access your application at: https://$NGROK_STATIC_URL"
+    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
+    if [[ -n "$TAILSCALE_IP" ]]; then
+        log "🔗 Access your application at: http://$TAILSCALE_IP:$DJANGO_PORT"
+        log "🔗 Or via hostname: http://$TAILNET_HOSTNAME:$DJANGO_PORT"
+    else
+        log "🔗 Check Tailscale status and access via your Tailnet"
+        log "ℹ️  Run: tailscale status"
+    fi
 }
 
 # Run main function

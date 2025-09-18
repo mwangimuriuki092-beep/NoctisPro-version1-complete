@@ -59,8 +59,9 @@ def _data_url_from_png(png_bytes: bytes) -> str:
 @login_required
 def report_list(request):
     # Restrict to admin and radiologist
-    if not getattr(request.user, 'can_edit_reports', None) or not request.user.can_edit_reports():
-        return HttpResponse(status=403)
+    if not hasattr(request.user, 'can_edit_reports') or not request.user.can_edit_reports():
+        messages.error(request, 'You do not have permission to access reports.')
+        return redirect('worklist:dashboard')
     """List all reports"""
     # Get filter parameters
     search_query = request.GET.get('search', '')

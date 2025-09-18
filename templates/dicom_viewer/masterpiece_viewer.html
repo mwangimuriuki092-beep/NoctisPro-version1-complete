@@ -11,7 +11,10 @@
     {% load static %}
     <script src="{% static 'js/masterpiece_3d_reconstruction.js' %}"></script>
     <script src="{% static 'js/vendor/dicomParser.min.js' %}"></script>
+    <script src="{% static 'js/dicom-measurements.js' %}"></script>
+    <script src="{% static 'js/session-timeout.js' %}"></script>
     <script src="{% static 'js/dicom-viewer-enhanced.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-fixes.js' %}"></script>
     <style>
         :root {
             --primary-bg: #0a0a0a;
@@ -1148,6 +1151,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
             setupEventListeners();
+            
+            // Initialize measurement system
+            canvas = document.getElementById('dicomCanvas');
+            if (canvas) {
+                measurementSystem = new DICOMMeasurements(canvas);
+                window.measurementSystem = measurementSystem; // Make it globally accessible
+            }
+            
             // Auto-hide disabled by default; user can manually toggle UI
             
             // Check if study ID is provided in URL

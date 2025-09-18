@@ -10,4 +10,6 @@ urlpatterns = [
     path('change-password/', views.change_password, name='change_password'),
     path('api/check-session/', views.check_session, name='check_session'),
     path('api/user-info/', views.user_api_info, name='user_api_info'),
+    path('extend-session/', views.extend_session, name='extend_session'),
+    path('session-status/', views.session_status, name='session_status'),
 ]

@@ -276,12 +276,30 @@ def upload_study(request):
 				
 				# Enhanced patient data extraction with medical validation
 				patient_id = getattr(rep_ds, 'PatientID', f'TEMP_{int(timezone.now().timestamp())}')
-				patient_name = str(getattr(rep_ds, 'PatientName', 'UNKNOWN^PATIENT')).replace('^', ' ')
+				patient_name_raw = getattr(rep_ds, 'PatientName', 'UNKNOWN^PATIENT')
 				
-				# Professional name parsing with medical standards
-				name_parts = patient_name.strip().split(' ')
-				first_name = name_parts[0] if name_parts and name_parts[0] != 'UNKNOWN' else 'Unknown'
-				last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else 'Patient'
+				# Professional DICOM name parsing with medical standards
+				# DICOM names are in format: "LastName^FirstName^MiddleName^Prefix^Suffix"
+				if hasattr(patient_name_raw, 'family_name'):
+					# pydicom PersonName object
+					first_name = str(patient_name_raw.given_name or 'Unknown').strip()
+					last_name = str(patient_name_raw.family_name or 'Patient').strip()
+				else:
+					# String format
+					patient_name_str = str(patient_name_raw)
+					if '^' in patient_name_str:
+						name_parts = patient_name_str.split('^')
+						last_name = name_parts[0].strip() if name_parts[0] else 'Patient'
+						first_name = name_parts[1].strip() if len(name_parts) > 1 and name_parts[1] else 'Unknown'
+					else:
+						# Space-separated format fallback
+						name_parts = patient_name_str.strip().split(' ')
+						if len(name_parts) >= 2:
+							first_name = name_parts[0] if name_parts[0] != 'UNKNOWN' else 'Unknown'
+							last_name = ' '.join(name_parts[1:])
+						else:
+							first_name = 'Unknown'
+							last_name = name_parts[0] if name_parts and name_parts[0] != 'UNKNOWN' else 'Patient'
 				
 				# Professional date handling with medical precision
 				birth_date = getattr(rep_ds, 'PatientBirthDate', None)
@@ -558,6 +576,31 @@ def upload_study(request):
 						)
 				except Exception:
 					pass
+				
+				# Trigger AI analysis for applicable modalities
+				try:
+					from ai_analysis.models import AIModel, AIAnalysis
+					# Check if there are active AI models for this modality
+					ai_models = AIModel.objects.filter(
+						modality=modality_code,
+						is_active=True
+					)
+					
+					if ai_models.exists():
+						# Create AI analysis request
+						for ai_model in ai_models[:3]:  # Limit to 3 models to avoid overload
+							AIAnalysis.objects.create(
+								study=study,
+								model=ai_model,
+								requested_by=request.user,
+								priority='normal',
+								status='pending',
+								analysis_type='automatic',
+								parameters={'auto_triggered': True, 'upload_session': True}
+							)
+						logger.info(f"Triggered AI analysis for study {study.accession_number} with {ai_models.count()} models")
+				except Exception as e:
+					logger.warning(f"Failed to trigger AI analysis for study {study.accession_number}: {e}")
 			
 			# Professional upload completion with comprehensive statistics
 			upload_stats['invalid_files'] = invalid_files
