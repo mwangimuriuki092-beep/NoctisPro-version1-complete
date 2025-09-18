@@ -5,26 +5,46 @@ A comprehensive Django-based Picture Archiving and Communication System (PACS) f
 ## Quick Deployment (Ubuntu Server 24.04)
 
 ### One-Command Deployment
+
+#### Option 1: Ngrok Deployment (Default)
 ```bash
 ./deploy_noctispro.sh
 ```
 
-This script will automatically:
+#### Option 2: Tailnet Deployment (Recommended for Production)
+```bash
+USE_TAILNET=true TAILNET_HOSTNAME=noctispro ./deploy_noctispro.sh
+```
+
+Or with Tailscale auth key for automated setup:
+```bash
+USE_TAILNET=true TAILSCALE_AUTH_KEY=your_auth_key TAILNET_HOSTNAME=noctispro ./deploy_noctispro.sh
+```
+
+The deployment script will automatically:
 - ✅ Install all system dependencies
 - ✅ Set up Python virtual environment
 - ✅ Install Python requirements (handling problematic packages)
-- ✅ Configure ngrok with your auth token
+- ✅ Configure network access (ngrok or Tailscale)
 - ✅ Set up Django database and migrations
 - ✅ Collect static files
 - ✅ Create admin superuser (admin/admin123)
 - ✅ Create systemd services
-- ✅ Start the application with ngrok tunnel
+- ✅ Start the application
 
 ### Access Information
+
+#### Ngrok Deployment:
 - **Application URL**: https://mallard-shining-curiously.ngrok-free.app
 - **Admin Login**: admin / admin123
 - **Admin Panel**: https://mallard-shining-curiously.ngrok-free.app/admin/
 - **Worklist**: https://mallard-shining-curiously.ngrok-free.app/worklist/
+
+#### Tailnet Deployment:
+- **Application URL**: http://noctispro:8080 (or via Tailscale IP)
+- **Admin Login**: admin / admin123
+- **Admin Panel**: http://noctispro:8080/admin/
+- **Worklist**: http://noctispro:8080/worklist/
 
 ### Management Commands
 ```bash

@@ -269,7 +269,7 @@ AUTH_USER_MODEL = 'accounts.User'
 
 # Login URLs
 LOGIN_URL = '/login/'
-LOGIN_REDIRECT_URL = '/worklist/'
+LOGIN_REDIRECT_URL = '/worklist/'  # Redirect to worklist after successful login
 LOGOUT_REDIRECT_URL = '/login/'
 
 # Session configuration - Use database sessions instead of Redis

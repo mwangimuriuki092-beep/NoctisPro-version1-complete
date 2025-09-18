@@ -27,10 +27,8 @@ from . import views
 from . import health as health_views
 
 def home_redirect(request):
-    """Redirect home page to login or dashboard based on authentication"""
-    if request.user.is_authenticated:
-        # Redirect authenticated users to worklist dashboard - FULL FUNCTIONALITY RESTORED
-        return redirect('worklist:dashboard')
+    """Redirect home page to login for fresh authentication"""
+    # Always redirect to login to ensure fresh authentication after server restart
     return redirect('accounts:login')
 
 def favicon_view(request):

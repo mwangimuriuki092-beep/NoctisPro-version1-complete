@@ -22,6 +22,11 @@ NC='\033[0m' # No Color
 NGROK_AUTH_TOKEN="${NGROK_AUTH_TOKEN:-}"
 NGROK_STATIC_URL="${NGROK_STATIC_URL:-mallard-shining-curiously.ngrok-free.app}"
 DJANGO_PORT=${DJANGO_PORT:-8080}
+
+# Tailnet Configuration
+USE_TAILNET="${USE_TAILNET:-false}"
+TAILNET_HOSTNAME="${TAILNET_HOSTNAME:-noctispro}"
+TAILSCALE_AUTH_KEY="${TAILSCALE_AUTH_KEY:-}"
 # Determine project directory robustly
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$SCRIPT_DIR/manage.py" || -f "$SCRIPT_DIR/requirements.txt" ]]; then
@@ -67,6 +72,75 @@ detect_package_manager() {
         PKG_MGR="unknown"
     fi
     info "Detected package manager: $PKG_MGR"
+}
+
+# Install and configure Tailscale
+setup_tailscale() {
+    if [[ "$USE_TAILNET" != "true" ]]; then
+        return 0
+    fi
+    
+    log "Setting up Tailscale for secure networking..."
+    
+    # Check if Tailscale is already installed
+    if command -v tailscale >/dev/null 2>&1; then
+        info "Tailscale is already installed"
+    else
+        info "Installing Tailscale..."
+        
+        # Install Tailscale based on distro
+        case $PKG_MGR in
+            apt)
+                curl -fsSL https://tailscale.com/install.sh | sh
+                ;;
+            dnf|yum)
+                curl -fsSL https://tailscale.com/install.sh | sh
+                ;;
+            zypper)
+                curl -fsSL https://tailscale.com/install.sh | sh
+                ;;
+            pacman)
+                curl -fsSL https://tailscale.com/install.sh | sh
+                ;;
+            *)
+                warn "Unknown package manager. Please install Tailscale manually from https://tailscale.com/download"
+                return 1
+                ;;
+        esac
+    fi
+    
+    # Start Tailscale daemon
+    if ! systemctl is-active --quiet tailscaled; then
+        info "Starting Tailscale daemon..."
+        sudo systemctl enable --now tailscaled
+    fi
+    
+    # Authenticate with Tailscale if auth key is provided
+    if [[ -n "$TAILSCALE_AUTH_KEY" ]]; then
+        info "Authenticating with Tailscale using auth key..."
+        sudo tailscale up --authkey="$TAILSCALE_AUTH_KEY" --hostname="$TAILNET_HOSTNAME" --accept-routes
+    else
+        info "Please authenticate Tailscale manually:"
+        info "Run: sudo tailscale up --hostname=$TAILNET_HOSTNAME"
+        warn "Waiting for Tailscale authentication..."
+        
+        # Wait for Tailscale to be authenticated
+        while ! tailscale status >/dev/null 2>&1; do
+            echo -n "."
+            sleep 2
+        done
+        echo
+    fi
+    
+    # Get Tailscale IP
+    TAILSCALE_IP=$(tailscale ip -4)
+    if [[ -n "$TAILSCALE_IP" ]]; then
+        log "Tailscale configured successfully. IP: $TAILSCALE_IP"
+        info "Your NoctisPro PACS will be accessible at: http://$TAILSCALE_IP:$DJANGO_PORT"
+        info "Or via hostname: http://$TAILNET_HOSTNAME:$DJANGO_PORT"
+    else
+        warn "Could not determine Tailscale IP. Please check Tailscale status."
+    fi
 }
 
 # Detect a suitable Python interpreter (prefers 3.12 -> 3.11 -> 3.10 -> python3)
@@ -455,9 +529,11 @@ start_services() {
         sudo systemctl start noctispro || true
         sleep 5
         
-        # Start ngrok tunnel
-        sudo systemctl start noctispro-ngrok || true
-        sleep 3
+        # Start ngrok tunnel only if not using Tailnet
+        if [[ "$USE_TAILNET" != "true" ]]; then
+            sudo systemctl start noctispro-ngrok || true
+            sleep 3
+        fi
         
         log "Services started successfully!"
     else
@@ -473,25 +549,50 @@ show_status() {
     if command -v systemctl >/dev/null 2>&1; then
         sudo systemctl status noctispro --no-pager -l || true
         echo
-        sudo systemctl status noctispro-ngrok --no-pager -l || true
+        if [[ "$USE_TAILNET" != "true" ]]; then
+            sudo systemctl status noctispro-ngrok --no-pager -l || true
+        else
+            tailscale status || true
+        fi
     else
         warn "systemd not available. Skipping service status."
     fi
     echo
     
     info "=== Access Information ==="
-    echo -e "${GREEN}🌐 Application URL: https://$NGROK_STATIC_URL${NC}"
-    echo -e "${GREEN}👤 Admin Login: admin / admin123${NC}"
-    echo -e "${GREEN}📊 Admin Panel: https://$NGROK_STATIC_URL/admin/${NC}"
-    echo -e "${GREEN}🏥 Worklist: https://$NGROK_STATIC_URL/worklist/${NC}"
+    if [[ "$USE_TAILNET" == "true" ]]; then
+        TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
+        if [[ -n "$TAILSCALE_IP" ]]; then
+            echo -e "${GREEN}🌐 Application URL: http://$TAILSCALE_IP:$DJANGO_PORT${NC}"
+            echo -e "${GREEN}🌐 Hostname URL: http://$TAILNET_HOSTNAME:$DJANGO_PORT${NC}"
+            echo -e "${GREEN}👤 Admin Login: admin / admin123${NC}"
+            echo -e "${GREEN}📊 Admin Panel: http://$TAILSCALE_IP:$DJANGO_PORT/admin/${NC}"
+            echo -e "${GREEN}🏥 Worklist: http://$TAILSCALE_IP:$DJANGO_PORT/worklist/${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Tailscale IP not available. Check Tailscale status.${NC}"
+        fi
+    else
+        echo -e "${GREEN}🌐 Application URL: https://$NGROK_STATIC_URL${NC}"
+        echo -e "${GREEN}👤 Admin Login: admin / admin123${NC}"
+        echo -e "${GREEN}📊 Admin Panel: https://$NGROK_STATIC_URL/admin/${NC}"
+        echo -e "${GREEN}🏥 Worklist: https://$NGROK_STATIC_URL/worklist/${NC}"
+    fi
     echo
     
     info "=== Service Management ==="
     if command -v systemctl >/dev/null 2>&1; then
-        echo "Start services:   sudo systemctl start noctispro noctispro-ngrok"
-        echo "Stop services:    sudo systemctl stop noctispro noctispro-ngrok"
-        echo "Restart services: sudo systemctl restart noctispro noctispro-ngrok"
-        echo "View logs:        sudo journalctl -f -u noctispro -u noctispro-ngrok"
+        if [[ "$USE_TAILNET" == "true" ]]; then
+            echo "Start services:   sudo systemctl start noctispro"
+            echo "Stop services:    sudo systemctl stop noctispro"
+            echo "Restart services: sudo systemctl restart noctispro"
+            echo "View logs:        sudo journalctl -f -u noctispro"
+            echo "Tailscale status: tailscale status"
+        else
+            echo "Start services:   sudo systemctl start noctispro noctispro-ngrok"
+            echo "Stop services:    sudo systemctl stop noctispro noctispro-ngrok"
+            echo "Restart services: sudo systemctl restart noctispro noctispro-ngrok"
+            echo "View logs:        sudo journalctl -f -u noctispro -u noctispro-ngrok"
+        fi
     else
         echo "Start: $PROJECT_DIR/start_noctispro.sh"
         echo "Stop:  $PROJECT_DIR/stop_noctispro.sh"
@@ -569,15 +670,21 @@ main() {
     setup_virtual_environment
     install_python_requirements
     
-    log "=== Phase 3: Ngrok Setup ==="
-    setup_ngrok
+    log "=== Phase 3: Network Setup ==="
+    if [[ "$USE_TAILNET" == "true" ]]; then
+        setup_tailscale
+    else
+        setup_ngrok
+    fi
     
     log "=== Phase 4: Django Configuration ==="
     setup_django
     
     log "=== Phase 5: Service Creation ==="
     create_systemd_service
-    create_ngrok_service
+    if [[ "$USE_TAILNET" != "true" ]]; then
+        create_ngrok_service
+    fi
     create_management_script
     
     log "=== Phase 6: Service Startup ==="
@@ -587,7 +694,16 @@ main() {
     show_status
     
     log "🎉 NoctisPro PACS has been successfully deployed!"
-    log "🔗 Access your application at: https://$NGROK_STATIC_URL"
+    if [[ "$USE_TAILNET" == "true" ]]; then
+        TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
+        if [[ -n "$TAILSCALE_IP" ]]; then
+            log "🔗 Access your application at: http://$TAILSCALE_IP:$DJANGO_PORT"
+        else
+            log "🔗 Check Tailscale status and access via your Tailnet"
+        fi
+    else
+        log "🔗 Access your application at: https://$NGROK_STATIC_URL"
+    fi
 }
 
 # Run main function
