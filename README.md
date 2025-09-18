@@ -63,14 +63,38 @@ sudo systemctl restart noctispro noctispro-ngrok
 sudo journalctl -f -u noctispro -u noctispro-ngrok
 ```
 
+### AI Analysis Setup
+After deployment, set up the AI analysis system:
+
+```bash
+# Setup AI models and start processing
+python setup_ai_system.py
+
+# Or manually:
+python manage.py setup_working_ai_models
+python manage.py process_ai_analyses --continuous
+```
+
+**AI Features:**
+- **Automatic Analysis**: AI analyzes all uploaded DICOM studies
+- **Real-time Processing**: Background processing of pending analyses
+- **Quality Assessment**: Technical parameter validation and image quality metrics
+- **Report Generation**: Automated preliminary reports with confidence scores
+- **Dashboard**: View AI results at `/ai/` endpoint
+
 ## Features
 - 🏥 **Medical Imaging**: DICOM viewer with support for CT, MR, CR, DX, US, XA
-- 🤖 **AI Analysis**: Automated medical image analysis
+- 🤖 **AI Analysis**: Real-time automated medical image analysis
+  - DICOM metadata analysis and validation
+  - Image quality assessment and statistics
+  - Hounsfield unit calibration checking (CT)
+  - Automatic report generation
+  - Technical parameter validation
 - 📊 **Worklist Management**: Patient and study management
 - 👥 **User Management**: Role-based access control
 - 📱 **Responsive Design**: Works on desktop and mobile
 - 🔒 **Security**: HTTPS, authentication, and authorization
-- 📈 **Reports**: Comprehensive reporting system
+- 📈 **Reports**: Comprehensive reporting system with AI integration
 - 💬 **Communication**: Built-in chat system
 - 🔔 **Notifications**: Real-time alerts and notifications
 
