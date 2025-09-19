@@ -10,8 +10,11 @@ from accounts.models import User, Facility
 from .utils import get_user_caps
 from worklist.models import Study, Modality
 from .models import SystemConfiguration, AuditLog, SystemUsageStatistics
+from .backup_system import medical_backup_system
+from .backup_scheduler import medical_backup_scheduler
 import json
 import re
+import threading
 from django.utils.crypto import get_random_string
 
 
@@ -910,3 +913,101 @@ def facility_delete(request, facility_id):
     
     context = {'facility': facility}
     return render(request, 'admin_panel/facility_confirm_delete.html', context)
+
+
+# =================== MEDICAL BACKUP SYSTEM VIEWS ===================
+
+@login_required
+@user_passes_test(is_admin)
+def backup_management(request):
+    """Medical-grade backup management dashboard"""
+    try:
+        # Get backup system status
+        backup_status = medical_backup_scheduler.get_backup_status()
+        
+        # Get recent backup history
+        backup_history = []
+        backup_root = medical_backup_system.backup_root
+        
+        import os
+        if os.path.exists(backup_root):
+            manifest_files = [f for f in os.listdir(backup_root) if f.endswith('_manifest.json')]
+            manifest_files.sort(key=lambda x: os.path.getctime(os.path.join(backup_root, x)), reverse=True)
+            
+            for manifest_file in manifest_files[:10]:  # Last 10 backups
+                try:
+                    with open(os.path.join(backup_root, manifest_file), 'r') as f:
+                        manifest = json.load(f)
+                    backup_history.append(manifest)
+                except Exception as e:
+                    print(f"Error reading manifest {manifest_file}: {e}")
+        
+        context = {
+            'backup_status': backup_status,
+            'backup_history': backup_history,
+            'page_title': 'Medical Data Backup Management',
+            'medical_compliance': 'FDA 21 CFR Part 11 Compliant'
+        }
+        
+        return render(request, 'admin_panel/backup_management.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error loading backup management: {str(e)}')
+        return redirect('admin_panel:dashboard')
+
+@login_required
+@user_passes_test(is_admin)
+def create_backup(request):
+    """Create manual backup"""
+    if request.method == 'POST':
+        try:
+            backup_type = request.POST.get('backup_type', 'manual')
+            
+            # Run backup in background thread
+            def run_backup():
+                try:
+                    backup_info = medical_backup_system.create_full_backup(backup_type=backup_type)
+                    
+                    if backup_info['status'] == 'completed':
+                        messages.success(request, f'✅ Medical backup completed successfully: {backup_info["backup_id"]}')
+                    else:
+                        messages.error(request, f'❌ Medical backup failed: {backup_info.get("error", "Unknown error")}')
+                        
+                except Exception as e:
+                    messages.error(request, f'❌ Backup error: {str(e)}')
+            
+            backup_thread = threading.Thread(target=run_backup, daemon=True)
+            backup_thread.start()
+            
+            messages.info(request, '🏥 Medical backup started in background. Check status in a few minutes.')
+            
+        except Exception as e:
+            messages.error(request, f'Failed to start backup: {str(e)}')
+    
+    return redirect('admin_panel:backup_management')
+
+@login_required
+@user_passes_test(is_admin)
+def emergency_backup(request):
+    """Trigger emergency backup"""
+    if request.method == 'POST':
+        try:
+            reason = request.POST.get('reason', 'Manual emergency backup')
+            
+            def run_emergency_backup():
+                backup_info = medical_backup_scheduler.trigger_emergency_backup(reason=reason)
+                
+                if backup_info['status'] == 'completed':
+                    messages.success(request, f'🚨 Emergency backup completed: {backup_info["backup_id"]}')
+                else:
+                    messages.error(request, f'🚨 Emergency backup failed: {backup_info.get("error", "Unknown error")}')
+            
+            backup_thread = threading.Thread(target=run_emergency_backup, daemon=True)
+            backup_thread.start()
+            
+            messages.info(request, '🚨 Emergency medical backup initiated. Check status shortly.')
+            
+        except Exception as e:
+            messages.error(request, f'Emergency backup failed: {str(e)}')
+    
+    return redirect('admin_panel:backup_management')

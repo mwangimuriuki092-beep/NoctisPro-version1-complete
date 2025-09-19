@@ -29,4 +29,9 @@ urlpatterns = [
     # Permissions and capabilities management
     path('permissions/', views_permissions.permissions_dashboard, name='permissions_dashboard'),
     path('permissions/user/<str:username>/', views_permissions.edit_user_permissions, name='edit_user_permissions'),
+    
+    # Medical backup system
+    path('backup/', views.backup_management, name='backup_management'),
+    path('backup/create/', views.create_backup, name='create_backup'),
+    path('backup/emergency/', views.emergency_backup, name='emergency_backup'),
 ]

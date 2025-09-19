@@ -777,29 +777,7 @@ def api_studies(request):
 			if not processing_stats['date_range']['latest'] or study.study_date > processing_stats['date_range']['latest']:
 				processing_stats['date_range']['latest'] = study.study_date
 			
-			# Professional series information for DICOM viewer integration
-			series_data = []
-			for series in study.series_set.all().order_by('series_number'):
-				series_image_count = series.images.count()
-				series_data.append({
-					'id': series.id,
-					'series_number': series.series_number,
-					'series_description': series.series_description or f'Series {series.series_number}',
-					'modality': series.modality,
-					'body_part': series.body_part,
-					'image_count': series_image_count,
-					'slice_thickness': series.slice_thickness,
-					'pixel_spacing': series.pixel_spacing,
-					'series_instance_uid': series.series_instance_uid,
-					'first_image_id': series.images.first().id if series_image_count > 0 else None,
-					'professional_metadata': {
-						'is_complete': series_image_count > 0,
-						'medical_grade': True,
-						'viewer_ready': series_image_count > 0
-					}
-				})
-			
-			# Professional study data formatting with medical precision
+			# Professional study data formatting with medical precision - simple and clean
 			studies_data.append({
 				'id': study.id,
 				'accession_number': study.accession_number,
@@ -820,13 +798,10 @@ def api_studies(request):
 				'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
 				'body_part': getattr(study, 'body_part', ''),
 				'referring_physician': study.referring_physician,
-				'series': series_data,  # Enhanced series information for viewer
 				'professional_metadata': {
 					'data_quality': 'EXCELLENT' if image_count > 0 else 'PENDING',
 					'completeness': 'COMPLETE' if series_count > 0 and image_count > 0 else 'PARTIAL',
 					'medical_grade': True,
-					'series_organized': len(series_data) > 0,
-					'viewer_compatible': all(s['professional_metadata']['viewer_ready'] for s in series_data)
 				}
 			})
 		
