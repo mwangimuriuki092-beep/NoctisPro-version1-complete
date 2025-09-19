@@ -73,7 +73,7 @@ services:
     container_name: noctis_web
     environment:
       - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - SECRET_KEY=${SECRET_KEY:-$-stc(0h#ryg-54@@j!zubqmz&vcc5vpqwav2q0%%=_f(l$o_7}
       - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - DB_ENGINE=django.db.backends.postgresql
       - DB_NAME=noctis_pro
@@ -125,7 +125,7 @@ services:
     container_name: noctis_ai_processor
     environment:
       - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - SECRET_KEY=${SECRET_KEY:-$-stc(0h#ryg-54@@j!zubqmz&vcc5vpqwav2q0%%=_f(l$o_7}
       - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - DB_ENGINE=django.db.backends.postgresql
       - DB_NAME=noctis_pro
@@ -160,7 +160,7 @@ services:
     container_name: noctis_dicom
     environment:
       - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - SECRET_KEY=${SECRET_KEY:-$-stc(0h#ryg-54@@j!zubqmz&vcc5vpqwav2q0%%=_f(l$o_7}
       - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - DB_ENGINE=django.db.backends.postgresql
       - DB_NAME=noctis_pro

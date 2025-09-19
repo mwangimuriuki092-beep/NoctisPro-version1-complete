@@ -68,6 +68,11 @@ qrcode
 # Extensions
 django-extensions
 
+# Production monitoring (for new features)
+psutil
+schedule
+gevent
+
 # Printing support for DICOM images
 reportlab
 # pycups - commented out due to installation issues on some systems
