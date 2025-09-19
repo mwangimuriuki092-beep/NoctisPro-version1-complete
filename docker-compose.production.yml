@@ -1,0 +1,150 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: noctispro-db
+    environment:
+      POSTGRES_DB: noctispro
+      POSTGRES_USER: noctispro
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-noctispro_secure_2024}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U noctispro -d noctispro"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - noctispro-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: noctispro-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - noctispro-network
+
+  # Main Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: noctispro-web
+    environment:
+      - DEBUG=False
+      - USE_HTTPS=True
+      - DATABASE_URL=postgresql://noctispro:${DB_PASSWORD:-noctispro_secure_2024}@db:5432/noctispro
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-$-stc(0h#ryg-54@@j!zubqmz&vcc5vpqwav2q0%%=_f(l$o_7}
+      - ALLOWED_HOSTS=localhost,127.0.0.1,${DOMAIN_NAME:-noctispro.local}
+      - DOMAIN_NAME=${DOMAIN_NAME:-noctispro.local}
+      - BACKUP_ROOT=/app/backups
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+      - backup_data:/app/backups
+      - logs_data:/app/logs
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - noctispro-network
+
+  # Backup Service
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: noctispro-backup
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://noctispro:${DB_PASSWORD:-noctispro_secure_2024}@db:5432/noctispro
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-$-stc(0h#ryg-54@@j!zubqmz&vcc5vpqwav2q0%%=_f(l$o_7}
+      - BACKUP_ROOT=/app/backups
+    volumes:
+      - media_data:/app/media:ro
+      - backup_data:/app/backups
+      - logs_data:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    command: /opt/venv/bin/python manage.py start_backup_scheduler
+    restart: unless-stopped
+    networks:
+      - noctispro-network
+
+  # AI Processing Service
+  ai-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: noctispro-ai
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://noctispro:${DB_PASSWORD:-noctispro_secure_2024}@db:5432/noctispro
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-$-stc(0h#ryg-54@@j!zubqmz&vcc5vpqwav2q0%%=_f(l$o_7}
+    volumes:
+      - media_data:/app/media
+      - logs_data:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: /opt/venv/bin/python manage.py process_ai_analyses --continuous
+    restart: unless-stopped
+    networks:
+      - noctispro-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  media_data:
+    driver: local
+  static_data:
+    driver: local
+  backup_data:
+    driver: local
+  logs_data:
+    driver: local
+
+networks:
+  noctispro-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
