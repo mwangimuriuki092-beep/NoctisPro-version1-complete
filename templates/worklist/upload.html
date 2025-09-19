@@ -739,10 +739,16 @@
                 </div>
                 <h4 class="text-light mb-2" style="font-size: 1.1rem; font-weight: 600;">Drop DICOM files or folders here</h4>
                 <p class="text-secondary mb-2" style="font-size: 0.95rem; line-height: 1.4;">Files upload automatically once selected.</p>
-                <button type="button" class="btn-control primary" id="chooseFilesBtn">
-                    <i class="fas fa-folder-open me-2"></i>
-                    Choose Files / Folder
-                </button>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button type="button" class="btn-control primary" id="chooseFilesBtn">
+                        <i class="fas fa-file-medical me-2"></i>
+                        Choose Individual Files
+                    </button>
+                    <button type="button" class="btn-control" id="chooseFolderBtn">
+                        <i class="fas fa-folder-open me-2"></i>
+                        Choose Entire Folder
+                    </button>
+                </div>
             </div>
             
             <style>
@@ -758,7 +764,8 @@
             }
             </style>
             
-            <input type="file" id="fileInput" class="file-input" multiple webkitdirectory directory>
+            <input type="file" id="fileInput" class="file-input" multiple>
+            <input type="file" id="folderInput" class="file-input" multiple webkitdirectory directory style="display: none;">
             
             <div class="upload-stats" id="uploadStats">
                 <h5 class="text-light mb-2">Upload Summary</h5>
@@ -785,6 +792,11 @@
             <div class="folder-info" id="folderInfo">
                 <h6 class="text-warning mb-2"><i class="fas fa-folder-open me-2"></i>Folder Structure Detected</h6>
                 <p class="text-secondary mb-2">Large folder with multiple series detected. This may take several minutes to process.</p>
+                <div class="text-info mb-2" style="font-size: 0.9rem;">
+                    <i class="fas fa-info-circle me-1"></i>
+                    <strong>Note:</strong> All DICOM files in the selected folder and subfolders will be processed. 
+                    Make sure the folder contains only the files you want to upload.
+                </div>
                 <div id="folderStructure"></div>
             </div>
             
@@ -852,6 +864,7 @@ let createdStudyIds = [];
 document.addEventListener('DOMContentLoaded', function() {
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
+    const folderInput = document.getElementById('folderInput');
     const uploadForm = document.getElementById('uploadForm');
     const uploadBtn = document.getElementById('uploadBtn');
     const chooseFilesBtn = document.getElementById('chooseFilesBtn');
@@ -875,12 +888,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const facilitySelect = document.getElementById('facilitySelect');
     const assignToMe = document.getElementById('assignToMe');
 
-    // Click to browse - prevent multiple triggers
+    // Click to browse individual files
     chooseFilesBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (!isUploading) {
             fileInput.click();
+        }
+    });
+
+    // Click to browse entire folder
+    const chooseFolderBtn = document.getElementById('chooseFolderBtn');
+    chooseFolderBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isUploading) {
+            folderInput.click();
         }
     });
 
@@ -946,8 +969,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // File input change
+    // File input change handlers
     fileInput.addEventListener('change', (e) => {
+        if (!isUploading) {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        }
+    });
+
+    folderInput.addEventListener('change', (e) => {
         if (!isUploading) {
             const files = Array.from(e.target.files);
             handleFiles(files);
