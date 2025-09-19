@@ -1,36 +1,372 @@
-{% extends 'base.html' %}
+{% extends 'base_admin.html' %}
 {% load dicts %}
 
-{% block title %}Edit Permissions - {{ user_obj.username }}{% endblock %}
+{% block title %}Edit User Permissions - {{ user_obj.username }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .edit-permissions-header {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .user-info-card {
+        background: var(--secondary-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+    
+    .permissions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .permission-category {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+    }
+    
+    .category-title {
+        color: var(--accent-color);
+        font-weight: 600;
+        font-size: 16px;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .permission-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .permission-item:last-child {
+        border-bottom: none;
+    }
+    
+    .permission-label {
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .permission-description {
+        color: var(--text-secondary);
+        font-size: 12px;
+        margin-top: 2px;
+        line-height: 1.4;
+    }
+    
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+    }
+    
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--border-color);
+        transition: .4s;
+        border-radius: 24px;
+    }
+    
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+        background-color: var(--accent-color);
+    }
+    
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+    
+    .save-permissions {
+        background: var(--accent-color);
+        color: var(--primary-bg);
+        border: none;
+        padding: 15px 40px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 600;
+        margin-top: 30px;
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    
+    .save-permissions:hover {
+        background: #00b8d4;
+        transform: translateY(-2px);
+    }
+    
+    .back-button {
+        background: var(--secondary-bg);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        padding: 8px 16px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+    
+    .back-button:hover {
+        background: var(--card-bg);
+        color: var(--accent-color);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3">
-    <div class="card">
-        <div class="card-header d-flex justify-content-between">
-            <div>Edit Permissions: {{ user_obj.username }}</div>
-            <div>
-                <a class="btn-control" href="{% url 'admin_panel:permissions_dashboard' %}">Back</a>
+<div class="edit-permissions-header">
+    <div>
+        <h2>🔐 Edit Permissions: {{ user_obj.username }}</h2>
+        <p style="color: var(--text-secondary); margin-top: 5px;">
+            Configure individual user access and capabilities
+        </p>
+    </div>
+    <a class="back-button" href="{% url 'admin_panel:permissions_dashboard' %}">
+        <i class="fas fa-arrow-left"></i> Back to Permissions
+    </a>
+</div>
+
+<div class="user-info-card">
+    <h3 style="color: var(--text-primary); margin-bottom: 15px;">
+        👤 User Information
+    </h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        <div>
+            <strong style="color: var(--accent-color);">Username:</strong>
+            <div style="color: var(--text-primary);">{{ user_obj.username }}</div>
+        </div>
+        <div>
+            <strong style="color: var(--accent-color);">Full Name:</strong>
+            <div style="color: var(--text-primary);">{{ user_obj.get_full_name|default:"Not Set" }}</div>
+        </div>
+        <div>
+            <strong style="color: var(--accent-color);">Role:</strong>
+            <div style="color: var(--text-primary);">
+                {% if user_obj.is_admin %}👑 Administrator
+                {% elif user_obj.is_radiologist %}🩺 Radiologist  
+                {% elif user_obj.is_technician %}🔧 Technician
+                {% else %}🏥 Facility User{% endif %}
             </div>
         </div>
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                <div class="row">
-                    {% for k in cap_keys %}
-                    <div class="col-12 col-md-4 mb-2">
-                        <label class="form-check">
-                            <input type="checkbox" class="form-check-input" name="{{ k }}" {% if caps|get_item:k %}checked{% endif %}>
-                            <span class="ms-2">{{ k|upper }}</span>
-                        </label>
-                    </div>
-                    {% endfor %}
-                </div>
-                <div class="mt-3">
-                    <button type="submit" class="btn-control">Save</button>
-                </div>
-            </form>
+        <div>
+            <strong style="color: var(--accent-color);">Facility:</strong>
+            <div style="color: var(--text-primary);">{{ user_obj.facility.name|default:"System Wide" }}</div>
         </div>
     </div>
 </div>
+
+<form method="post">
+    {% csrf_token %}
+    
+    <div class="permissions-grid">
+        <!-- AI & Analysis Permissions -->
+        <div class="permission-category">
+            <div class="category-title">
+                <i class="fas fa-brain"></i>
+                AI & Analysis
+            </div>
+            
+            {% for k in cap_keys %}
+                {% if 'ai' in k or 'analysis' in k %}
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">{{ k|title|replace:"_":" " }}</div>
+                        <div class="permission-description">
+                            {% if 'ai_visible' in k %}View AI analysis results and reports
+                            {% elif 'ai_manage' in k %}Configure AI models and analysis settings
+                            {% elif 'analysis' in k %}Access to analysis tools and features
+                            {% else %}{{ k|replace:"_":" "|title }} capability{% endif %}
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="{{ k }}" {% if caps|get_item:k %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        
+        <!-- DICOM & Viewer Permissions -->
+        <div class="permission-category">
+            <div class="category-title">
+                <i class="fas fa-eye"></i>
+                DICOM Viewer
+            </div>
+            
+            {% for k in cap_keys %}
+                {% if 'dicom' in k or 'viewer' in k or 'view' in k %}
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">{{ k|title|replace:"_":" " }}</div>
+                        <div class="permission-description">
+                            {% if 'view' in k %}Access to DICOM image viewing
+                            {% elif 'export' in k %}Export DICOM images and data
+                            {% elif 'print' in k %}Print medical images and reports
+                            {% else %}{{ k|replace:"_":" "|title }} capability{% endif %}
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="{{ k }}" {% if caps|get_item:k %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        
+        <!-- Administrative Permissions -->
+        <div class="permission-category">
+            <div class="category-title">
+                <i class="fas fa-cogs"></i>
+                Administration
+            </div>
+            
+            {% for k in cap_keys %}
+                {% if 'admin' in k or 'manage' in k or 'delete' in k %}
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">{{ k|title|replace:"_":" " }}</div>
+                        <div class="permission-description">
+                            {% if 'admin' in k %}Administrative system access
+                            {% elif 'manage' in k %}Management and configuration access
+                            {% elif 'delete' in k %}Delete data and records
+                            {% else %}{{ k|replace:"_":" "|title }} capability{% endif %}
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="{{ k }}" {% if caps|get_item:k %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        
+        <!-- Other Permissions -->
+        <div class="permission-category">
+            <div class="category-title">
+                <i class="fas fa-ellipsis-h"></i>
+                Other Capabilities
+            </div>
+            
+            {% for k in cap_keys %}
+                {% if 'ai' not in k and 'dicom' not in k and 'viewer' not in k and 'view' not in k and 'admin' not in k and 'manage' not in k and 'delete' not in k and 'analysis' not in k %}
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">{{ k|title|replace:"_":" " }}</div>
+                        <div class="permission-description">
+                            {{ k|replace:"_":" "|title }} system capability
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="{{ k }}" {% if caps|get_item:k %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    
+    <button type="submit" class="save-permissions">
+        <i class="fas fa-save"></i> Save User Permissions
+    </button>
+</form>
+
+<script>
+// Add visual feedback for permission changes
+document.querySelectorAll('.toggle-switch input').forEach(toggle => {
+    toggle.addEventListener('change', function() {
+        const category = this.closest('.permission-category');
+        category.style.transform = 'scale(1.02)';
+        category.style.boxShadow = '0 4px 12px rgba(0, 212, 255, 0.3)';
+        
+        setTimeout(() => {
+            category.style.transform = 'scale(1)';
+            category.style.boxShadow = 'none';
+        }, 200);
+        
+        // Show what changed
+        const label = this.closest('.permission-item').querySelector('.permission-label').textContent;
+        const status = this.checked ? 'Enabled' : 'Disabled';
+        
+        // Create temporary feedback
+        const feedback = document.createElement('div');
+        feedback.textContent = `${label}: ${status}`;
+        feedback.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+        `;
+        
+        document.body.appendChild(feedback);
+        
+        setTimeout(() => {
+            feedback.remove();
+        }, 2000);
+    });
+});
+
+// Add slide-in animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+`;
+document.head.appendChild(style);
+</script>
 {% endblock %}
 
