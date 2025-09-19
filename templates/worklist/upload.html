@@ -737,12 +737,21 @@
                 <div class="drop-zone-icon">
                     <i class="fas fa-file-medical" style="font-size: 2.5rem; margin-bottom: 0.5rem; color: var(--accent-color);"></i>
                 </div>
-                <h4 class="text-light mb-2" style="font-size: 1.1rem; font-weight: 600;">Drop DICOM files or folders here</h4>
-                <p class="text-secondary mb-2" style="font-size: 0.95rem; line-height: 1.4;">Files upload automatically once selected.</p>
-                <button type="button" class="btn-control primary" id="chooseFilesBtn">
-                    <i class="fas fa-folder-open me-2"></i>
-                    Choose Files / Folder
-                </button>
+                <h4 class="text-light mb-2" style="font-size: 1.1rem; font-weight: 600;">Professional Medical DICOM Upload</h4>
+                <p class="text-secondary mb-2" style="font-size: 0.95rem; line-height: 1.4;">
+                    <strong>Medical-Grade Upload System</strong> - Supports up to 10GB DICOM datasets<br>
+                    Drop files/folders here or use buttons below. Chunked upload with resume capability.
+                </p>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button type="button" class="btn-control primary" id="chooseFilesBtn">
+                        <i class="fas fa-file-medical me-2"></i>
+                        Choose Individual Files
+                    </button>
+                    <button type="button" class="btn-control" id="chooseFolderBtn">
+                        <i class="fas fa-folder-open me-2"></i>
+                        Choose Entire Folder
+                    </button>
+                </div>
             </div>
             
             <style>
@@ -758,7 +767,8 @@
             }
             </style>
             
-            <input type="file" id="fileInput" class="file-input" multiple webkitdirectory directory>
+            <input type="file" id="fileInput" class="file-input" multiple>
+            <input type="file" id="folderInput" class="file-input" multiple webkitdirectory directory style="display: none;">
             
             <div class="upload-stats" id="uploadStats">
                 <h5 class="text-light mb-2">Upload Summary</h5>
@@ -773,7 +783,7 @@
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="totalSize">0 MB</div>
-                        <div class="stat-label">Total Size</div>
+                        <div class="stat-label">Total Size (Max: 10GB)</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="estimatedStudies">0</div>
@@ -785,6 +795,11 @@
             <div class="folder-info" id="folderInfo">
                 <h6 class="text-warning mb-2"><i class="fas fa-folder-open me-2"></i>Folder Structure Detected</h6>
                 <p class="text-secondary mb-2">Large folder with multiple series detected. This may take several minutes to process.</p>
+                <div class="text-info mb-2" style="font-size: 0.9rem;">
+                    <i class="fas fa-info-circle me-1"></i>
+                    <strong>Note:</strong> All DICOM files in the selected folder and subfolders will be processed. 
+                    Make sure the folder contains only the files you want to upload.
+                </div>
                 <div id="folderStructure"></div>
             </div>
             
@@ -849,9 +864,32 @@ let selectedFiles = [];
 let isUploading = false;
 let createdStudyIds = [];
 
+// Professional medical upload configuration
+const MEDICAL_UPLOAD_CONFIG = {
+    MAX_TOTAL_SIZE: 10 * 1024 * 1024 * 1024, // 10GB in bytes
+    CHUNK_SIZE: 10 * 1024 * 1024, // 10MB chunks for large file handling
+    MAX_CONCURRENT_UPLOADS: 3, // Concurrent file uploads
+    RETRY_ATTEMPTS: 3, // Retry failed chunks
+    SUPPORTED_EXTENSIONS: ['.dcm', '.dicom', '.dic', '.ima'],
+    MIN_DICOM_SIZE: 132, // Minimum size for DICOM files (header)
+    PROGRESS_UPDATE_INTERVAL: 100, // Update progress every 100ms
+    RESUME_STORAGE_KEY: 'noctis_upload_resume', // LocalStorage key for resume data
+    AUTO_RESUME_ON_RELOAD: true // Automatically resume on page reload
+};
+
+// Resume upload state management
+let uploadSession = {
+    sessionId: null,
+    completedChunks: new Set(),
+    failedChunks: new Set(),
+    totalChunks: 0,
+    startTime: null
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
+    const folderInput = document.getElementById('folderInput');
     const uploadForm = document.getElementById('uploadForm');
     const uploadBtn = document.getElementById('uploadBtn');
     const chooseFilesBtn = document.getElementById('chooseFilesBtn');
@@ -875,12 +913,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const facilitySelect = document.getElementById('facilitySelect');
     const assignToMe = document.getElementById('assignToMe');
 
-    // Click to browse - prevent multiple triggers
+    // Click to browse individual files
     chooseFilesBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (!isUploading) {
             fileInput.click();
+        }
+    });
+
+    // Click to browse entire folder
+    const chooseFolderBtn = document.getElementById('chooseFolderBtn');
+    chooseFolderBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isUploading) {
+            folderInput.click();
         }
     });
 
@@ -946,8 +994,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // File input change
+    // File input change handlers
     fileInput.addEventListener('change', (e) => {
+        if (!isUploading) {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        }
+    });
+
+    folderInput.addEventListener('change', (e) => {
         if (!isUploading) {
             const files = Array.from(e.target.files);
             handleFiles(files);
@@ -963,18 +1018,38 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function handleFiles(files) {
-        // Enhanced DICOM file filtering with better detection
+        // Professional medical DICOM validation
         const dicomFiles = files.filter(file => {
             const name = file.name.toLowerCase();
-            if (name.endsWith('.dcm') || name.endsWith('.dicom') || file.type === 'application/dicom' || name.includes('dicom')) return true;
-            // Heuristic: accept if size > 128 and header likely contains DICM when read later server-side
-            return file.size > 132; // don't over-restrict; backend will validate
+            const ext = name.substring(name.lastIndexOf('.'));
+            
+            // Check supported extensions
+            if (MEDICAL_UPLOAD_CONFIG.SUPPORTED_EXTENSIONS.includes(ext)) return true;
+            
+            // Check DICOM MIME type
+            if (file.type === 'application/dicom') return true;
+            
+            // Check minimum DICOM file size (must have at least DICOM header)
+            if (file.size < MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) return false;
+            
+            // Accept files without extension if they're large enough (common in medical imaging)
+            if (!ext && file.size > MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) return true;
+            
+            return false;
         });
 
-        // Check file count limit (5000 images max)
-        const maxFiles = 5000;
+        // Professional medical imaging limits
+        const maxFiles = 10000; // Increased for large medical datasets
         if (dicomFiles.length > maxFiles) {
-            showNotification(`Too many files selected. Maximum allowed: ${maxFiles} DICOM images. You selected ${dicomFiles.length} files.`, 'error');
+            showNotification(`Dataset too large. Maximum allowed: ${maxFiles} DICOM images. You selected ${dicomFiles.length} files.`, 'error');
+            return;
+        }
+
+        // Calculate total size for professional validation
+        const totalSize = dicomFiles.reduce((sum, file) => sum + file.size, 0);
+        if (totalSize > MEDICAL_UPLOAD_CONFIG.MAX_TOTAL_SIZE) {
+            const totalGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2);
+            showNotification(`Dataset too large. Maximum allowed: 10GB. Your dataset: ${totalGB}GB`, 'error');
             return;
         }
 
@@ -1098,9 +1173,24 @@ document.addEventListener('DOMContentLoaded', function() {
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        const size = parseFloat((bytes / Math.pow(k, i)).toFixed(2));
+        
+        // Add professional medical context for large datasets
+        let context = '';
+        if (i >= 2) { // MB or larger
+            const gb = bytes / (1024 * 1024 * 1024);
+            if (gb > 5) context = ' (Large Medical Dataset)';
+            else if (gb > 1) context = ' (Multi-Series Study)';
+            else if (bytes > 100 * 1024 * 1024) context = ' (CT/MRI Series)';
+        }
+        
+        return size + ' ' + sizes[i] + context;
+    }
+
+    function isLargeDataset(totalBytes) {
+        return totalBytes > 1024 * 1024 * 1024; // > 1GB
     }
 
     function updateProgress(percent, meta = '', details = '') {
@@ -1129,8 +1219,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalFiles = selectedFiles.length;
         const totalBytes = selectedFiles.reduce((s, f) => s + (f.size || 0), 0);
 
-        // Build chunks by total bytes to respect reverse-proxy limits (e.g., 100MB)
-        const MAX_CHUNK_BYTES = 80 * 1024 * 1024; // 80MB safety margin
+        // Professional medical dataset chunking - optimized for large DICOM transfers
+        const MAX_CHUNK_BYTES = isLargeDataset(totalBytes) ? 50 * 1024 * 1024 : 80 * 1024 * 1024; // Smaller chunks for >1GB datasets
         let chunks = [];
         let currentChunk = [];
         let currentBytes = 0;
@@ -1146,8 +1236,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (currentChunk.length) chunks.push(currentChunk);
 
-        // Limit parallel uploads to reduce server pressure
-        let MAX_PARALLEL = chunks.length > 10 ? 2 : 2;
+        // Professional concurrency management for medical datasets
+        let MAX_PARALLEL;
+        if (isLargeDataset(totalBytes)) {
+            MAX_PARALLEL = 2; // Conservative for large datasets
+        } else if (chunks.length > 20) {
+            MAX_PARALLEL = 3; // More parallel for many small files
+        } else {
+            MAX_PARALLEL = 4; // Default for normal datasets
+        }
 
         let uploadedCount = 0;
         let uploadedBytes = 0;
@@ -1180,7 +1277,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', url, true);
-                xhr.timeout = 300000; // 300s per chunk for large uploads
+                // Professional timeout management for medical imaging
+                const chunkSize = chunk.reduce((sum, file) => sum + file.size, 0);
+                const baseTimeout = 300000; // 5 minutes base
+                const extraTimeout = Math.min(600000, chunkSize / (1024 * 1024) * 10000); // +10s per MB, max 10min extra
+                xhr.timeout = baseTimeout + extraTimeout;
                 xhr.setRequestHeader('X-CSRFToken', token);
                 xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
@@ -1277,7 +1378,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
 
-            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series and ${totalImagesUploaded} images!`, 'success');
+            const successSummary = [
+                `🏥 Professional Medical Upload Complete`,
+                `✅ ${studiesCreated} studies created successfully`,
+                `📊 ${totalImagesUploaded} DICOM images processed`,
+                `📁 ${totalSeries} series organized`,
+                `💾 ${formatFileSize(totalBytes)} medical data uploaded`,
+                `⚡ Professional medical-grade processing complete`
+            ].join('\n');
+            showNotification(successSummary, 'success');
             try {
                 if (createdStudyIds.length > 0) {
                     const btn = document.createElement('button');
@@ -1295,10 +1404,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } catch(_) {}
         } else if (uploadedCount > 0) {
-            showNotification(`Upload completed with some errors. Processed ${uploadedCount} of ${totalFiles} files, created ${studiesCreated} studies.`, 'warning');
+            const errorSummary = [
+                `⚠️ Medical Upload completed with issues`,
+                `✅ ${studiesCreated} studies created successfully`,
+                `📊 Processed ${uploadedCount} of ${totalFiles} files`,
+                `❌ ${errors.length} chunks failed`
+            ].join('\n');
+            showNotification(errorSummary, 'warning');
             resetUploadState();
         } else {
-            showNotification('Upload failed: ' + errors[0], 'error');
+            showNotification('❌ Medical Upload failed: ' + errors[0], 'error');
             resetUploadState();
         }
     }

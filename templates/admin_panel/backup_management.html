@@ -1,0 +1,361 @@
+{% extends 'base_admin.html' %}
+
+{% block title %}Medical Data Backup Management - Admin Panel{% endblock %}
+
+{% block extra_css %}
+<style>
+    .backup-dashboard {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .backup-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+    }
+    
+    .backup-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--success-color);
+        animation: pulse 2s infinite;
+    }
+    
+    .status-indicator.stopped {
+        background: var(--danger-color);
+        animation: none;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    
+    .backup-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+    }
+    
+    .stat-card {
+        background: var(--secondary-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 15px;
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: var(--accent-color);
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+    
+    .backup-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 20px 0;
+    }
+    
+    .btn-backup {
+        background: var(--accent-color);
+        color: var(--primary-bg);
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-backup:hover {
+        background: #00b8d4;
+        transform: translateY(-2px);
+    }
+    
+    .btn-emergency {
+        background: var(--danger-color);
+        color: white;
+    }
+    
+    .btn-emergency:hover {
+        background: #cc3333;
+    }
+    
+    .backup-history {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .history-header {
+        background: var(--secondary-bg);
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+    }
+    
+    .history-item {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .history-item:last-child {
+        border-bottom: none;
+    }
+    
+    .backup-info {
+        flex: 1;
+    }
+    
+    .backup-id {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 5px;
+    }
+    
+    .backup-details {
+        font-size: 12px;
+        color: var(--text-secondary);
+    }
+    
+    .backup-status-badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-completed {
+        background: rgba(0, 255, 136, 0.2);
+        color: var(--success-color);
+    }
+    
+    .status-failed {
+        background: rgba(255, 68, 68, 0.2);
+        color: var(--danger-color);
+    }
+    
+    .status-in-progress {
+        background: rgba(255, 170, 0, 0.2);
+        color: var(--warning-color);
+    }
+    
+    .medical-compliance {
+        background: linear-gradient(45deg, #00d4ff, #00b8d4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 600;
+        font-size: 14px;
+    }
+    
+    .retention-info {
+        background: var(--secondary-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 15px;
+        margin: 20px 0;
+    }
+    
+    .retention-title {
+        color: var(--accent-color);
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+    
+    .emergency-section {
+        background: linear-gradient(135deg, rgba(255, 68, 68, 0.1), rgba(255, 68, 68, 0.05));
+        border: 1px solid var(--danger-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h2>🏥 Medical Data Backup Management</h2>
+    <div class="medical-compliance">{{ medical_compliance }}</div>
+</div>
+
+<div class="backup-dashboard">
+    <div class="backup-card">
+        <h3>Backup System Status</h3>
+        <div class="backup-status">
+            <div class="status-indicator {% if not backup_status.scheduler_running %}stopped{% endif %}"></div>
+            <span>
+                {% if backup_status.scheduler_running %}
+                    ✅ Scheduler Running
+                {% else %}
+                    ❌ Scheduler Stopped
+                {% endif %}
+            </span>
+        </div>
+        
+        <div class="backup-stats">
+            <div class="stat-card">
+                <div class="stat-value">{{ backup_status.total_backups }}</div>
+                <div class="stat-label">Total Backups</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ backup_status.total_size_gb }}GB</div>
+                <div class="stat-label">Storage Used</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ backup_status.backup_counts.daily }}</div>
+                <div class="stat-label">Daily Backups</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ backup_status.backup_counts.monthly }}</div>
+                <div class="stat-label">Monthly Backups</div>
+            </div>
+        </div>
+        
+        <div class="retention-info">
+            <div class="retention-title">🛡️ Medical Data Retention Policy</div>
+            <div style="font-size: 13px; color: var(--text-secondary);">
+                • Daily backups: 7 days retention<br>
+                • Weekly backups: 12 weeks retention<br>
+                • Monthly backups: <strong>10 years retention</strong><br>
+                • Emergency backups: Permanent until manual cleanup
+            </div>
+        </div>
+    </div>
+    
+    <div class="backup-card">
+        <h3>Quick Actions</h3>
+        
+        <div class="backup-actions">
+            <form method="post" action="{% url 'admin_panel:create_backup' %}" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="backup_type" value="manual">
+                <button type="submit" class="btn-backup">
+                    <i class="fas fa-database"></i> Create Manual Backup
+                </button>
+            </form>
+        </div>
+        
+        <div class="emergency-section">
+            <h4 style="color: var(--danger-color); margin-bottom: 10px;">🚨 Emergency Backup</h4>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 15px;">
+                Use for immediate backup before system maintenance or critical operations.
+            </p>
+            
+            <form method="post" action="{% url 'admin_panel:emergency_backup' %}">
+                {% csrf_token %}
+                <input type="text" name="reason" placeholder="Emergency reason (optional)" 
+                       style="width: 100%; padding: 8px; margin-bottom: 10px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary);">
+                <button type="submit" class="btn-backup btn-emergency">
+                    <i class="fas fa-exclamation-triangle"></i> Emergency Backup
+                </button>
+            </form>
+        </div>
+        
+        {% if backup_status.last_backup %}
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+            <h4>Last Backup</h4>
+            <div style="font-size: 13px; color: var(--text-secondary);">
+                <strong>{{ backup_status.last_backup.backup_id }}</strong><br>
+                Status: <span class="backup-status-badge status-{{ backup_status.last_backup.status }}">{{ backup_status.last_backup.status }}</span><br>
+                Type: {{ backup_status.last_backup.type|title }}<br>
+                {% if backup_status.last_backup.completed_at %}
+                Completed: {{ backup_status.last_backup.completed_at|slice:":19"|date:"Y-m-d H:i" }}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="backup-history">
+    <div class="history-header">
+        <i class="fas fa-history"></i> Recent Backup History
+    </div>
+    
+    {% for backup in backup_history %}
+    <div class="history-item">
+        <div class="backup-info">
+            <div class="backup-id">{{ backup.backup_id }}</div>
+            <div class="backup-details">
+                Type: {{ backup.type|title }} | 
+                {% if backup.completed_at %}
+                    Completed: {{ backup.completed_at|slice:":19"|date:"Y-m-d H:i" }}
+                {% elif backup.failed_at %}
+                    Failed: {{ backup.failed_at|slice:":19"|date:"Y-m-d H:i" }}
+                {% else %}
+                    Started: {{ backup.timestamp|slice:":8" }}
+                {% endif %}
+                
+                {% if backup.components.database.total_size_mb %}
+                    | Size: {{ backup.components.database.total_size_mb|floatformat:1 }}MB
+                {% endif %}
+            </div>
+        </div>
+        <div class="backup-status-badge status-{{ backup.status }}">
+            {{ backup.status }}
+        </div>
+    </div>
+    {% empty %}
+    <div class="history-item">
+        <div style="color: var(--text-secondary); font-style: italic;">
+            No backup history available. Create your first backup above.
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="retention-info" style="margin-top: 30px;">
+    <div class="retention-title">📋 Medical Compliance Information</div>
+    <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+        <strong>FDA 21 CFR Part 11 Compliance:</strong> All backups include digital signatures and integrity verification.<br>
+        <strong>DICOM Standard:</strong> Medical imaging data preserved with full metadata integrity.<br>
+        <strong>Disaster Recovery:</strong> Complete system restoration capability from any backup point.<br>
+        <strong>Audit Trail:</strong> All backup operations logged for regulatory compliance.<br>
+        <strong>Data Retention:</strong> 10-year minimum retention for medical records compliance.
+    </div>
+</div>
+
+<script>
+// Auto-refresh backup status every 30 seconds
+setInterval(function() {
+    // You can add AJAX call here to refresh status
+    console.log('Checking backup status...');
+}, 30000);
+
+// Add confirmation for emergency backup
+document.querySelector('form[action*="emergency"]').addEventListener('submit', function(e) {
+    if (!confirm('Are you sure you want to trigger an emergency backup? This will create an immediate full backup of all medical data.')) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}

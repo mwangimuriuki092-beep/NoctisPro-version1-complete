@@ -18,8 +18,12 @@
     <link href="{% static 'css/dicom-viewer-buttons.css' %}" rel="stylesheet">
     <link href="{% static 'css/enhanced-buttons.css' %}" rel="stylesheet">
     <link href="{% static 'css/websocket-ui.css' %}" rel="stylesheet">
+    <link href="{% static 'css/visibility-fixes.css' %}" rel="stylesheet">
+    <link href="{% static 'css/admin-permissions-fix.css' %}" rel="stylesheet">
     <script src="{% static 'js/dicom-viewer-utils.js' %}" defer></script>
     <script src="{% static 'js/websocket-client.js' %}" defer></script>
+    <script src="{% static 'js/enhanced-search.js' %}" defer></script>
+    <script src="{% static 'js/dicom-viewer-keyboard-shortcuts.js' %}" defer></script>
     <style>
         :root {
             /* Unified dark theme palette */
@@ -709,6 +713,9 @@
                 <i class="fas fa-comments"></i> CHATS
             </button>
             {% if user.is_authenticated %}
+            <button type="button" class="btn-control" onclick="window.location.href='{% url 'accounts:preferences' %}'" title="User Preferences">
+                <i class="fas fa-cog"></i> PREFERENCES
+            </button>
             <button type="button" class="btn-control" onclick="window.location.href='{% url 'accounts:logout' %}'"   title="Logout">
                 <i class="fas fa-sign-out-alt"></i> LOGOUT
             </button>

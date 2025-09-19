@@ -1,0 +1,57 @@
+/* 
+Admin Permissions Visibility Fix
+Small safe enhancement - improves text visibility only
+*/
+
+/* Fix permissions page specific visibility */
+.permissions-section .permission-label {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+}
+
+.permissions-section .permission-description {
+    color: var(--text-secondary) !important;
+    font-size: 13px !important;
+}
+
+.role-title {
+    color: var(--text-primary) !important;
+    font-weight: 700 !important;
+}
+
+.capability-status {
+    font-weight: 700 !important;
+}
+
+.status-yes {
+    color: var(--success-color) !important;
+    background: rgba(0, 255, 136, 0.15) !important;
+}
+
+.status-no {
+    color: var(--danger-color) !important;
+    background: rgba(255, 68, 68, 0.15) !important;
+}
+
+/* Ensure all admin panel text is visible */
+.admin-header h2 {
+    color: var(--text-primary) !important;
+}
+
+.section-title {
+    color: var(--accent-color) !important;
+    font-weight: 700 !important;
+}
+
+/* Fix any remaining invisible text */
+.card-body {
+    color: var(--text-primary) !important;
+}
+
+.user-info {
+    color: var(--text-primary) !important;
+}
+
+.user-role {
+    color: var(--text-secondary) !important;
+}

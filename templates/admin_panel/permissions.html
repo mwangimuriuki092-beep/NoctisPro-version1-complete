@@ -1,65 +1,540 @@
-{% extends 'base.html' %}
+{% extends 'base_admin.html' %}
 {% load dicts %}
 
-{% block title %}Permissions - Admin Panel{% endblock %}
+{% block title %}User Permissions & Access Control - Admin Panel{% endblock %}
+
+{% block extra_css %}
+<style>
+    .permissions-header {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    
+    .permissions-section {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 25px;
+    }
+    
+    .section-title {
+        color: var(--accent-color);
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .role-toggles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .role-card {
+        background: var(--secondary-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+    }
+    
+    .role-title {
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: 16px;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .permission-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .permission-item:last-child {
+        border-bottom: none;
+    }
+    
+    .permission-label {
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .permission-description {
+        color: var(--text-secondary);
+        font-size: 12px;
+        margin-top: 2px;
+    }
+    
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+    }
+    
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--border-color);
+        transition: .4s;
+        border-radius: 24px;
+    }
+    
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+        background-color: var(--accent-color);
+    }
+    
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+    
+    .permissions-table {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .table-header {
+        background: var(--secondary-bg);
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .user-row {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-color);
+        display: grid;
+        grid-template-columns: 200px repeat(auto-fit, minmax(100px, 1fr)) 120px;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .user-row:last-child {
+        border-bottom: none;
+    }
+    
+    .user-info {
+        color: var(--text-primary);
+        font-weight: 500;
+    }
+    
+    .user-role {
+        color: var(--text-secondary);
+        font-size: 12px;
+        margin-top: 2px;
+    }
+    
+    .capability-status {
+        text-align: center;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-yes {
+        background: rgba(0, 255, 136, 0.2);
+        color: var(--success-color);
+    }
+    
+    .status-no {
+        background: rgba(255, 68, 68, 0.2);
+        color: var(--danger-color);
+    }
+    
+    .btn-edit {
+        background: var(--accent-color);
+        color: var(--primary-bg);
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-edit:hover {
+        background: #00b8d4;
+        transform: translateY(-1px);
+    }
+    
+    .save-permissions {
+        background: var(--accent-color);
+        color: var(--primary-bg);
+        border: none;
+        padding: 12px 30px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        margin-top: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .save-permissions:hover {
+        background: #00b8d4;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3">
-    <div class="card">
-        <div class="card-header">
-            <div>Permissions & Capabilities</div>
-            <div>
-                <a class="btn-control" href="{% url 'admin_panel:dashboard' %}">Back</a>
-            </div>
-        </div>
-        <div class="card-body">
-            <div class="card" style="margin-bottom:12px;">
-                <div class="card-header">Role-based AI Visibility</div>
-                <div class="card-body">
-                    <form method="post" action="{% url 'admin_panel:permissions_dashboard' %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="_roles" value="1"/>
-                        <div style="display:flex;gap:16px;flex-wrap:wrap;">
-                            <label class="form-check">
-                                <input type="checkbox" class="form-check-input" name="role_admin_ai_visible" {% if role_toggles.admin.ai_visible %}checked{% endif %}> <span class="ms-2">Admin can view AI</span>
-                            </label>
-                            <label class="form-check">
-                                <input type="checkbox" class="form-check-input" name="role_radiologist_ai_visible" {% if role_toggles.radiologist.ai_visible %}checked{% endif %}> <span class="ms-2">Radiologist can view AI</span>
-                            </label>
-                            <label class="form-check">
-                                <input type="checkbox" class="form-check-input" name="role_facility_ai_visible" {% if role_toggles.facility.ai_visible %}checked{% endif %}> <span class="ms-2">Facility can view AI</span>
-                            </label>
-                        </div>
-                        <div class="mt-2"><button type="submit" class="btn-control">Save Role Toggles</button></div>
-                    </form>
+<div class="permissions-header">
+    <h2>🔐 User Permissions & Access Control</h2>
+    <p style="color: var(--text-secondary); margin-top: 10px;">
+        Manage user privileges, AI access, and system capabilities
+    </p>
+</div>
+<!-- AI Access Control Section -->
+<div class="permissions-section">
+    <div class="section-title">
+        <i class="fas fa-brain"></i>
+        AI Analysis Access Control
+    </div>
+    
+    <form method="post" action="{% url 'admin_panel:permissions_dashboard' %}">
+        {% csrf_token %}
+        <input type="hidden" name="_roles" value="1"/>
+        
+        <div class="role-toggles">
+            <div class="role-card">
+                <div class="role-title">
+                    <i class="fas fa-user-shield"></i>
+                    Administrator
+                </div>
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">AI Analysis Access</div>
+                        <div class="permission-description">Can view and manage AI analysis results</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="role_admin_ai_visible" {% if role_toggles.admin.ai_visible %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">AI Model Management</div>
+                        <div class="permission-description">Can configure AI models and settings</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="role_admin_ai_manage" {% if role_toggles.admin.ai_manage %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
                 </div>
             </div>
-            <div class="table-responsive">
-                <table class="table table-dark table-striped align-middle" style="width:100%">
-                    <thead>
-                        <tr>
-                            <th>User</th>
-                            {% for k in cap_keys %}
-                            <th>{{ k|upper }}</th>
-                            {% endfor %}
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in users_table %}
-                        <tr>
-                            <td>{{ row.user.username }}</td>
-                            {% for k in cap_keys %}
-                            <td>{% if row.caps|get_item:k %}Yes{% else %}No{% endif %}</td>
-                            {% endfor %}
-                            <td><a class="btn-control" href="{% url 'admin_panel:edit_user_permissions' row.user.username %}">Edit</a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            
+            <div class="role-card">
+                <div class="role-title">
+                    <i class="fas fa-user-md"></i>
+                    Radiologist
+                </div>
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">AI Analysis Access</div>
+                        <div class="permission-description">Can view AI analysis results for diagnosis</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="role_radiologist_ai_visible" {% if role_toggles.radiologist.ai_visible %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">AI Report Integration</div>
+                        <div class="permission-description">Can integrate AI findings into reports</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="role_radiologist_ai_reports" {% if role_toggles.radiologist.ai_reports %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="role-card">
+                <div class="role-title">
+                    <i class="fas fa-hospital"></i>
+                    Facility User
+                </div>
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">AI Analysis Access</div>
+                        <div class="permission-description">Can view basic AI analysis results</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="role_facility_ai_visible" {% if role_toggles.facility.ai_visible %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="permission-item">
+                    <div>
+                        <div class="permission-label">Limited AI Access</div>
+                        <div class="permission-description">View-only access to AI results</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="role_facility_ai_readonly" {% if role_toggles.facility.ai_readonly %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <button type="submit" class="save-permissions">
+            <i class="fas fa-save"></i> Save AI Access Permissions
+        </button>
+    </form>
+</div>
+<!-- Individual User Permissions -->
+<div class="permissions-section">
+    <div class="section-title">
+        <i class="fas fa-users-cog"></i>
+        Individual User Permissions
+    </div>
+    
+    <div class="permissions-table">
+        <div class="table-header">
+            <div style="display: grid; grid-template-columns: 200px repeat(auto-fit, minmax(120px, 1fr)) 120px; gap: 15px; align-items: center;">
+                <div><strong>User</strong></div>
+                {% for k in cap_keys %}
+                <div style="text-align: center;"><strong>{{ k|upper|replace:"_":" " }}</strong></div>
+                {% endfor %}
+                <div style="text-align: center;"><strong>Actions</strong></div>
+            </div>
+        </div>
+        
+        {% for row in users_table %}
+        <div class="user-row">
+            <div class="user-info">
+                <div>{{ row.user.username }}</div>
+                <div class="user-role">
+                    {% if row.user.is_admin %}👑 Administrator
+                    {% elif row.user.is_radiologist %}🩺 Radiologist  
+                    {% elif row.user.is_technician %}🔧 Technician
+                    {% else %}🏥 Facility User{% endif %}
+                </div>
+            </div>
+            
+            {% for k in cap_keys %}
+            <div style="text-align: center;">
+                <span class="capability-status {% if row.caps|get_item:k %}status-yes{% else %}status-no{% endif %}">
+                    {% if row.caps|get_item:k %}✅ Yes{% else %}❌ No{% endif %}
+                </span>
+            </div>
+            {% endfor %}
+            
+            <div style="text-align: center;">
+                <a class="btn-edit" href="{% url 'admin_panel:edit_user_permissions' row.user.username %}">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Privilege Elevation Section -->
+<div class="permissions-section">
+    <div class="section-title">
+        <i class="fas fa-key"></i>
+        Privilege Elevation & Special Access
+    </div>
+    
+    <div class="role-toggles">
+        <div class="role-card">
+            <div class="role-title">
+                <i class="fas fa-database"></i>
+                System Administration
+            </div>
+            <div class="permission-item">
+                <div>
+                    <div class="permission-label">Backup Management</div>
+                    <div class="permission-description">Access to medical data backup system</div>
+                </div>
+                <div style="color: var(--success-color); font-weight: 600;">Admin Only</div>
+            </div>
+            <div class="permission-item">
+                <div>
+                    <div class="permission-label">System Monitoring</div>
+                    <div class="permission-description">Real-time system health monitoring</div>
+                </div>
+                <div style="color: var(--success-color); font-weight: 600;">Admin Only</div>
+            </div>
+            <div class="permission-item">
+                <div>
+                    <div class="permission-label">User Management</div>
+                    <div class="permission-description">Create, edit, and delete user accounts</div>
+                </div>
+                <div style="color: var(--success-color); font-weight: 600;">Admin Only</div>
+            </div>
+        </div>
+        
+        <div class="role-card">
+            <div class="role-title">
+                <i class="fas fa-shield-alt"></i>
+                Medical Data Access
+            </div>
+            <div class="permission-item">
+                <div>
+                    <div class="permission-label">Cross-Facility Access</div>
+                    <div class="permission-description">View studies from all facilities</div>
+                </div>
+                <div style="color: var(--warning-color); font-weight: 600;">Admin + Radiologist</div>
+            </div>
+            <div class="permission-item">
+                <div>
+                    <div class="permission-label">Study Deletion</div>
+                    <div class="permission-description">Delete studies and medical data</div>
+                </div>
+                <div style="color: var(--warning-color); font-weight: 600;">Admin + Radiologist</div>
+            </div>
+            <div class="permission-item">
+                <div>
+                    <div class="permission-label">Report Writing</div>
+                    <div class="permission-description">Create and edit medical reports</div>
+                </div>
+                <div style="color: var(--info-color); font-weight: 600;">Radiologist</div>
+            </div>
+        </div>
+        
+        <div class="role-card">
+            <div class="role-title">
+                <i class="fas fa-eye"></i>
+                DICOM Viewer Access
+            </div>
+            <div class="permission-item">
+                <div>
+                    <div class="permission-label">Advanced Tools</div>
+                    <div class="permission-description">3D reconstruction, MPR, advanced measurements</div>
+                </div>
+                <div style="color: var(--accent-color); font-weight: 600;">All Users</div>
+            </div>
+            <div class="permission-item">
+                <div>
+                    <div class="permission-label">Export Functions</div>
+                    <div class="permission-description">Export images and measurements</div>
+                </div>
+                <div style="color: var(--accent-color); font-weight: 600;">All Users</div>
+            </div>
+            <div class="permission-item">
+                <div>
+                    <div class="permission-label">Print Functions</div>
+                    <div class="permission-description">Print DICOM images and reports</div>
+                </div>
+                <div style="color: var(--accent-color); font-weight: 600;">All Users</div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Quick Actions -->
+<div class="permissions-section">
+    <div class="section-title">
+        <i class="fas fa-bolt"></i>
+        Quick Permission Actions
+    </div>
+    
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <button class="save-permissions" onclick="grantAllAIAccess()" type="button">
+            <i class="fas fa-brain"></i> Grant AI Access to All Radiologists
+        </button>
+        <button class="save-permissions" onclick="revokeAllAIAccess()" type="button" style="background: var(--danger-color);">
+            <i class="fas fa-ban"></i> Revoke All AI Access
+        </button>
+        <button class="save-permissions" onclick="resetToDefaults()" type="button" style="background: var(--warning-color);">
+            <i class="fas fa-undo"></i> Reset to Default Permissions
+        </button>
+    </div>
+</div>
+
+<script>
+function grantAllAIAccess() {
+    if (confirm('Grant AI access to all radiologists? This will enable AI analysis viewing for all radiologist users.')) {
+        document.querySelector('input[name="role_radiologist_ai_visible"]').checked = true;
+        document.querySelector('input[name="role_radiologist_ai_reports"]').checked = true;
+        
+        // Auto-submit form
+        document.querySelector('form').submit();
+    }
+}
+
+function revokeAllAIAccess() {
+    if (confirm('Revoke AI access for all users? This will disable AI features for all non-admin users.')) {
+        document.querySelector('input[name="role_radiologist_ai_visible"]').checked = false;
+        document.querySelector('input[name="role_facility_ai_visible"]').checked = false;
+        
+        // Auto-submit form
+        document.querySelector('form').submit();
+    }
+}
+
+function resetToDefaults() {
+    if (confirm('Reset all permissions to medical-grade defaults? This will restore standard medical imaging access levels.')) {
+        // Set medical-grade defaults
+        document.querySelector('input[name="role_admin_ai_visible"]').checked = true;
+        document.querySelector('input[name="role_radiologist_ai_visible"]').checked = true;
+        document.querySelector('input[name="role_facility_ai_visible"]').checked = false;
+        
+        // Auto-submit form
+        document.querySelector('form').submit();
+    }
+}
+
+// Add visual feedback for permission changes
+document.querySelectorAll('.toggle-switch input').forEach(toggle => {
+    toggle.addEventListener('change', function() {
+        const card = this.closest('.role-card');
+        card.style.transform = 'scale(1.02)';
+        card.style.boxShadow = '0 4px 12px rgba(0, 212, 255, 0.3)';
+        
+        setTimeout(() => {
+            card.style.transform = 'scale(1)';
+            card.style.boxShadow = 'none';
+        }, 200);
+    });
+});
+</script>
 {% endblock %}
 

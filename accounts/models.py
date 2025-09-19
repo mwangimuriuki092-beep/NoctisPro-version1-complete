@@ -76,3 +76,45 @@ class UserSession(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.login_time}"
+
+
+class UserPreferences(models.Model):
+    """
+    User preferences model - stores customizable settings
+    Safe addition - doesn't affect existing user functionality
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preferences')
+    
+    # DICOM Viewer Preferences
+    dicom_viewer_preferences = models.JSONField(default=dict, blank=True)
+    
+    # Dashboard Preferences  
+    dashboard_preferences = models.JSONField(default=dict, blank=True)
+    
+    # General UI Preferences
+    ui_preferences = models.JSONField(default=dict, blank=True)
+    
+    # Notification Preferences
+    notification_preferences = models.JSONField(default=dict, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "User Preferences"
+        verbose_name_plural = "User Preferences"
+    
+    def __str__(self):
+        return f"Preferences for {self.user.username}"
+    
+    def get_all_preferences(self):
+        """Get all preferences with defaults"""
+        from .user_preferences import get_preference_defaults
+        defaults = get_preference_defaults()
+        
+        return {
+            'dicom_viewer': {**defaults['dicom_viewer'], **(self.dicom_viewer_preferences or {})},
+            'dashboard': {**defaults['dashboard'], **(self.dashboard_preferences or {})},
+            'ui': {**defaults['ui'], **(self.ui_preferences or {})},
+            'notifications': {**defaults['notifications'], **(self.notification_preferences or {})}
+        }

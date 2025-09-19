@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.contrib.auth.forms import AuthenticationForm
 from .models import User, UserSession, Facility
+from .user_preferences import get_user_preferences, update_user_preferences
 import json
 
 def login_view(request):
@@ -251,3 +252,96 @@ def session_status(request):
             'valid': False,
             'error': str(e)
         }, status=500)
+
+
+# =================== USER PREFERENCES SYSTEM ===================
+# Safe enhancement - doesn't modify existing functionality
+
+@login_required
+def user_preferences_view(request):
+    """User preferences management - safe new feature"""
+    user_prefs = get_user_preferences(request.user)
+    
+    if request.method == 'POST':
+        try:
+            category = request.POST.get('category')
+            if category in ['dicom_viewer', 'dashboard', 'ui', 'notifications']:
+                # Get preferences from POST data
+                preferences = {}
+                for key, value in request.POST.items():
+                    if key.startswith(f'{category}_'):
+                        pref_key = key.replace(f'{category}_', '')
+                        
+                        # Convert string values to appropriate types
+                        if value in ['true', 'false']:
+                            preferences[pref_key] = value == 'true'
+                        elif value.isdigit():
+                            preferences[pref_key] = int(value)
+                        else:
+                            preferences[pref_key] = value
+                
+                update_user_preferences(request.user, category, preferences)
+                messages.success(request, f'{category.replace("_", " ").title()} preferences updated successfully!')
+            
+        except Exception as e:
+            messages.error(request, f'Failed to update preferences: {str(e)}')
+        
+        return redirect('accounts:preferences')
+    
+    context = {
+        'preferences': user_prefs.get_all_preferences(),
+        'user': request.user
+    }
+    
+    return render(request, 'accounts/preferences.html', context)
+
+@login_required
+def preferences_api(request):
+    """API endpoint for preferences - safe addition"""
+    user_prefs = get_user_preferences(request.user)
+    
+    if request.method == 'GET':
+        category = request.GET.get('category')
+        
+        if category == 'dicom_viewer':
+            preferences = user_prefs.get_dicom_viewer_preferences()
+        elif category == 'dashboard':
+            preferences = user_prefs.get_dashboard_preferences()
+        elif category == 'ui':
+            preferences = user_prefs.get_ui_preferences()
+        elif category == 'notifications':
+            preferences = user_prefs.get_notification_preferences()
+        else:
+            preferences = user_prefs.get_all_preferences()
+        
+        return JsonResponse({
+            'success': True,
+            'preferences': preferences
+        })
+    
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            category = data.get('category')
+            preferences = data.get('preferences', {})
+            
+            if category in ['dicom_viewer', 'dashboard', 'ui', 'notifications']:
+                update_user_preferences(request.user, category, preferences)
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'{category} preferences updated'
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid category'
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Method not allowed'})

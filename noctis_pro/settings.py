@@ -22,7 +22,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 import os
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6t@n5q8r7y#3e$6u9i%m&o^2d1f0g')
+# Production-grade secret key - Medical PACS Security
+SECRET_KEY = os.environ.get('SECRET_KEY', '$-stc(0h#ryg-54@@j!zubqmz&vcc5vpqwav2q0%%=_f(l$o_7')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'

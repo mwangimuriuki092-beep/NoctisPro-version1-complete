@@ -1,0 +1,32 @@
+[Unit]
+Description=NoctisPro PACS Medical Imaging System
+Documentation=https://github.com/noctispro/pacs
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/noctispro
+ExecStartPre=-/usr/bin/docker compose -f docker-compose.production.yml down
+ExecStart=/usr/bin/docker compose -f docker-compose.production.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.production.yml down
+ExecReload=/usr/bin/docker compose -f docker-compose.production.yml restart
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Restart policy for medical system reliability
+Restart=on-failure
+RestartSec=30
+
+# Security settings
+User=root
+Group=docker
+
+# Environment
+Environment=COMPOSE_PROJECT_NAME=noctispro
+Environment=COMPOSE_HTTP_TIMEOUT=300
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,142 @@
+/* 
+Small visibility fixes - Safe enhancements only
+Does not modify existing styles, just improves readability
+*/
+
+/* Fix admin permissions text visibility */
+.form-check-input {
+    background-color: var(--secondary-bg, #1a1a1a) !important;
+    border-color: var(--border-color, #404040) !important;
+}
+
+.form-check-input:checked {
+    background-color: var(--accent-color, #00d4ff) !important;
+    border-color: var(--accent-color, #00d4ff) !important;
+}
+
+.form-check .ms-2 {
+    color: var(--text-primary, #ffffff) !important;
+    font-weight: 500 !important;
+}
+
+/* Ensure table text is visible */
+.table-dark th,
+.table-dark td {
+    color: var(--text-primary, #ffffff) !important;
+    border-color: var(--border-color, #404040) !important;
+}
+
+/* Fix button text visibility */
+.btn-control {
+    color: var(--text-primary, #ffffff) !important;
+    background: var(--secondary-bg, #1a1a1a) !important;
+    border: 1px solid var(--border-color, #404040) !important;
+}
+
+.btn-control:hover {
+    background: var(--accent-color, #00d4ff) !important;
+    color: var(--primary-bg, #0a0a0a) !important;
+}
+
+/* Fix card header visibility */
+.card-header {
+    background: var(--secondary-bg, #1a1a1a) !important;
+    border-bottom: 1px solid var(--border-color, #404040) !important;
+    color: var(--text-primary, #ffffff) !important;
+    font-weight: 600 !important;
+}
+
+/* Fix form labels */
+label {
+    color: var(--text-primary, #ffffff) !important;
+}
+
+/* Fix input field visibility */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+select,
+textarea {
+    background-color: var(--secondary-bg, #1a1a1a) !important;
+    border: 1px solid var(--border-color, #404040) !important;
+    color: var(--text-primary, #ffffff) !important;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--accent-color, #00d4ff) !important;
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2) !important;
+}
+
+/* Fix dropdown/select visibility */
+option {
+    background-color: var(--secondary-bg, #1a1a1a) !important;
+    color: var(--text-primary, #ffffff) !important;
+}
+
+/* Ensure all text is visible */
+p, span, div, h1, h2, h3, h4, h5, h6 {
+    color: inherit;
+}
+
+/* Fix any invisible text issues */
+.text-dark {
+    color: var(--text-primary, #ffffff) !important;
+}
+
+/* Fix modal visibility if any */
+.modal-content {
+    background-color: var(--card-surface, #252525) !important;
+    border: 1px solid var(--border-color, #404040) !important;
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-color, #404040) !important;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-color, #404040) !important;
+}
+
+/* Fix any Bootstrap overrides */
+.text-muted {
+    color: var(--text-secondary, #b3b3b3) !important;
+}
+
+.text-secondary {
+    color: var(--text-secondary, #b3b3b3) !important;
+}
+
+/* Fix alert visibility */
+.alert {
+    border: 1px solid var(--border-color, #404040) !important;
+}
+
+.alert-success {
+    background-color: rgba(0, 255, 136, 0.1) !important;
+    border-color: var(--success-color, #00ff88) !important;
+    color: var(--success-color, #00ff88) !important;
+}
+
+.alert-danger {
+    background-color: rgba(255, 68, 68, 0.1) !important;
+    border-color: var(--danger-color, #ff4444) !important;
+    color: var(--danger-color, #ff4444) !important;
+}
+
+.alert-warning {
+    background-color: rgba(255, 170, 0, 0.1) !important;
+    border-color: var(--warning-color, #ffaa00) !important;
+    color: var(--warning-color, #ffaa00) !important;
+}
+
+.alert-info {
+    background-color: rgba(0, 188, 212, 0.1) !important;
+    border-color: var(--info-color, #00bcd4) !important;
+    color: var(--info-color, #00bcd4) !important;
+}
