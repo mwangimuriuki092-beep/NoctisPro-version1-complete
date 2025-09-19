@@ -36,7 +36,9 @@ class MedicalBackupSystem:
     """
     
     def __init__(self):
-        self.backup_root = getattr(settings, 'BACKUP_ROOT', '/var/backups/noctispro')
+        # Use workspace-relative backup directory for safety
+        default_backup_root = os.path.join(getattr(settings, 'BASE_DIR', '/workspace'), 'backups')
+        self.backup_root = getattr(settings, 'BACKUP_ROOT', default_backup_root)
         self.retention_years = 10
         self.max_backup_size_gb = 500  # Maximum backup size before compression
         

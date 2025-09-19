@@ -1,0 +1,589 @@
+{% extends 'base.html' %}
+
+{% block title %}User Preferences - Noctis Pro PACS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .preferences-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .preferences-header {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    
+    .preferences-tabs {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 30px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .tab-button {
+        background: var(--secondary-bg);
+        border: none;
+        color: var(--text-secondary);
+        padding: 12px 20px;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .tab-button.active {
+        background: var(--accent-color);
+        color: var(--primary-bg);
+        font-weight: 600;
+    }
+    
+    .tab-button:hover:not(.active) {
+        background: var(--card-bg);
+        color: var(--text-primary);
+    }
+    
+    .preferences-section {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 20px;
+        display: none;
+    }
+    
+    .preferences-section.active {
+        display: block;
+    }
+    
+    .section-title {
+        color: var(--accent-color);
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .preference-group {
+        margin-bottom: 25px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .preference-group:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    
+    .group-title {
+        color: var(--text-primary);
+        font-weight: 600;
+        margin-bottom: 15px;
+        font-size: 14px;
+    }
+    
+    .preference-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding: 8px 0;
+    }
+    
+    .preference-label {
+        color: var(--text-primary);
+        font-size: 13px;
+        flex: 1;
+    }
+    
+    .preference-description {
+        color: var(--text-secondary);
+        font-size: 11px;
+        margin-top: 3px;
+    }
+    
+    .preference-control {
+        min-width: 150px;
+        text-align: right;
+    }
+    
+    .preference-control input,
+    .preference-control select {
+        background: var(--secondary-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+    }
+    
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--border-color);
+        transition: .4s;
+        border-radius: 24px;
+    }
+    
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+        background-color: var(--accent-color);
+    }
+    
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+    
+    .save-preferences {
+        background: var(--accent-color);
+        color: var(--primary-bg);
+        border: none;
+        padding: 12px 30px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        margin-top: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .save-preferences:hover {
+        background: #00b8d4;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="preferences-container">
+    <div class="preferences-header">
+        <h2>⚙️ User Preferences</h2>
+        <p style="color: var(--text-secondary); margin-top: 10px;">
+            Customize your NoctisPro PACS experience for optimal medical imaging workflow
+        </p>
+    </div>
+    
+    <div class="preferences-tabs">
+        <button class="tab-button active" onclick="showPreferencesTab('dicom_viewer')">
+            <i class="fas fa-eye"></i> DICOM Viewer
+        </button>
+        <button class="tab-button" onclick="showPreferencesTab('dashboard')">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </button>
+        <button class="tab-button" onclick="showPreferencesTab('ui')">
+            <i class="fas fa-palette"></i> Interface
+        </button>
+        <button class="tab-button" onclick="showPreferencesTab('notifications')">
+            <i class="fas fa-bell"></i> Notifications
+        </button>
+    </div>
+    
+    <!-- DICOM Viewer Preferences -->
+    <div id="dicom_viewer_prefs" class="preferences-section active">
+        <div class="section-title">
+            <i class="fas fa-eye"></i>
+            DICOM Viewer Preferences
+        </div>
+        
+        <form method="post" id="dicomViewerForm">
+            {% csrf_token %}
+            <input type="hidden" name="category" value="dicom_viewer">
+            
+            <div class="preference-group">
+                <div class="group-title">🔧 Default Tools</div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Default Tool</div>
+                        <div class="preference-description">Tool selected when opening viewer</div>
+                    </div>
+                    <div class="preference-control">
+                        <select name="dicom_viewer_default_tool">
+                            <option value="window" {% if preferences.dicom_viewer.default_tool == 'window' %}selected{% endif %}>Window/Level</option>
+                            <option value="zoom" {% if preferences.dicom_viewer.default_tool == 'zoom' %}selected{% endif %}>Zoom</option>
+                            <option value="pan" {% if preferences.dicom_viewer.default_tool == 'pan' %}selected{% endif %}>Pan</option>
+                            <option value="measure" {% if preferences.dicom_viewer.default_tool == 'measure' %}selected{% endif %}>Measure</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Default Window Preset</div>
+                        <div class="preference-description">Default windowing for new images</div>
+                    </div>
+                    <div class="preference-control">
+                        <select name="dicom_viewer_default_window_preset">
+                            <option value="soft" {% if preferences.dicom_viewer.default_window_preset == 'soft' %}selected{% endif %}>Soft Tissue</option>
+                            <option value="lung" {% if preferences.dicom_viewer.default_window_preset == 'lung' %}selected{% endif %}>Lung</option>
+                            <option value="bone" {% if preferences.dicom_viewer.default_window_preset == 'bone' %}selected{% endif %}>Bone</option>
+                            <option value="brain" {% if preferences.dicom_viewer.default_window_preset == 'brain' %}selected{% endif %}>Brain</option>
+                            <option value="liver" {% if preferences.dicom_viewer.default_window_preset == 'liver' %}selected{% endif %}>Liver</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Keyboard Shortcuts</div>
+                        <div class="preference-description">Enable professional keyboard navigation</div>
+                    </div>
+                    <div class="preference-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="dicom_viewer_keyboard_shortcuts_enabled" {% if preferences.dicom_viewer.keyboard_shortcuts_enabled %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="preference-group">
+                <div class="group-title">📏 Measurements & Annotations</div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Measurement Units</div>
+                        <div class="preference-description">Default units for measurements</div>
+                    </div>
+                    <div class="preference-control">
+                        <select name="dicom_viewer_measurement_units">
+                            <option value="mm" {% if preferences.dicom_viewer.measurement_units == 'mm' %}selected{% endif %}>Millimeters (mm)</option>
+                            <option value="cm" {% if preferences.dicom_viewer.measurement_units == 'cm' %}selected{% endif %}>Centimeters (cm)</option>
+                            <option value="pixels" {% if preferences.dicom_viewer.measurement_units == 'pixels' %}selected{% endif %}>Pixels</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Show Measurements</div>
+                        <div class="preference-description">Display measurements overlay</div>
+                    </div>
+                    <div class="preference-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="dicom_viewer_show_measurements" {% if preferences.dicom_viewer.show_measurements %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Show Annotations</div>
+                        <div class="preference-description">Display annotations overlay</div>
+                    </div>
+                    <div class="preference-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="dicom_viewer_show_annotations" {% if preferences.dicom_viewer.show_annotations %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="save-preferences">
+                <i class="fas fa-save"></i> Save DICOM Viewer Preferences
+            </button>
+        </form>
+    </div>
+    
+    <!-- Dashboard Preferences -->
+    <div id="dashboard_prefs" class="preferences-section">
+        <div class="section-title">
+            <i class="fas fa-tachometer-alt"></i>
+            Dashboard Preferences
+        </div>
+        
+        <form method="post" id="dashboardForm">
+            {% csrf_token %}
+            <input type="hidden" name="category" value="dashboard">
+            
+            <div class="preference-group">
+                <div class="group-title">📊 Display Options</div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Studies Per Page</div>
+                        <div class="preference-description">Number of studies to show per page</div>
+                    </div>
+                    <div class="preference-control">
+                        <select name="dashboard_studies_per_page">
+                            <option value="10" {% if preferences.dashboard.studies_per_page == 10 %}selected{% endif %}>10</option>
+                            <option value="25" {% if preferences.dashboard.studies_per_page == 25 %}selected{% endif %}>25</option>
+                            <option value="50" {% if preferences.dashboard.studies_per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if preferences.dashboard.studies_per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Auto Refresh</div>
+                        <div class="preference-description">Automatically refresh worklist</div>
+                    </div>
+                    <div class="preference-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="dashboard_auto_refresh" {% if preferences.dashboard.auto_refresh %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Refresh Interval</div>
+                        <div class="preference-description">Auto-refresh frequency (seconds)</div>
+                    </div>
+                    <div class="preference-control">
+                        <input type="number" name="dashboard_refresh_interval" value="{{ preferences.dashboard.refresh_interval }}" min="10" max="300">
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="save-preferences">
+                <i class="fas fa-save"></i> Save Dashboard Preferences
+            </button>
+        </form>
+    </div>
+    
+    <!-- UI Preferences -->
+    <div id="ui_prefs" class="preferences-section">
+        <div class="section-title">
+            <i class="fas fa-palette"></i>
+            Interface Preferences
+        </div>
+        
+        <form method="post" id="uiForm">
+            {% csrf_token %}
+            <input type="hidden" name="category" value="ui">
+            
+            <div class="preference-group">
+                <div class="group-title">🎨 Appearance</div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Theme</div>
+                        <div class="preference-description">Color theme for interface</div>
+                    </div>
+                    <div class="preference-control">
+                        <select name="ui_theme">
+                            <option value="dark" {% if preferences.ui.theme == 'dark' %}selected{% endif %}>Dark (Medical Grade)</option>
+                            <option value="light" {% if preferences.ui.theme == 'light' %}selected{% endif %}>Light</option>
+                            <option value="high_contrast" {% if preferences.ui.theme == 'high_contrast' %}selected{% endif %}>High Contrast</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Font Size</div>
+                        <div class="preference-description">Interface text size</div>
+                    </div>
+                    <div class="preference-control">
+                        <select name="ui_font_size">
+                            <option value="small" {% if preferences.ui.font_size == 'small' %}selected{% endif %}>Small</option>
+                            <option value="medium" {% if preferences.ui.font_size == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="large" {% if preferences.ui.font_size == 'large' %}selected{% endif %}>Large</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Show Tooltips</div>
+                        <div class="preference-description">Display helpful tooltips</div>
+                    </div>
+                    <div class="preference-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="ui_show_tooltips" {% if preferences.ui.show_tooltips %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="save-preferences">
+                <i class="fas fa-save"></i> Save Interface Preferences
+            </button>
+        </form>
+    </div>
+    
+    <!-- Notification Preferences -->
+    <div id="notifications_prefs" class="preferences-section">
+        <div class="section-title">
+            <i class="fas fa-bell"></i>
+            Notification Preferences
+        </div>
+        
+        <form method="post" id="notificationsForm">
+            {% csrf_token %}
+            <input type="hidden" name="category" value="notifications">
+            
+            <div class="preference-group">
+                <div class="group-title">🔔 Notification Types</div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">New Study Notifications</div>
+                        <div class="preference-description">Notify when new studies are uploaded</div>
+                    </div>
+                    <div class="preference-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="notifications_new_study_notifications" {% if preferences.notifications.new_study_notifications %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">AI Analysis Notifications</div>
+                        <div class="preference-description">Notify when AI analysis is complete</div>
+                    </div>
+                    <div class="preference-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="notifications_ai_analysis_notifications" {% if preferences.notifications.ai_analysis_notifications %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div>
+                        <div class="preference-label">Sound Enabled</div>
+                        <div class="preference-description">Play sound for notifications</div>
+                    </div>
+                    <div class="preference-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="notifications_sound_enabled" {% if preferences.notifications.sound_enabled %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="save-preferences">
+                <i class="fas fa-save"></i> Save Notification Preferences
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+function showPreferencesTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Update sections
+    document.querySelectorAll('.preferences-section').forEach(section => {
+        section.classList.remove('active');
+    });
+    document.getElementById(tabName + '_prefs').classList.add('active');
+}
+
+// Form submission with AJAX
+document.querySelectorAll('form[id$="Form"]').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        const category = formData.get('category');
+        
+        // Show loading state
+        const submitBtn = form.querySelector('.save-preferences');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        submitBtn.disabled = true;
+        
+        fetch('{% url "accounts:preferences" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                submitBtn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+                submitBtn.style.background = 'var(--success-color)';
+                
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.style.background = 'var(--accent-color)';
+                    submitBtn.disabled = false;
+                }, 2000);
+                
+                // Apply preferences immediately if possible
+                applyPreferencesImmediately(category, new FormData(form));
+            } else {
+                throw new Error(data.error || 'Failed to save preferences');
+            }
+        })
+        .catch(error => {
+            console.error('Error saving preferences:', error);
+            submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+            submitBtn.style.background = 'var(--danger-color)';
+            
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.style.background = 'var(--accent-color)';
+                submitBtn.disabled = false;
+            }, 3000);
+        });
+    });
+});
+
+function applyPreferencesImmediately(category, formData) {
+    // Apply some preferences immediately without page reload
+    if (category === 'ui') {
+        const theme = formData.get('ui_theme');
+        if (theme === 'high_contrast') {
+            document.body.style.filter = 'contrast(1.5)';
+        } else {
+            document.body.style.filter = 'none';
+        }
+    }
+}
+</script>
+{% endblock %}

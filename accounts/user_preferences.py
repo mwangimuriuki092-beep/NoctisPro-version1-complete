@@ -1,48 +1,59 @@
 """
 User Preferences System
 Safe enhancement - doesn't modify existing functionality
-Stores user preferences in JSON field for flexibility
+Helper functions for managing user preferences
 """
 
 import json
-from django.db import models
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
-class UserPreferences(models.Model):
+def get_user_preferences(user):
     """
-    User preferences model - stores customizable settings
-    Safe addition - doesn't affect existing user functionality
+    Get or create user preferences
+    Safe function - doesn't affect existing functionality
     """
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preferences')
+    from .models import UserPreferences
     
-    # DICOM Viewer Preferences
-    dicom_viewer_preferences = models.JSONField(default=dict, blank=True)
+    try:
+        preferences = UserPreferences.objects.get(user=user)
+    except UserPreferences.DoesNotExist:
+        preferences = UserPreferences.objects.create(user=user)
     
-    # Dashboard Preferences  
-    dashboard_preferences = models.JSONField(default=dict, blank=True)
+    return preferences
+
+def update_user_preferences(user, category, preferences):
+    """
+    Update user preferences safely
+    """
+    user_prefs = get_user_preferences(user)
     
-    # General UI Preferences
-    ui_preferences = models.JSONField(default=dict, blank=True)
+    # Update preferences based on category
+    if category == 'dicom_viewer':
+        current = user_prefs.dicom_viewer_preferences or {}
+        current.update(preferences)
+        user_prefs.dicom_viewer_preferences = current
+    elif category == 'dashboard':
+        current = user_prefs.dashboard_preferences or {}
+        current.update(preferences)
+        user_prefs.dashboard_preferences = current
+    elif category == 'ui':
+        current = user_prefs.ui_preferences or {}
+        current.update(preferences)
+        user_prefs.ui_preferences = current
+    elif category == 'notifications':
+        current = user_prefs.notification_preferences or {}
+        current.update(preferences)
+        user_prefs.notification_preferences = current
     
-    # Notification Preferences
-    notification_preferences = models.JSONField(default=dict, blank=True)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        verbose_name = "User Preferences"
-        verbose_name_plural = "User Preferences"
-    
-    def __str__(self):
-        return f"Preferences for {self.user.username}"
-    
-    def get_dicom_viewer_preferences(self):
-        """Get DICOM viewer preferences with defaults"""
-        defaults = {
+    user_prefs.save()
+    return user_prefs
+
+def get_preference_defaults():
+    """Get default preferences for all categories"""
+    return {
+        'dicom_viewer': {
             'default_tool': 'window',
             'default_window_preset': 'soft',
             'auto_fit': True,
@@ -59,21 +70,8 @@ class UserPreferences(models.Model):
             'grid_lines': False,
             'ruler_color': '#00d4ff',
             'annotation_color': '#ffaa00'
-        }
-        
-        prefs = self.dicom_viewer_preferences or {}
-        return {**defaults, **prefs}
-    
-    def set_dicom_viewer_preferences(self, preferences):
-        """Set DICOM viewer preferences"""
-        current = self.get_dicom_viewer_preferences()
-        current.update(preferences)
-        self.dicom_viewer_preferences = current
-        self.save()
-    
-    def get_dashboard_preferences(self):
-        """Get dashboard preferences with defaults"""
-        defaults = {
+        },
+        'dashboard': {
             'studies_per_page': 25,
             'default_sort': '-study_date',
             'show_thumbnails': True,
@@ -86,21 +84,8 @@ class UserPreferences(models.Model):
             'show_modality_icons': True,
             'highlight_new_studies': True,
             'default_filters': {}
-        }
-        
-        prefs = self.dashboard_preferences or {}
-        return {**defaults, **prefs}
-    
-    def set_dashboard_preferences(self, preferences):
-        """Set dashboard preferences"""
-        current = self.get_dashboard_preferences()
-        current.update(preferences)
-        self.dashboard_preferences = current
-        self.save()
-    
-    def get_ui_preferences(self):
-        """Get UI preferences with defaults"""
-        defaults = {
+        },
+        'ui': {
             'theme': 'dark',
             'font_size': 'medium',
             'sidebar_collapsed': False,
@@ -112,98 +97,19 @@ class UserPreferences(models.Model):
             'timezone': 'UTC',
             'date_format': 'YYYY-MM-DD',
             'time_format': '24h'
-        }
-        
-        prefs = self.ui_preferences or {}
-        return {**defaults, **prefs}
-    
-    def set_ui_preferences(self, preferences):
-        """Set UI preferences"""
-        current = self.get_ui_preferences()
-        current.update(preferences)
-        self.ui_preferences = current
-        self.save()
-    
-    def get_notification_preferences(self):
-        """Get notification preferences with defaults"""
-        defaults = {
+        },
+        'notifications': {
             'email_notifications': True,
             'browser_notifications': True,
             'new_study_notifications': True,
             'report_ready_notifications': True,
             'ai_analysis_notifications': True,
             'system_maintenance_notifications': True,
-            'backup_status_notifications': False,  # Only for admins
+            'backup_status_notifications': False,
             'sound_enabled': True,
             'notification_duration': 5000,
             'quiet_hours_enabled': False,
             'quiet_hours_start': '22:00',
             'quiet_hours_end': '08:00'
         }
-        
-        prefs = self.notification_preferences or {}
-        return {**defaults, **prefs}
-    
-    def set_notification_preferences(self, preferences):
-        """Set notification preferences"""
-        current = self.get_notification_preferences()
-        current.update(preferences)
-        self.notification_preferences = current
-        self.save()
-    
-    def get_all_preferences(self):
-        """Get all preferences as a single dictionary"""
-        return {
-            'dicom_viewer': self.get_dicom_viewer_preferences(),
-            'dashboard': self.get_dashboard_preferences(),
-            'ui': self.get_ui_preferences(),
-            'notifications': self.get_notification_preferences()
-        }
-    
-    def reset_to_defaults(self, category=None):
-        """Reset preferences to defaults"""
-        if category == 'dicom_viewer':
-            self.dicom_viewer_preferences = {}
-        elif category == 'dashboard':
-            self.dashboard_preferences = {}
-        elif category == 'ui':
-            self.ui_preferences = {}
-        elif category == 'notifications':
-            self.notification_preferences = {}
-        else:
-            # Reset all
-            self.dicom_viewer_preferences = {}
-            self.dashboard_preferences = {}
-            self.ui_preferences = {}
-            self.notification_preferences = {}
-        
-        self.save()
-
-def get_user_preferences(user):
-    """
-    Get or create user preferences
-    Safe function - doesn't affect existing functionality
-    """
-    try:
-        preferences = UserPreferences.objects.get(user=user)
-    except UserPreferences.DoesNotExist:
-        preferences = UserPreferences.objects.create(user=user)
-    
-    return preferences
-
-def update_user_preferences(user, category, preferences):
-    """
-    Update user preferences safely
-    """
-    user_prefs = get_user_preferences(user)
-    
-    if category == 'dicom_viewer':
-        user_prefs.set_dicom_viewer_preferences(preferences)
-    elif category == 'dashboard':
-        user_prefs.set_dashboard_preferences(preferences)
-    elif category == 'ui':
-        user_prefs.set_ui_preferences(preferences)
-    elif category == 'notifications':
-        user_prefs.set_notification_preferences(preferences)
-    
-    return user_prefs
+    }
