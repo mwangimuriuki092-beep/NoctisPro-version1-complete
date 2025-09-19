@@ -34,4 +34,8 @@ urlpatterns = [
     path('backup/', views.backup_management, name='backup_management'),
     path('backup/create/', views.create_backup, name='create_backup'),
     path('backup/emergency/', views.emergency_backup, name='emergency_backup'),
+    
+    # System monitoring
+    path('monitoring/', views.system_monitoring, name='system_monitoring'),
+    path('api/metrics/', views.system_metrics_api, name='system_metrics_api'),
 ]

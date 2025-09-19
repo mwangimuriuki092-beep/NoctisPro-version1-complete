@@ -12,6 +12,7 @@ from worklist.models import Study, Modality
 from .models import SystemConfiguration, AuditLog, SystemUsageStatistics
 from .backup_system import medical_backup_system
 from .backup_scheduler import medical_backup_scheduler
+from .system_monitor import system_monitor
 import json
 import re
 import threading
@@ -1011,3 +1012,42 @@ def emergency_backup(request):
             messages.error(request, f'Emergency backup failed: {str(e)}')
     
     return redirect('admin_panel:backup_management')
+
+
+# =================== SYSTEM MONITORING VIEWS ===================
+# Safe enhancement - separate monitoring feature
+
+@login_required
+@user_passes_test(is_admin)
+def system_monitoring(request):
+    """System monitoring dashboard - safe new feature"""
+    try:
+        metrics = system_monitor.get_system_metrics()
+        
+        context = {
+            'metrics': metrics,
+            'page_title': 'System Monitoring Dashboard',
+            'refresh_interval': 30  # Auto-refresh every 30 seconds
+        }
+        
+        return render(request, 'admin_panel/system_monitoring.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error loading system monitoring: {str(e)}')
+        return redirect('admin_panel:dashboard')
+
+@login_required
+@user_passes_test(is_admin)
+def system_metrics_api(request):
+    """API endpoint for system metrics - safe addition"""
+    try:
+        metrics = system_monitor.get_system_metrics()
+        return JsonResponse({
+            'success': True,
+            'metrics': metrics
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
