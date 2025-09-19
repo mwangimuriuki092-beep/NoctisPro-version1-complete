@@ -185,7 +185,7 @@ def upload_study(request):
 					'user': request.user.username
 				})
 			
-			# Professional upload statistics tracking
+			# Professional medical-grade upload statistics tracking
 			upload_stats = {
 				'total_files': len(uploaded_files),
 				'processed_files': 0,
@@ -196,7 +196,10 @@ def upload_study(request):
 				'total_size_mb': 0,
 				'processing_time_ms': 0,
 				'user': request.user.username,
-				'timestamp': timezone.now().isoformat()
+				'timestamp': timezone.now().isoformat(),
+				'medical_grade': True,
+				'max_capacity': '10GB',
+				'chunk_processing': True
 			}
 			
 			logger.info(f"Professional DICOM upload started: {upload_stats['total_files']} files by {request.user.username}")
@@ -216,12 +219,18 @@ def upload_study(request):
 				file_size_mb = in_file.size / (1024 * 1024)  # Convert to MB
 				file_size_total += file_size_mb
 				try:
-					# Professional DICOM reading with comprehensive error handling
-					# Prefer fast header read to avoid loading pixel data during request
+					# Professional medical-grade DICOM reading with memory optimization
+					# Always stop before pixels for large dataset processing efficiency
 					try:
 						ds = pydicom.dcmread(in_file, stop_before_pixels=True, force=True)
-					except Exception:
+						# Reset file pointer for later use
+						in_file.seek(0)
+					except Exception as e:
+						logger.warning(f"Failed fast DICOM read for file {file_index + 1}: {str(e)}")
+						# Fallback with full read only if necessary
+						in_file.seek(0)
 						ds = pydicom.dcmread(in_file, force=True)
+						in_file.seek(0)
 					
 					# Medical-grade metadata extraction and validation
 					study_uid = getattr(ds, 'StudyInstanceUID', None)
@@ -251,9 +260,13 @@ def upload_study(request):
 					processed_files += 1
 					file_processing_time = (time.time() - file_start_time) * 1000
 					
-					# Professional progress logging every 10 files
-					if (file_index + 1) % 10 == 0:
-						logger.info(f"Professional processing: {file_index + 1}/{total_files} files processed ({file_processing_time:.1f}ms per file)")
+					# Professional medical progress logging - adaptive frequency for large datasets
+					log_frequency = 50 if total_files > 1000 else 25 if total_files > 500 else 10
+					if (file_index + 1) % log_frequency == 0:
+						progress_percent = ((file_index + 1) / total_files) * 100
+						avg_time_per_file = file_processing_time
+						eta_seconds = (total_files - file_index - 1) * (avg_time_per_file / 1000)
+						logger.info(f"Medical dataset processing: {file_index + 1}/{total_files} files ({progress_percent:.1f}%) - ETA: {eta_seconds:.0f}s")
 					
 				except Exception as e:
 					logger.error(f"File {file_index + 1} processing failed: {str(e)}")
