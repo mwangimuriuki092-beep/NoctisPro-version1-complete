@@ -307,14 +307,18 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/worklist/'  # Redirect to worklist after successful login
 LOGOUT_REDIRECT_URL = '/login/'
 
-# Session configuration - Use database sessions instead of Redis
+# Session configuration - Medical PACS optimized
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-# 30 minutes inactivity timeout
-SESSION_COOKIE_AGE = 1800
+# 60 minutes inactivity timeout (extended for medical workflows)
+SESSION_COOKIE_AGE = 3600  # 1 hour
 # Refresh expiry on each request to implement inactivity-based expiry
 SESSION_SAVE_EVERY_REQUEST = True
-# Expire session at browser close to require fresh login on new window
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+# Don't expire session at browser close for better UX in medical environment
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+# Session cookie name for better identification
+SESSION_COOKIE_NAME = 'noctispro_sessionid'
+# Clear session data on logout
+SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 
 # File upload settings - Enhanced for up to 5000 DICOM images
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batches
