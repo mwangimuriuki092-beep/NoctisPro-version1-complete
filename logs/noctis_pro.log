@@ -342,3 +342,7 @@ django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found
 [INFO] 2025-09-24 06:50:57,196 django.utils.autoreload autoreload 11730 139762332520704 Watching for file changes with StatReloader
 [INFO] 2025-09-24 06:52:59,435 django.utils.autoreload autoreload 11730 139762332520704 /workspace/dicom_viewer/views.py changed, reloading.
 [INFO] 2025-09-24 06:53:00,692 django.utils.autoreload autoreload 12952 139662587248896 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:54:22,973 django.channels.server runserver 12952 139662523406016 [mHTTP GET /login/ 200 [0.03, 127.0.0.1:54764][0m
+[INFO] 2025-09-24 06:54:30,713 django.channels.server runserver 12952 139662523406016 [32mHTTP POST /login/ 302 [0.55, 127.0.0.1:54774][0m
+[WARNING] 2025-09-24 06:54:30,739 django.channels.server runserver 12952 139662523406016 [31;1mHTTP POST /worklist/ 403 [0.02, 127.0.0.1:54774][0m
+[INFO] 2025-09-24 06:54:38,257 django.channels.server runserver 12952 139662523406016 [mHTTP GET /worklist/ 200 [0.04, 127.0.0.1:41706][0m

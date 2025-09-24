@@ -6,3 +6,4 @@
 [WARNING] 2025-09-24 06:41:38,483 django.security.csrf log 6973 140004488484544 Forbidden (CSRF token missing.): /worklist/
 [WARNING] 2025-09-24 06:42:28,015 django.security.csrf log 7389 140623260427968 Forbidden (CSRF token missing.): /worklist/
 [WARNING] 2025-09-24 06:44:03,648 django.security.csrf log 7389 140623240496832 Forbidden (CSRF token missing.): /worklist/
+[WARNING] 2025-09-24 06:54:30,727 django.security.csrf log 12952 139661987903168 Forbidden (CSRF token missing.): /worklist/
