@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Model Management - Noctis Pro PACS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .model-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .model-card:hover {
+        border-color: var(--accent-color);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 212, 255, 0.2);
+    }
+    
+    .model-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    
+    .model-name {
+        font-size: 18px;
+        font-weight: bold;
+        color: var(--text-primary);
+    }
+    
+    .model-version {
+        background: var(--accent-color);
+        color: var(--primary-bg);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    
+    .model-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+    }
+    
+    .stat-value {
+        font-size: 20px;
+        font-weight: bold;
+        color: var(--accent-color);
+    }
+    
+    .stat-label {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 5px;
+    }
+    
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    
+    .status-active {
+        background: var(--success-color);
+        color: var(--primary-bg);
+    }
+    
+    .status-inactive {
+        background: var(--text-muted);
+        color: var(--text-primary);
+    }
+    
+    .model-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .btn-test {
+        background: var(--warning-color);
+        color: var(--primary-bg);
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-test:hover {
+        background: #ffcc33;
+        transform: translateY(-1px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Top Navigation -->
+    <div class="top-navbar">
+        <div class="nav-left">
+            <div class="logo">Noctis Pro PACS</div>
+            <div class="nav-tabs">
+                <a href="{% url 'worklist:dashboard' %}" class="nav-tab">Dashboard</a>
+                <a href="{% url 'ai_analysis:ai_dashboard' %}" class="nav-tab">AI Analysis</a>
+                <a href="{% url 'ai_analysis:model_management' %}" class="nav-tab active">Model Management</a>
+                <a href="{% url 'ai_analysis:verify_ai_models' %}" class="nav-tab">Verification</a>
+            </div>
+        </div>
+        <div class="nav-right">
+            <div class="user-info">
+                <div class="user-avatar">{{ user.first_name.0|default:"U" }}</div>
+                <span>{{ user.get_full_name|default:user.username }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="content-header">
+            <h2><i class="fas fa-robot"></i> AI Model Management</h2>
+            <p class="text-secondary">Manage and monitor AI models for medical image analysis</p>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="filters-section">
+            <form method="GET" class="filters-form">
+                <div class="filter-group">
+                    <input type="text" name="search" value="{{ search_query }}" placeholder="Search models..." class="form-input">
+                </div>
+                <div class="filter-group">
+                    <select name="model_type" class="form-select">
+                        <option value="">All Types</option>
+                        {% for type_code, type_name in model_types %}
+                        <option value="{{ type_code }}" {% if model_type_filter == type_code %}selected{% endif %}>{{ type_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn-control primary">Filter</button>
+            </form>
+        </div>
+
+        <!-- Models List -->
+        <div class="models-list">
+            {% for model in models %}
+            <div class="model-card">
+                <div class="model-header">
+                    <div>
+                        <div class="model-name">{{ model.name }}</div>
+                        <div class="text-secondary">{{ model.get_model_type_display }} • {{ model.modality }}</div>
+                    </div>
+                    <div>
+                        <span class="model-version">v{{ model.version }}</span>
+                        <span class="status-badge {% if model.is_active %}status-active{% else %}status-inactive{% endif %}">
+                            {% if model.is_active %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="model-description">
+                    <p class="text-secondary">{{ model.description }}</p>
+                </div>
+                
+                <div class="model-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ model.total_analyses }}</div>
+                        <div class="stat-label">Total Analyses</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ model.success_rate|floatformat:1 }}%</div>
+                        <div class="stat-label">Success Rate</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ model.avg_processing_time|floatformat:1 }}s</div>
+                        <div class="stat-label">Avg Processing Time</div>
+                    </div>
+                </div>
+                
+                <div class="model-actions">
+                    <button class="btn-test" onclick="testModel({{ model.id }})">
+                        <i class="fas fa-play"></i> Run Test
+                    </button>
+                    {% if model.is_active %}
+                    <button class="btn-control" onclick="toggleModel({{ model.id }}, false)">
+                        <i class="fas fa-pause"></i> Deactivate
+                    </button>
+                    {% else %}
+                    <button class="btn-control primary" onclick="toggleModel({{ model.id }}, true)">
+                        <i class="fas fa-play"></i> Activate
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state">
+                <i class="fas fa-robot" style="font-size: 48px; color: var(--text-muted); margin-bottom: 20px;"></i>
+                <h3>No AI Models Found</h3>
+                <p class="text-secondary">No AI models match your current filters.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if models.has_other_pages %}
+        <div class="pagination-wrapper">
+            <div class="pagination">
+                {% if models.has_previous %}
+                    <a href="?page={{ models.previous_page_number }}" class="page-link">Previous</a>
+                {% endif %}
+                
+                {% for num in models.paginator.page_range %}
+                    {% if models.number == num %}
+                        <span class="page-link active">{{ num }}</span>
+                    {% else %}
+                        <a href="?page={{ num }}" class="page-link">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if models.has_next %}
+                    <a href="?page={{ models.next_page_number }}" class="page-link">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+async function testModel(modelId) {
+    try {
+        const response = await fetch(`/ai/api/model/${modelId}/test/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(`Test started for model. Analysis ID: ${data.analysis_id}`, 'success');
+        } else {
+            showNotification(`Test failed: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Test failed: ${error.message}`, 'error');
+    }
+}
+
+function toggleModel(modelId, activate) {
+    // Implementation for activating/deactivating models
+    showNotification(`Model ${activate ? 'activated' : 'deactivated'}`, 'info');
+}
+
+function showNotification(message, type) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+    `;
+    document.body.appendChild(alert);
+    setTimeout(() => alert.remove(), 5000);
+}
+</script>
+{% endblock %}

@@ -232,20 +232,37 @@
             align-items: center;
             justify-content: center;
             background: #000000;
+            /* Ensure proper image display */
+            overflow: hidden;
+            /* Medical image display optimization */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
         }
 
         .dicom-image {
             max-width: 100%;
             max-height: 100%;
+            /* Medical-grade image rendering for crisp display */
             image-rendering: -webkit-optimize-contrast;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
             image-rendering: high-quality;
+            image-rendering: pixelated; /* Fallback for medical images */
+            /* Ensure proper positioning and display */
+            object-fit: contain;
+            object-position: center;
+            display: block;
+            visibility: visible;
+            opacity: 1;
+            /* Interaction settings */
             cursor: crosshair;
             user-select: none;
             transition: none;
+            /* Medical-grade image enhancement */
             filter: contrast(1.15) brightness(1.08) sharpen(0.3);
             -webkit-filter: contrast(1.15) brightness(1.08);
+            /* Transform origin for zoom/pan */
+            transform-origin: center center;
         }
 
         /* Overlay Information */
@@ -1722,23 +1739,48 @@
                     if (welcomeScreen) welcomeScreen.style.display = 'none';
                     if (singleView) singleView.style.display = 'flex';
                     
-                    dicomImage.src = data.image_data;
+                    // Clear any previous image first
+                    dicomImage.src = '';
+                    
+                    // Set up proper error handling first
+                    dicomImage.onerror = function() {
+                        console.error('Failed to load DICOM image');
+                        hideLoading();
+                        showToast('Failed to load image - please try again', 'error');
+                    };
+                    
+                    // Set up successful load handler
                     dicomImage.onload = function() {
+                        console.log('DICOM image loaded successfully');
                         hideLoading();
                         updateImageInfo(data.image_info);
                         updateMeasurementOverlay();
                         updateAnnotationOverlay();
                         
-                        // Apply high-quality rendering
+                        // Apply high-quality rendering for medical images
                         dicomImage.style.imageRendering = 'pixelated';
                         dicomImage.style.imageRendering = 'crisp-edges';
                         dicomImage.style.maxWidth = '100%';
                         dicomImage.style.maxHeight = '100%';
+                        dicomImage.style.objectFit = 'contain';
+                        
+                        // Ensure the image is visible
+                        dicomImage.style.display = 'block';
+                        dicomImage.style.visibility = 'visible';
+                        
+                        showToast('DICOM image loaded successfully', 'success');
                     };
-                    dicomImage.onerror = function() {
-                        hideLoading();
-                        showToast('Failed to load image', 'error');
-                    };
+                    
+                    // Load the image
+                    dicomImage.src = data.image_data;
+                    
+                    // Force a repaint if needed
+                    setTimeout(() => {
+                        if (dicomImage.complete && dicomImage.naturalHeight !== 0) {
+                            dicomImage.onload();
+                        }
+                    }, 100);
+                    
                 } else {
                     hideLoading();
                     if (data.warnings?.pixel_decode_error) {
@@ -1875,9 +1917,12 @@
             
             try {
                 showLoading('Loading study data...');
+                console.log('Loading study:', studyId);
                 
                 const response = await fetch(`/dicom-viewer/api/study/${studyId}/`);
                 const data = await response.json();
+                
+                console.log('Study data received:', data);
                 
                 if (data.study && data.series) {
                     currentStudy = data.study;
@@ -1892,33 +1937,44 @@
                     document.getElementById('studyStatus').textContent = 
                         `${currentStudy.patient_name} - ${currentStudy.accession_number}`;
                     
-                    // Populate series dropdown
+                    // Populate series dropdown with better error handling
                     const seriesSelect = document.getElementById('seriesSelect');
                     seriesSelect.innerHTML = '<option value="">Select Series</option>';
                     
                     data.series.forEach(series => {
                         const option = document.createElement('option');
                         option.value = series.id;
-                        option.textContent = `Series ${series.series_number}: ${series.description} (${series.image_count} images)`;
+                        const seriesNum = series.series_number || 'Unknown';
+                        const seriesDesc = series.description || series.series_description || 'Unnamed Series';
+                        const imageCount = series.image_count || 0;
+                        option.textContent = `Series ${seriesNum}: ${seriesDesc} (${imageCount} images)`;
                         seriesSelect.appendChild(option);
+                        console.log('Added series option:', option.textContent);
                     });
                     
-                    // Auto-load first series
+                    // Auto-load first series with better error handling
                     if (data.series.length > 0) {
-                        loadSeries(data.series[0].id);
+                        console.log('Auto-loading first series:', data.series[0].id);
+                        seriesSelect.value = data.series[0].id;
+                        await loadSeries(data.series[0].id);
+                    } else {
+                        hideLoading();
+                        showToast('No series found in this study', 'warning');
+                        return;
                     }
                     
                     hideLoading();
-                    showToast('Study loaded successfully', 'success');
+                    showToast(`Study loaded: ${currentStudy.patient_name || 'Unknown Patient'}`, 'success');
                 } else {
                     hideLoading();
-                    showToast('Failed to load study data', 'error');
+                    console.error('Invalid study data structure:', data);
+                    showToast('Failed to load study data - invalid format', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error loading study:', error);
-                showToast('Error loading study', 'error');
+                showToast('Error loading study: ' + error.message, 'error');
             }
         }
 
@@ -1927,18 +1983,23 @@
             
             try {
                 showLoading('Loading series images...');
+                console.log('Loading series:', seriesId);
                 
                 const response = await fetch(`/dicom-viewer/web/series/${seriesId}/images/`);
                 const data = await response.json();
                 
-                if (data.series && data.images) {
+                console.log('Series data received:', data);
+                
+                if (data.series && data.images && data.images.length > 0) {
                     currentSeries = data.series;
                     images = data.images;
                     currentImageIndex = 0;
                     
+                    console.log(`Loaded ${images.length} images for series`);
+                    
                     // Update series status
                     document.getElementById('seriesStatus').textContent = 
-                        `${currentSeries.series_description} (${images.length} images)`;
+                        `${currentSeries.series_description || 'Unnamed Series'} (${images.length} images)`;
                     document.getElementById('imageCount').textContent = images.length;
                     
                     // Update slice slider
@@ -1949,27 +2010,33 @@
                     // Update series info
                     document.getElementById('seriesInfo').innerHTML = `
                         <div>Images: ${images.length}</div>
-                        <div>Modality: ${currentSeries.modality}</div>
+                        <div>Modality: ${currentSeries.modality || 'Unknown'}</div>
                         <div>Thickness: ${currentSeries.slice_thickness || 'N/A'}</div>
                     `;
                     
                     // Load modality-specific reconstruction options
-                    await loadModalityReconstructionOptions(seriesId);
+                    try {
+                        await loadModalityReconstructionOptions(seriesId);
+                    } catch (reconError) {
+                        console.warn('Failed to load reconstruction options:', reconError);
+                    }
                     
                     // Load first image
+                    console.log('Loading first image...');
                     await updateImageDisplay();
                     
                     hideLoading();
-                    showToast(`Loaded ${images.length} images`, 'success');
+                    showToast(`Loaded ${images.length} images successfully`, 'success');
                 } else {
                     hideLoading();
-                    showToast('Failed to load series images', 'error');
+                    console.error('No images found in series:', data);
+                    showToast('No images found in this series', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error loading series:', error);
-                showToast('Error loading series', 'error');
+                showToast('Error loading series: ' + error.message, 'error');
             }
         }
 
@@ -1977,14 +2044,20 @@
         function loadFromLocalFiles() {
             try {
                 const fileInput = document.getElementById('fileInput');
+                // Reset file input first
+                fileInput.value = '';
                 // Allow selecting a folder of DICOMs
                 fileInput.setAttribute('webkitdirectory', '');
                 fileInput.setAttribute('directory', '');
                 fileInput.setAttribute('accept', '.dcm,.dicom,*');
                 fileInput.multiple = true;
-                fileInput.click();
+                // Ensure the file input can be triggered
+                setTimeout(() => {
+                    fileInput.click();
+                }, 100);
                 showToast('📁 Select a DICOM folder or files', 'success');
             } catch (e) {
+                console.error('Error opening file browser:', e);
                 showToast('File browser opened', 'success');
             }
         }
@@ -1992,12 +2065,19 @@
         function loadFromExternalMedia() {
             try {
                 const fileInput = document.getElementById('fileInput');
+                // Reset file input first
+                fileInput.value = '';
                 fileInput.removeAttribute('webkitdirectory');
+                fileInput.removeAttribute('directory');
                 fileInput.setAttribute('accept', '.dcm,.dicom,*');
                 fileInput.multiple = true;
-                fileInput.click();
+                // Ensure the file input can be triggered
+                setTimeout(() => {
+                    fileInput.click();
+                }, 100);
                 showToast('📁 File browser opened - Select DICOM files from USB/DVD', 'success');
             } catch (e) {
+                console.error('Error opening file browser:', e);
                 showToast('File browser opened', 'success');
             }
         }

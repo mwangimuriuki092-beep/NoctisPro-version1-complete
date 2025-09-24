@@ -208,11 +208,42 @@ def viewer(request):
 @login_required
 def masterpiece_viewer(request):
     """Masterpiece DICOM viewer - THE MAIN DICOM VIEWER with enhanced features."""
+    user = request.user
+    
+    # Get study parameter and validate
+    study_id = request.GET.get('study', '')
+    initial_study = None
+    
+    if study_id:
+        try:
+            initial_study = Study.objects.exclude(
+                patient__patient_id__startswith='TEMP_'
+            ).exclude(accession_number__startswith='TEMP_').get(id=study_id)
+            
+            # Check facility permissions
+            if user.is_facility_user() and getattr(user, 'facility', None):
+                if initial_study.facility != user.facility:
+                    initial_study = None
+        except (Study.DoesNotExist, ValueError):
+            initial_study = None
+    
+    # Get recent studies for quick access - exclude temp studies
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        recent_studies = Study.objects.filter(facility=user.facility).exclude(
+            patient__patient_id__startswith='TEMP_'
+        ).exclude(accession_number__startswith='TEMP_').order_by('-study_date')[:10]
+    else:
+        recent_studies = Study.objects.all().exclude(
+            patient__patient_id__startswith='TEMP_'
+        ).exclude(accession_number__startswith='TEMP_').order_by('-study_date')[:10]
+    
     context = {
-        'study_id': request.GET.get('study', ''),
+        'study_id': study_id,
         'series_id': request.GET.get('series', ''),
         'current_date': timezone.now().strftime('%Y-%m-%d'),
-        'user': request.user
+        'user': user,
+        'initial_study': initial_study,
+        'recent_studies': recent_studies,
     }
     return render(request, 'dicom_viewer/masterpiece_viewer.html', context)
 
@@ -231,13 +262,17 @@ def view_study(request, study_id):
 def api_study_data(request, study_id):
     """API endpoint to get study data for viewer"""
     try:
-        study = get_object_or_404(Study, id=study_id)
+        # Exclude temp studies from viewer
+        study = get_object_or_404(
+            Study.objects.exclude(patient__patient_id__startswith='TEMP_').exclude(accession_number__startswith='TEMP_'),
+            id=study_id
+        )
         user = request.user
         
-        # Check permissions - Allow all authenticated users for now
-        # TODO: Implement proper facility-based permissions after user setup
-        # Simplified permission check to ensure DICOM viewer works
-        pass  # Allow all authenticated users to view studies
+        # Check facility permissions
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            if study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
         
         series_list = study.series_set.all().order_by('series_number')
         
@@ -737,6 +772,12 @@ def api_realtime_studies(request):
                 studies = Study.objects.filter(
                     last_updated__gt=last_update_time
                 ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
+            
+            # Filter out temporary/invalid entries
+            studies = studies.exclude(patient__patient_id__startswith='TEMP_')
+            studies = studies.exclude(accession_number__startswith='TEMP_')
+            studies = studies.exclude(patient__first_name='TEMP')
+            studies = studies.exclude(patient__last_name__startswith='TEMP')
         except Exception as e:
             logger.error(f"Error fetching studies: {str(e)}")
             # Return empty list if there's an issue
@@ -2414,6 +2455,12 @@ def web_index(request):
         studies = Study.objects.filter(facility=request.user.facility).order_by('-study_date')[:50]
     else:
         studies = Study.objects.order_by('-study_date')[:50]
+    
+    # Filter out temporary/invalid entries
+    studies = studies.exclude(patient__patient_id__startswith='TEMP_')
+    studies = studies.exclude(accession_number__startswith='TEMP_')
+    studies = studies.exclude(patient__first_name='TEMP')
+    studies = studies.exclude(patient__last_name__startswith='TEMP')
     return render(request, 'dicom_viewer/index.html', {'studies': studies})
 
 
@@ -4984,6 +5031,133 @@ def create_ct_diagnostic_film_layout(c, image_paths, width, height, print_medium
         
     except Exception as e:
         logger.error(f"Error creating CT diagnostic film layout: {str(e)}")
+
+@login_required
+@csrf_exempt
+def api_image_data(request, image_id):
+    """API endpoint to get DICOM image pixel data for viewer"""
+    try:
+        image = get_object_or_404(DicomImage, id=image_id)
+        user = request.user
+        
+        # Check facility permissions
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            if image.series.study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Read DICOM file and extract pixel data
+        try:
+            dicom_path = image.file_path.path if hasattr(image.file_path, 'path') else str(image.file_path)
+            
+            if not os.path.exists(dicom_path):
+                return JsonResponse({'error': 'DICOM file not found'}, status=404)
+            
+            # Read DICOM data
+            ds = pydicom.dcmread(dicom_path)
+            
+            # Extract basic image information
+            data = {
+                'id': image.id,
+                'instance_number': image.instance_number,
+                'columns': getattr(ds, 'Columns', 512),
+                'rows': getattr(ds, 'Rows', 512),
+                'window_center': getattr(ds, 'WindowCenter', 128),
+                'window_width': getattr(ds, 'WindowWidth', 256),
+                'pixel_spacing': list(getattr(ds, 'PixelSpacing', [1.0, 1.0])),
+                'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
+                'image_position': list(getattr(ds, 'ImagePositionPatient', [0, 0, 0])),
+                'image_orientation': list(getattr(ds, 'ImageOrientationPatient', [1, 0, 0, 0, 1, 0])),
+            }
+            
+            # Extract pixel data if available
+            if hasattr(ds, 'pixel_array'):
+                pixel_array = ds.pixel_array
+                
+                # Apply rescale slope and intercept if present
+                slope = getattr(ds, 'RescaleSlope', 1)
+                intercept = getattr(ds, 'RescaleIntercept', 0)
+                
+                if slope != 1 or intercept != 0:
+                    pixel_array = pixel_array * slope + intercept
+                
+                # Normalize to 8-bit for display
+                pixel_min = float(np.min(pixel_array))
+                pixel_max = float(np.max(pixel_array))
+                
+                if pixel_max > pixel_min:
+                    pixel_array = ((pixel_array - pixel_min) / (pixel_max - pixel_min) * 255).astype(np.uint8)
+                else:
+                    pixel_array = np.zeros_like(pixel_array, dtype=np.uint8)
+                
+                data['pixel_data'] = pixel_array.flatten().tolist()
+                data['pixel_min'] = pixel_min
+                data['pixel_max'] = pixel_max
+            else:
+                data['pixel_data'] = None
+                data['error'] = 'No pixel data available'
+            
+            return JsonResponse(data)
+            
+        except Exception as e:
+            logger.error(f"Error reading DICOM file {dicom_path}: {str(e)}")
+            return JsonResponse({'error': f'Error reading DICOM file: {str(e)}'}, status=500)
+            
+    except DicomImage.DoesNotExist:
+        return JsonResponse({'error': 'Image not found'}, status=404)
+    except Exception as e:
+        logger.error(f"Error in api_image_data: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def web_study_detail(request, study_id):
+    """Web viewer endpoint to get study details"""
+    return api_study_data(request, study_id)
+
+@login_required
+def web_series_images(request, series_id):
+    """Web viewer endpoint to get series images"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        user = request.user
+        
+        # Check facility permissions
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            if series.study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        images = series.images.all().order_by('instance_number')
+        
+        images_data = []
+        for image in images:
+            images_data.append({
+                'id': image.id,
+                'instance_number': image.instance_number,
+                'sop_instance_uid': image.sop_instance_uid,
+                'slice_location': image.slice_location,
+                'image_position': image.image_position,
+            })
+        
+        return JsonResponse({
+            'series': {
+                'id': series.id,
+                'series_number': series.series_number,
+                'series_description': series.series_description,
+                'modality': series.modality,
+                'body_part': series.body_part,
+            },
+            'images': images_data
+        })
+        
+    except Series.DoesNotExist:
+        return JsonResponse({'error': 'Series not found'}, status=404)
+    except Exception as e:
+        logger.error(f"Error in web_series_images: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def web_dicom_image(request, image_id):
+    """Web viewer endpoint to get DICOM image data"""
+    return api_image_data(request, image_id)
 
 @login_required
 def api_studies_redirect(request):

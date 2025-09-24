@@ -30,7 +30,7 @@ class AIProcessor:
     def process_analysis(self, analysis):
         """Process an AI analysis request"""
         try:
-            model_name = analysis.model.model_file_path.replace('builtin://', '')
+            model_name = analysis.ai_model.model_file_path.replace('builtin://', '')
             
             if model_name not in self.processors:
                 raise ValueError(f"Unknown processor: {model_name}")
@@ -48,9 +48,18 @@ class AIProcessor:
             
             # Update analysis with results
             analysis.results = results
+            analysis.findings = results.get('findings', '')
+            analysis.abnormalities_detected = results.get('abnormalities', [])
+            analysis.measurements = results.get('measurements', {})
             analysis.status = 'completed'
             analysis.completed_at = timezone.now()
             analysis.confidence_score = results.get('confidence', 0.95)
+            
+            # Calculate processing time
+            if analysis.started_at:
+                processing_time = (analysis.completed_at - analysis.started_at).total_seconds()
+                analysis.processing_time = processing_time
+            
             analysis.save()
             
             logger.info(f"AI analysis completed for study {analysis.study.accession_number}")

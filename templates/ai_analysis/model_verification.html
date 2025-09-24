@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Model Verification - Noctis Pro PACS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .verification-header {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    
+    .overall-status {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+    
+    .status-good { color: var(--success-color); }
+    .status-warning { color: var(--warning-color); }
+    .status-error { color: var(--danger-color); }
+    
+    .verification-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .verification-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .model-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .status-icon {
+        font-size: 24px;
+    }
+    
+    .model-info h3 {
+        margin: 0;
+        color: var(--text-primary);
+    }
+    
+    .model-info p {
+        margin: 5px 0 0 0;
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+    
+    .test-results {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+        padding: 15px;
+        margin: 15px 0;
+    }
+    
+    .test-metric {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .test-metric:last-child {
+        margin-bottom: 0;
+    }
+    
+    .issues-list {
+        background: rgba(255, 68, 68, 0.1);
+        border: 1px solid var(--danger-color);
+        border-radius: 6px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+    
+    .issue-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        color: var(--danger-color);
+    }
+    
+    .issue-item:last-child {
+        margin-bottom: 0;
+    }
+    
+    .refresh-btn {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: var(--accent-color);
+        color: var(--primary-bg);
+        border: none;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        font-size: 20px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+        transition: all 0.3s ease;
+    }
+    
+    .refresh-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 16px rgba(0, 212, 255, 0.6);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Top Navigation -->
+    <div class="top-navbar">
+        <div class="nav-left">
+            <div class="logo">Noctis Pro PACS</div>
+            <div class="nav-tabs">
+                <a href="{% url 'worklist:dashboard' %}" class="nav-tab">Dashboard</a>
+                <a href="{% url 'ai_analysis:ai_dashboard' %}" class="nav-tab">AI Analysis</a>
+                <a href="{% url 'ai_analysis:model_management' %}" class="nav-tab">Model Management</a>
+                <a href="{% url 'ai_analysis:verify_ai_models' %}" class="nav-tab active">Verification</a>
+            </div>
+        </div>
+        <div class="nav-right">
+            <div class="user-info">
+                <div class="user-avatar">{{ user.first_name.0|default:"U" }}</div>
+                <span>{{ user.get_full_name|default:user.username }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="verification-header">
+            <div class="overall-status status-{{ overall_status }}">
+                {% if overall_status == 'good' %}
+                    <i class="fas fa-check-circle"></i>
+                {% elif overall_status == 'warning' %}
+                    <i class="fas fa-exclamation-triangle"></i>
+                {% else %}
+                    <i class="fas fa-times-circle"></i>
+                {% endif %}
+            </div>
+            <h2>AI System Status: 
+                {% if overall_status == 'good' %}All Systems Operational
+                {% elif overall_status == 'warning' %}Issues Detected
+                {% else %}Critical Issues
+                {% endif %}
+            </h2>
+            <div class="verification-stats">
+                <div class="stat-item">
+                    <div class="stat-value text-success">{{ good_count }}</div>
+                    <div class="stat-label">Working Models</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value text-warning">{{ warning_count }}</div>
+                    <div class="stat-label">Warnings</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value text-danger">{{ error_count }}</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ total_models }}</div>
+                    <div class="stat-label">Total Models</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Verification Results -->
+        <div class="verification-results">
+            {% for result in verification_results %}
+            <div class="verification-card">
+                <div class="model-status">
+                    <div class="status-icon status-{{ result.status }}">
+                        {% if result.status == 'excellent' or result.status == 'good' %}
+                            <i class="fas fa-check-circle"></i>
+                        {% elif result.status == 'warning' or result.status == 'untested' %}
+                            <i class="fas fa-exclamation-triangle"></i>
+                        {% else %}
+                            <i class="fas fa-times-circle"></i>
+                        {% endif %}
+                    </div>
+                    <div class="model-info">
+                        <h3>{{ result.model.name }} v{{ result.model.version }}</h3>
+                        <p>{{ result.model.get_model_type_display }} • {{ result.model.modality }}</p>
+                    </div>
+                </div>
+                
+                {% if result.test_results %}
+                <div class="test-results">
+                    <h4>Recent Test Results (Last 7 Days)</h4>
+                    <div class="test-metric">
+                        <span>Total Tests:</span>
+                        <strong>{{ result.test_results.total_tests }}</strong>
+                    </div>
+                    <div class="test-metric">
+                        <span>Completed:</span>
+                        <strong class="text-success">{{ result.test_results.completed }}</strong>
+                    </div>
+                    <div class="test-metric">
+                        <span>Failed:</span>
+                        <strong class="text-danger">{{ result.test_results.failed }}</strong>
+                    </div>
+                    <div class="test-metric">
+                        <span>Success Rate:</span>
+                        <strong class="{% if result.test_results.success_rate >= 95 %}text-success{% elif result.test_results.success_rate >= 85 %}text-warning{% else %}text-danger{% endif %}">
+                            {{ result.test_results.success_rate }}%
+                        </strong>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if result.last_test %}
+                <div class="last-test">
+                    <small class="text-secondary">Last tested: {{ result.last_test }}</small>
+                </div>
+                {% endif %}
+                
+                {% if result.issues %}
+                <div class="issues-list">
+                    <h4><i class="fas fa-exclamation-triangle"></i> Issues Detected:</h4>
+                    {% for issue in result.issues %}
+                    <div class="issue-item">
+                        <i class="fas fa-circle" style="font-size: 6px;"></i>
+                        {{ issue }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% empty %}
+            <div class="empty-state">
+                <i class="fas fa-robot" style="font-size: 48px; color: var(--text-muted); margin-bottom: 20px;"></i>
+                <h3>No AI Models to Verify</h3>
+                <p class="text-secondary">No AI models are available for verification.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Refresh Button -->
+    <button class="refresh-btn" onclick="window.location.reload()" title="Refresh Verification">
+        <i class="fas fa-sync-alt"></i>
+    </button>
+</div>
+
+<script>
+// Auto-refresh every 30 seconds
+setTimeout(() => {
+    window.location.reload();
+}, 30000);
+</script>
+{% endblock %}
