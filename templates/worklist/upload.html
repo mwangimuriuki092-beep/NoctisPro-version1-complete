@@ -915,20 +915,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Click to browse individual files
     chooseFilesBtn.addEventListener('click', (e) => {
+        console.log('Choose files button clicked');
         e.preventDefault();
         e.stopPropagation();
         if (!isUploading) {
+            console.log('Triggering file input click');
             fileInput.click();
+        } else {
+            console.log('Upload in progress, ignoring click');
         }
     });
 
     // Click to browse entire folder
     const chooseFolderBtn = document.getElementById('chooseFolderBtn');
     chooseFolderBtn.addEventListener('click', (e) => {
+        console.log('Choose folder button clicked');
         e.preventDefault();
         e.stopPropagation();
         if (!isUploading) {
+            console.log('Triggering folder input click');
             folderInput.click();
+        } else {
+            console.log('Upload in progress, ignoring click');
         }
     });
 
@@ -996,16 +1004,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // File input change handlers
     fileInput.addEventListener('change', (e) => {
+        console.log('File input changed:', e.target.files.length, 'files');
         if (!isUploading) {
             const files = Array.from(e.target.files);
             handleFiles(files);
+        } else {
+            console.log('Upload already in progress, ignoring file input');
         }
     });
 
     folderInput.addEventListener('change', (e) => {
+        console.log('Folder input changed:', e.target.files.length, 'files');
         if (!isUploading) {
             const files = Array.from(e.target.files);
             handleFiles(files);
+        } else {
+            console.log('Upload already in progress, ignoring folder input');
         }
     });
 
@@ -1018,25 +1032,42 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function handleFiles(files) {
+        console.log('handleFiles called with:', files.length, 'files');
         // Professional medical DICOM validation
         const dicomFiles = files.filter(file => {
             const name = file.name.toLowerCase();
             const ext = name.substring(name.lastIndexOf('.'));
+            console.log('Checking file:', name, 'ext:', ext, 'size:', file.size, 'type:', file.type);
             
             // Check supported extensions
-            if (MEDICAL_UPLOAD_CONFIG.SUPPORTED_EXTENSIONS.includes(ext)) return true;
+            if (MEDICAL_UPLOAD_CONFIG.SUPPORTED_EXTENSIONS.includes(ext)) {
+                console.log('File accepted by extension:', name);
+                return true;
+            }
             
             // Check DICOM MIME type
-            if (file.type === 'application/dicom') return true;
+            if (file.type === 'application/dicom') {
+                console.log('File accepted by MIME type:', name);
+                return true;
+            }
             
             // Check minimum DICOM file size (must have at least DICOM header)
-            if (file.size < MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) return false;
+            if (file.size < MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) {
+                console.log('File rejected - too small:', name, file.size);
+                return false;
+            }
             
             // Accept files without extension if they're large enough (common in medical imaging)
-            if (!ext && file.size > MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) return true;
+            if (!ext && file.size > MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) {
+                console.log('File accepted - no extension but large enough:', name);
+                return true;
+            }
             
+            console.log('File rejected:', name);
             return false;
         });
+
+        console.log('Filtered files:', dicomFiles.length, 'out of', files.length, 'passed validation');
 
         // Professional medical imaging limits
         const maxFiles = 10000; // Increased for large medical datasets
@@ -1058,14 +1089,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Check total size limit (5GB max)
-        const totalSize = dicomFiles.reduce((sum, file) => sum + file.size, 0);
-        const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
-        if (totalSize > maxSize) {
-            showNotification(`Total file size too large. Maximum allowed: 5GB. Your files: ${formatFileSize(totalSize)}`, 'error');
-            return;
-        }
-
         selectedFiles = [...selectedFiles, ...dicomFiles];
         updateUploadStats();
         // Skip showing file list and immediately start upload
@@ -1076,8 +1099,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Auto-start upload after a brief delay to show stats
         setTimeout(() => {
+            console.log('Auto-upload check:', { selectedFiles: selectedFiles.length, isUploading });
             if (selectedFiles.length > 0 && !isUploading) {
+                console.log('Starting auto-upload...');
                 uploadFilesInChunks();
+            } else {
+                console.log('Auto-upload conditions not met');
             }
         }, 1000);
     }
@@ -1214,10 +1241,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function uploadFilesInChunks() {
+        console.log('Starting upload process...', { selectedFiles: selectedFiles.length, isUploading });
         const url = '{% url "worklist:upload_study" %}';
         const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
         const totalFiles = selectedFiles.length;
         const totalBytes = selectedFiles.reduce((s, f) => s + (f.size || 0), 0);
+        console.log('Upload configuration:', { url, totalFiles, totalBytes, hasToken: !!token });
 
         // Professional medical dataset chunking - optimized for large DICOM transfers
         const MAX_CHUNK_BYTES = isLargeDataset(totalBytes) ? 50 * 1024 * 1024 : 80 * 1024 * 1024; // Smaller chunks for >1GB datasets
@@ -1276,6 +1305,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (assignToMe) { formData.append('assign_to_me', assignToMe.checked ? '1' : '0'); }
 
                 const xhr = new XMLHttpRequest();
+                console.log('Creating XHR request for chunk', chunkIdx, 'with', chunk.length, 'files');
                 xhr.open('POST', url, true);
                 // Professional timeout management for medical imaging
                 const chunkSize = chunk.reduce((sum, file) => sum + file.size, 0);
@@ -1295,6 +1325,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
 
                 const handleFailure = (reason) => {
+                    console.error('Upload chunk failed:', reason, 'Chunk:', chunkIdx);
                     errors.push(reason || 'Upload failed');
                     resolve({ ok: false });
                 };
@@ -1304,6 +1335,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         try {
                             if (xhr.status >= 200 && xhr.status < 300) {
                                 const data = JSON.parse(xhr.responseText || '{}');
+                                console.log('Upload response for chunk', chunkIdx, ':', data);
                                 if (data && data.success) {
                                     const processed = typeof data.processed_files === 'number' ? data.processed_files : chunk.length;
                                     uploadedCount += processed;
