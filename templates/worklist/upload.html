@@ -887,6 +887,7 @@ let uploadSession = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing upload functionality...');
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const folderInput = document.getElementById('folderInput');
@@ -912,6 +913,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const clinicalInfoInput = document.getElementById('clinicalInfoInput');
     const facilitySelect = document.getElementById('facilitySelect');
     const assignToMe = document.getElementById('assignToMe');
+    
+    // Debug: Check if critical elements are found
+    console.log('DOM Elements Check:', {
+        dropZone: !!dropZone,
+        fileInput: !!fileInput,
+        folderInput: !!folderInput,
+        chooseFilesBtn: !!chooseFilesBtn,
+        uploadForm: !!uploadForm
+    });
 
     // Click to browse individual files
     chooseFilesBtn.addEventListener('click', (e) => {
@@ -920,7 +930,14 @@ document.addEventListener('DOMContentLoaded', function() {
         e.stopPropagation();
         if (!isUploading) {
             console.log('Triggering file input click');
-            fileInput.click();
+            // Ensure the file input exists and is accessible
+            if (fileInput) {
+                fileInput.value = ''; // Clear previous selection
+                fileInput.click();
+                console.log('File input clicked successfully');
+            } else {
+                console.error('File input not found!');
+            }
         } else {
             console.log('Upload in progress, ignoring click');
         }
@@ -934,7 +951,14 @@ document.addEventListener('DOMContentLoaded', function() {
         e.stopPropagation();
         if (!isUploading) {
             console.log('Triggering folder input click');
-            folderInput.click();
+            // Ensure the folder input exists and is accessible
+            if (folderInput) {
+                folderInput.value = ''; // Clear previous selection
+                folderInput.click();
+                console.log('Folder input clicked successfully');
+            } else {
+                console.error('Folder input not found!');
+            }
         } else {
             console.log('Upload in progress, ignoring click');
         }
@@ -1036,11 +1060,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Professional medical DICOM validation
         const dicomFiles = files.filter(file => {
             const name = file.name.toLowerCase();
-            const ext = name.substring(name.lastIndexOf('.'));
+            const lastDotIndex = name.lastIndexOf('.');
+            const ext = lastDotIndex >= 0 ? name.substring(lastDotIndex) : '';
             console.log('Checking file:', name, 'ext:', ext, 'size:', file.size, 'type:', file.type);
             
             // Check supported extensions
-            if (MEDICAL_UPLOAD_CONFIG.SUPPORTED_EXTENSIONS.includes(ext)) {
+            if (ext && MEDICAL_UPLOAD_CONFIG.SUPPORTED_EXTENSIONS.includes(ext)) {
                 console.log('File accepted by extension:', name);
                 return true;
             }
@@ -1058,8 +1083,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Accept files without extension if they're large enough (common in medical imaging)
-            if (!ext && file.size > MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) {
+            if (!ext && file.size >= MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) {
                 console.log('File accepted - no extension but large enough:', name);
+                return true;
+            }
+            
+            // Accept any file larger than minimum size (relaxed validation)
+            if (file.size >= MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) {
+                console.log('File accepted - meets minimum size requirement:', name);
                 return true;
             }
             
@@ -1091,7 +1122,10 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Auto-upload check:', { selectedFiles: selectedFiles.length, isUploading });
             if (selectedFiles.length > 0 && !isUploading) {
                 console.log('Starting auto-upload...');
-                uploadFilesInChunks();
+                uploadFilesInChunks().catch(error => {
+                    console.error('Auto-upload failed:', error);
+                    showNotification('Auto-upload failed: ' + error.message, 'error');
+                });
             } else {
                 console.log('Auto-upload conditions not met');
             }
