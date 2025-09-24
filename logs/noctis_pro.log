@@ -346,3 +346,419 @@ django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found
 [INFO] 2025-09-24 06:54:30,713 django.channels.server runserver 12952 139662523406016 [32mHTTP POST /login/ 302 [0.55, 127.0.0.1:54774][0m
 [WARNING] 2025-09-24 06:54:30,739 django.channels.server runserver 12952 139662523406016 [31;1mHTTP POST /worklist/ 403 [0.02, 127.0.0.1:54774][0m
 [INFO] 2025-09-24 06:54:38,257 django.channels.server runserver 12952 139662523406016 [mHTTP GET /worklist/ 200 [0.04, 127.0.0.1:41706][0m
+[INFO] 2025-09-24 06:58:05,248 noctis_pro.api views 12952 139661987903168 Professional studies API request from admin (Administrator)
+[INFO] 2025-09-24 06:58:05,260 noctis_pro.api views 12952 139661987903168 Professional studies API completed: 0 studies in 11.8ms
+[INFO] 2025-09-24 06:58:05,269 django.channels.server runserver 12952 139662523406016 [mHTTP GET /worklist/api/studies/ 200 [0.04, 127.0.0.1:54752][0m
+[WARNING] 2025-09-24 06:58:17,866 django.request log 12952 139661978461888 Not Found: /worklist/study_list/
+[WARNING] 2025-09-24 06:58:17,867 django.channels.server runserver 12952 139662523406016 [33mHTTP GET /worklist/study_list/ 404 [0.02, 127.0.0.1:51230][0m
+[ERROR] 2025-09-24 06:58:30,152 django.request log 12952 139661978461888 Internal Server Error: /worklist/studies/
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/worklist/views.py", line 119, in study_list
+    return render(request, 'worklist/study_list.html', context)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/loader.py", line 62, in render_to_string
+    return template.render(context, request)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/backends/django.py", line 107, in render
+    return self.template.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 171, in render
+    return self._render(context)
+           ~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 163, in _render
+    return self.nodelist.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/defaulttags.py", line 480, in render
+    url = reverse(view_name, args=args, kwargs=kwargs, current_app=current_app)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/base.py", line 98, in reverse
+    resolved_url = resolver._reverse_with_prefix(view, prefix, *args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/resolvers.py", line 831, in _reverse_with_prefix
+    raise NoReverseMatch(msg)
+django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found. 'notification_list' is not a valid view function or pattern name.
+[ERROR] 2025-09-24 06:58:30,169 django.channels.server runserver 12952 139662523406016 [35;1mHTTP GET /worklist/studies/ 500 [0.05, 127.0.0.1:42396][0m
+[INFO] 2025-09-24 06:58:37,632 django.utils.autoreload autoreload 12952 139662587248896 /workspace/noctis_pro/settings.py changed, reloading.
+[INFO] 2025-09-24 06:58:38,837 django.utils.autoreload autoreload 15456 139862235267328 Watching for file changes with StatReloader
+[ERROR] 2025-09-24 06:58:41,342 django.request log 15456 139861626484416 Internal Server Error: /worklist/studies/
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/worklist/views.py", line 119, in study_list
+    return render(request, 'worklist/study_list.html', context)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/loader.py", line 62, in render_to_string
+    return template.render(context, request)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/backends/django.py", line 107, in render
+    return self.template.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 171, in render
+    return self._render(context)
+           ~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 163, in _render
+    return self.nodelist.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/defaulttags.py", line 480, in render
+    url = reverse(view_name, args=args, kwargs=kwargs, current_app=current_app)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/base.py", line 98, in reverse
+    resolved_url = resolver._reverse_with_prefix(view, prefix, *args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/resolvers.py", line 831, in _reverse_with_prefix
+    raise NoReverseMatch(msg)
+django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found. 'notification_list' is not a valid view function or pattern name.
+[ERROR] 2025-09-24 06:58:41,354 django.channels.server runserver 15456 139862171424448 [35;1mHTTP GET /worklist/studies/ 500 [0.14, 127.0.0.1:52100][0m
+[ERROR] 2025-09-24 06:59:30,800 django.request log 15456 139861626484416 Internal Server Error: /worklist/studies/
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/worklist/views.py", line 119, in study_list
+    return render(request, 'worklist/study_list.html', context)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/loader.py", line 62, in render_to_string
+    return template.render(context, request)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/backends/django.py", line 107, in render
+    return self.template.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 171, in render
+    return self._render(context)
+           ~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 163, in _render
+    return self.nodelist.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/defaulttags.py", line 480, in render
+    url = reverse(view_name, args=args, kwargs=kwargs, current_app=current_app)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/base.py", line 98, in reverse
+    resolved_url = resolver._reverse_with_prefix(view, prefix, *args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/resolvers.py", line 831, in _reverse_with_prefix
+    raise NoReverseMatch(msg)
+django.urls.exceptions.NoReverseMatch: Reverse for 'api_unread_count' not found. 'api_unread_count' is not a valid view function or pattern name.
+[ERROR] 2025-09-24 06:59:30,815 django.channels.server runserver 15456 139862171424448 [35;1mHTTP GET /worklist/studies/ 500 [0.06, 127.0.0.1:33430][0m
+[ERROR] 2025-09-24 06:59:38,250 django.request log 15456 139861626484416 Internal Server Error: /worklist/studies/
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/worklist/views.py", line 119, in study_list
+    return render(request, 'worklist/study_list.html', context)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/loader.py", line 62, in render_to_string
+    return template.render(context, request)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/backends/django.py", line 107, in render
+    return self.template.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 171, in render
+    return self._render(context)
+           ~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 163, in _render
+    return self.nodelist.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/defaulttags.py", line 480, in render
+    url = reverse(view_name, args=args, kwargs=kwargs, current_app=current_app)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/base.py", line 98, in reverse
+    resolved_url = resolver._reverse_with_prefix(view, prefix, *args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/resolvers.py", line 831, in _reverse_with_prefix
+    raise NoReverseMatch(msg)
+django.urls.exceptions.NoReverseMatch: Reverse for 'api_unread_count' not found. 'api_unread_count' is not a valid view function or pattern name.
+[ERROR] 2025-09-24 06:59:38,269 django.channels.server runserver 15456 139862171424448 [35;1mHTTP GET /worklist/studies/ 500 [0.11, 127.0.0.1:57014][0m
+[INFO] 2025-09-24 06:59:59,793 django.utils.autoreload autoreload 15456 139862235267328 /workspace/notifications/urls.py changed, reloading.
+[INFO] 2025-09-24 07:00:01,013 django.utils.autoreload autoreload 16033 139911798345984 Watching for file changes with StatReloader
+[INFO] 2025-09-24 07:00:11,194 django.utils.autoreload autoreload 16033 139911798345984 /workspace/notifications/views.py changed, reloading.
+[INFO] 2025-09-24 07:00:12,290 django.utils.autoreload autoreload 16086 140010010992896 Watching for file changes with StatReloader
+[INFO] 2025-09-24 07:00:32,761 django.utils.autoreload autoreload 16086 140010010992896 /workspace/notifications/views.py changed, reloading.
+[INFO] 2025-09-24 07:00:33,928 django.utils.autoreload autoreload 16440 139983825404160 Watching for file changes with StatReloader
+[INFO] 2025-09-24 07:00:39,597 django.channels.server runserver 16440 139983761561280 [mHTTP GET /worklist/studies/ 200 [0.09, 127.0.0.1:56768][0m
+[INFO] 2025-09-24 07:00:47,854 django.channels.server runserver 16440 139983761561280 [mHTTP GET /reports/ 200 [0.04, 127.0.0.1:48026][0m
+[ERROR] 2025-09-24 07:00:53,991 django.request log 16440 139983215593152 Internal Server Error: /admin-panel/
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/admin_panel/views.py", line 69, in dashboard
+    return render(request, 'admin_panel/dashboard.html', context)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/loader.py", line 62, in render_to_string
+    return template.render(context, request)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/backends/django.py", line 107, in render
+    return self.template.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 171, in render
+    return self._render(context)
+           ~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 163, in _render
+    return self.nodelist.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/loader_tags.py", line 159, in render
+    return compiled_parent._render(context)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 163, in _render
+    return self.nodelist.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/defaulttags.py", line 327, in render
+    return nodelist.render(context)
+           ~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/defaulttags.py", line 480, in render
+    url = reverse(view_name, args=args, kwargs=kwargs, current_app=current_app)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/base.py", line 98, in reverse
+    resolved_url = resolver._reverse_with_prefix(view, prefix, *args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/resolvers.py", line 831, in _reverse_with_prefix
+    raise NoReverseMatch(msg)
+django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found. 'notification_list' is not a valid view function or pattern name.
+[ERROR] 2025-09-24 07:00:54,002 django.channels.server runserver 16440 139983761561280 [35;1mHTTP GET /admin-panel/ 500 [0.16, 127.0.0.1:51526][0m
+[ERROR] 2025-09-24 07:01:01,764 django.request log 16440 139983215593152 Internal Server Error: /admin-panel/
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/admin_panel/views.py", line 69, in dashboard
+    return render(request, 'admin_panel/dashboard.html', context)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/loader.py", line 62, in render_to_string
+    return template.render(context, request)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/backends/django.py", line 107, in render
+    return self.template.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 171, in render
+    return self._render(context)
+           ~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 163, in _render
+    return self.nodelist.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/loader_tags.py", line 159, in render
+    return compiled_parent._render(context)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 163, in _render
+    return self.nodelist.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/defaulttags.py", line 327, in render
+    return nodelist.render(context)
+           ~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/defaulttags.py", line 480, in render
+    url = reverse(view_name, args=args, kwargs=kwargs, current_app=current_app)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/base.py", line 98, in reverse
+    resolved_url = resolver._reverse_with_prefix(view, prefix, *args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/resolvers.py", line 831, in _reverse_with_prefix
+    raise NoReverseMatch(msg)
+django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found. 'notification_list' is not a valid view function or pattern name.
+[ERROR] 2025-09-24 07:01:01,773 django.channels.server runserver 16440 139983761561280 [35;1mHTTP GET /admin-panel/ 500 [0.09, 127.0.0.1:42184][0m
+[INFO] 2025-09-24 07:01:56,113 django.channels.server runserver 16440 139983761561280 [mHTTP GET /admin-panel/ 200 [0.07, 127.0.0.1:41568][0m
+[WARNING] 2025-09-24 07:02:02,139 django.request log 16440 139983215593152 Not Found: /notifications/
+[WARNING] 2025-09-24 07:02:02,140 django.channels.server runserver 16440 139983761561280 [33mHTTP GET /notifications/ 404 [0.02, 127.0.0.1:45062][0m
+[INFO] 2025-09-24 07:02:07,944 django.channels.server runserver 16440 139983761561280 [mHTTP GET /notifications/list/ 200 [0.04, 127.0.0.1:45066][0m
+[INFO] 2025-09-24 07:02:13,761 django.channels.server runserver 16440 139983761561280 [mHTTP GET /chat/ 200 [0.03, 127.0.0.1:36234][0m
+[INFO] 2025-09-24 07:02:19,820 django.channels.server runserver 16440 139983761561280 [mHTTP GET /ai/ 200 [0.06, 127.0.0.1:36240][0m
+[INFO] 2025-09-24 07:02:25,726 django.channels.server runserver 16440 139983761561280 [mHTTP GET /dicom-viewer/ 200 [0.02, 127.0.0.1:49720][0m
+[INFO] 2025-09-24 07:02:32,413 django.channels.server runserver 16440 139983761561280 [mHTTP GET /worklist/upload/ 200 [0.03, 127.0.0.1:36074][0m
+[INFO] 2025-09-24 07:02:40,194 django.channels.server runserver 16440 139983761561280 [mHTTP GET /notifications/api/unread-count/ 200 [0.02, 127.0.0.1:36088][0m
+[INFO] 2025-09-24 07:02:47,742 django.utils.autoreload autoreload 16440 139983825404160 /workspace/noctis_pro/settings.py changed, reloading.
+[INFO] 2025-09-24 07:02:49,133 django.utils.autoreload autoreload 17624 140306140446976 Watching for file changes with StatReloader
+[INFO] 2025-09-24 07:02:56,938 django.channels.server runserver 17624 140306076604096 [mHTTP GET /worklist/ 200 [0.06, 127.0.0.1:45264][0m
+[INFO] 2025-09-24 07:02:56,979 django.channels.server runserver 17624 140306076604096 [mHTTP GET /worklist/studies/ 200 [0.03, 127.0.0.1:45266][0m
+[INFO] 2025-09-24 07:02:57,029 django.channels.server runserver 17624 140306076604096 [mHTTP GET /worklist/upload/ 200 [0.04, 127.0.0.1:45276][0m
+[INFO] 2025-09-24 07:02:57,064 django.channels.server runserver 17624 140306076604096 [mHTTP GET /reports/ 200 [0.02, 127.0.0.1:45286][0m
+[INFO] 2025-09-24 07:02:57,096 django.channels.server runserver 17624 140306076604096 [mHTTP GET /admin-panel/ 200 [0.02, 127.0.0.1:45296][0m
+[INFO] 2025-09-24 07:02:57,131 django.channels.server runserver 17624 140306076604096 [mHTTP GET /notifications/list/ 200 [0.02, 127.0.0.1:45298][0m
+[INFO] 2025-09-24 07:02:57,182 django.channels.server runserver 17624 140306076604096 [mHTTP GET /chat/ 200 [0.04, 127.0.0.1:45306][0m
+[INFO] 2025-09-24 07:02:57,218 django.channels.server runserver 17624 140306076604096 [mHTTP GET /ai/ 200 [0.02, 127.0.0.1:45314][0m
+[INFO] 2025-09-24 07:02:57,243 django.channels.server runserver 17624 140306076604096 [mHTTP GET /dicom-viewer/ 200 [0.01, 127.0.0.1:45318][0m
+[INFO] 2025-09-24 07:03:06,985 noctis_pro.api views 17624 140305541117632 Professional studies API request from admin (Administrator)
+[INFO] 2025-09-24 07:03:06,988 noctis_pro.api views 17624 140305541117632 Professional studies API completed: 0 studies in 2.9ms
+[INFO] 2025-09-24 07:03:06,994 django.channels.server runserver 17624 140306076604096 [mHTTP GET /worklist/api/studies/ 200 [0.02, 127.0.0.1:35332][0m
+[INFO] 2025-09-24 07:03:07,023 django.channels.server runserver 17624 140306076604096 [mHTTP GET /notifications/api/unread-count/ 200 [0.02, 127.0.0.1:35340][0m
+[INFO] 2025-09-24 07:03:07,047 django.channels.server runserver 17624 140306076604096 [mHTTP GET /api/user-info/ 200 [0.01, 127.0.0.1:35354][0m

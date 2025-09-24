@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
 from .services import notification_service
+from .models import Notification
 
 
 @login_required
@@ -91,4 +92,25 @@ def mark_notification_read(request, notification_id):
         return JsonResponse({
             'success': False,
             'message': f'Error: {str(e)}'
+        }, status=500)
+
+@login_required
+def api_unread_count(request):
+    """API endpoint to get unread notification count for current user"""
+    try:
+        unread_count = Notification.objects.filter(
+            recipient=request.user,
+            is_read=False
+        ).count()
+        
+        return JsonResponse({
+            'success': True,
+            'unread_count': unread_count
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'unread_count': 0
         }, status=500)
