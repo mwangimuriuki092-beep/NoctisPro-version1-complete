@@ -327,3 +327,4 @@ django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found
 [INFO] 2025-09-24 06:47:55,513 django.utils.autoreload autoreload 8631 140395622682880 /workspace/noctis_pro/settings.py changed, reloading.
 [INFO] 2025-09-24 06:47:57,400 django.utils.autoreload autoreload 9821 140087051784448 Watching for file changes with StatReloader
 [INFO] 2025-09-24 06:48:09,369 django.utils.autoreload autoreload 9821 140087051784448 /workspace/accounts/views.py changed, reloading.
+[INFO] 2025-09-24 06:48:10,728 django.utils.autoreload autoreload 9896 139622659830016 Watching for file changes with StatReloader
