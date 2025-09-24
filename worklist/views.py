@@ -43,11 +43,17 @@ def study_list(request):
 	"""List all studies with filtering and pagination"""
 	user = request.user
 	
-	# Base queryset based on user role
+	# Base queryset based on user role - exclude temporary entries
 	if user.is_facility_user() and getattr(user, 'facility', None):
 		studies = Study.objects.filter(facility=user.facility)
 	else:
 		studies = Study.objects.all()
+	
+	# Filter out temporary/invalid entries from display
+	studies = studies.exclude(patient__patient_id__startswith='TEMP_')
+	studies = studies.exclude(accession_number__startswith='TEMP_')
+	studies = studies.exclude(patient__first_name='TEMP')
+	studies = studies.exclude(patient__last_name__startswith='TEMP')
 	
 	# Apply filters
 	status_filter = request.GET.get('status')
@@ -736,6 +742,12 @@ def api_studies(request):
 			studies = Study.objects.all()
 			logger.debug("All studies access granted for admin/radiologist")
 		
+		# Filter out temporary/invalid entries from API response
+		studies = studies.exclude(patient__patient_id__startswith='TEMP_')
+		studies = studies.exclude(accession_number__startswith='TEMP_')
+		studies = studies.exclude(patient__first_name='TEMP')
+		studies = studies.exclude(patient__last_name__startswith='TEMP')
+		
 		# Professional data processing with enhanced medical information
 		studies_data = []
 		processing_stats = {
@@ -1402,6 +1414,12 @@ def api_refresh_worklist(request):
     else:
         studies = Study.objects.filter(upload_date__gte=recent_cutoff)
     
+    # Filter out temporary/invalid entries
+    studies = studies.exclude(patient__patient_id__startswith='TEMP_')
+    studies = studies.exclude(accession_number__startswith='TEMP_')
+    studies = studies.exclude(patient__first_name='TEMP')
+    studies = studies.exclude(patient__last_name__startswith='TEMP')
+    
     studies_data = []
     for study in studies.order_by('-upload_date')[:20]:  # Last 20 uploaded studies
         studies_data.append({
@@ -1441,6 +1459,12 @@ def api_get_upload_stats(request):
         recent_studies = Study.objects.filter(facility=user.facility, upload_date__gte=week_ago)
     else:
         recent_studies = Study.objects.filter(upload_date__gte=week_ago)
+    
+    # Filter out temporary/invalid entries
+    recent_studies = recent_studies.exclude(patient__patient_id__startswith='TEMP_')
+    recent_studies = recent_studies.exclude(accession_number__startswith='TEMP_')
+    recent_studies = recent_studies.exclude(patient__first_name='TEMP')
+    recent_studies = recent_studies.exclude(patient__last_name__startswith='TEMP')
     
     total_studies = recent_studies.count()
     total_series = sum(study.get_series_count() for study in recent_studies)

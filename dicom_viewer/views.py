@@ -737,6 +737,12 @@ def api_realtime_studies(request):
                 studies = Study.objects.filter(
                     last_updated__gt=last_update_time
                 ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
+            
+            # Filter out temporary/invalid entries
+            studies = studies.exclude(patient__patient_id__startswith='TEMP_')
+            studies = studies.exclude(accession_number__startswith='TEMP_')
+            studies = studies.exclude(patient__first_name='TEMP')
+            studies = studies.exclude(patient__last_name__startswith='TEMP')
         except Exception as e:
             logger.error(f"Error fetching studies: {str(e)}")
             # Return empty list if there's an issue
@@ -2414,6 +2420,12 @@ def web_index(request):
         studies = Study.objects.filter(facility=request.user.facility).order_by('-study_date')[:50]
     else:
         studies = Study.objects.order_by('-study_date')[:50]
+    
+    # Filter out temporary/invalid entries
+    studies = studies.exclude(patient__patient_id__startswith='TEMP_')
+    studies = studies.exclude(accession_number__startswith='TEMP_')
+    studies = studies.exclude(patient__first_name='TEMP')
+    studies = studies.exclude(patient__last_name__startswith='TEMP')
     return render(request, 'dicom_viewer/index.html', {'studies': studies})
 
 
