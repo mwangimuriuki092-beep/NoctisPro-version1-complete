@@ -2900,40 +2900,94 @@
     
     <!-- AI Analysis Integration - Safe Addition -->
     <script>
-        // AI Analysis Variables - Safe Addition
+        // AI Analysis Variables - Safe Addition with Feature Detection
         let aiAnalysisInProgress = false;
         let currentAiAnalysisIds = [];
+        let aiAnalysisAvailable = false;
 
-        // Add AI analysis tool handler to existing tool system
+        // Check if AI analysis is available and working
+        function checkAiAnalysisAvailability() {
+            try {
+                // Test if AI endpoints are accessible
+                fetch('/ai/api/realtime/analyses/', { method: 'HEAD' })
+                    .then(response => {
+                        aiAnalysisAvailable = response.ok || response.status === 404; // 404 is OK, means endpoint exists
+                        if (!aiAnalysisAvailable) {
+                            console.warn('AI Analysis not available - hiding AI button');
+                            const aiBtn = document.getElementById('aiAnalysisToolBtn');
+                            if (aiBtn) aiBtn.style.display = 'none';
+                        }
+                    })
+                    .catch(error => {
+                        console.warn('AI Analysis endpoints not accessible:', error);
+                        aiAnalysisAvailable = false;
+                        const aiBtn = document.getElementById('aiAnalysisToolBtn');
+                        if (aiBtn) aiBtn.style.display = 'none';
+                    });
+            } catch (error) {
+                console.warn('AI Analysis feature detection failed:', error);
+                aiAnalysisAvailable = false;
+            }
+        }
+
+        // Add AI analysis tool handler to existing tool system - SAFE IMPLEMENTATION
         document.addEventListener('DOMContentLoaded', function() {
-            // Safely add AI analysis tool handler
-            const aiAnalysisBtn = document.getElementById('aiAnalysisToolBtn');
-            if (aiAnalysisBtn) {
-                aiAnalysisBtn.addEventListener('click', function() {
-                    toggleAiAnalysisTool();
-                });
+            // Check AI availability first
+            setTimeout(checkAiAnalysisAvailability, 1000);
+            
+            // Safely add AI analysis tool handler with error protection
+            try {
+                const aiAnalysisBtn = document.getElementById('aiAnalysisToolBtn');
+                if (aiAnalysisBtn) {
+                    aiAnalysisBtn.addEventListener('click', function(e) {
+                        try {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (aiAnalysisAvailable) {
+                                toggleAiAnalysisTool();
+                            } else {
+                                console.warn('AI Analysis not available');
+                                alert('AI Analysis is currently not available. Please check system configuration.');
+                            }
+                        } catch (error) {
+                            console.error('AI Analysis button error:', error);
+                            // Don't break the viewer if AI fails
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('AI Analysis initialization error:', error);
+                // Silently fail - don't break the DICOM viewer
             }
         });
 
         function toggleAiAnalysisTool() {
-            const aiPanel = document.getElementById('aiAnalysisPanel');
-            const aiBtn = document.getElementById('aiAnalysisToolBtn');
-            
-            if (aiPanel && aiBtn) {
-                if (aiPanel.style.display === 'none') {
-                    // Show AI panel
-                    aiPanel.style.display = 'block';
-                    aiBtn.classList.add('active');
-                    
-                    // Check if we have a current study to analyze
-                    if (currentStudy) {
-                        checkExistingAiAnalysis();
+            try {
+                const aiPanel = document.getElementById('aiAnalysisPanel');
+                const aiBtn = document.getElementById('aiAnalysisToolBtn');
+                
+                if (aiPanel && aiBtn) {
+                    if (aiPanel.style.display === 'none') {
+                        // Show AI panel
+                        aiPanel.style.display = 'block';
+                        aiBtn.classList.add('active');
+                        
+                        // Check if we have a current study to analyze
+                        if (currentStudy) {
+                            checkExistingAiAnalysis().catch(error => {
+                                console.error('Error checking AI analysis:', error);
+                                resetAiAnalysisPanel();
+                            });
+                        }
+                    } else {
+                        // Hide AI panel
+                        aiPanel.style.display = 'none';
+                        aiBtn.classList.remove('active');
                     }
-                } else {
-                    // Hide AI panel
-                    aiPanel.style.display = 'none';
-                    aiBtn.classList.remove('active');
                 }
+            } catch (error) {
+                console.error('Error toggling AI analysis tool:', error);
+                // Don't break the DICOM viewer
             }
         }
 
@@ -2997,10 +3051,11 @@
         }
 
         async function startDicomViewerAiAnalysis() {
-            if (!currentStudy || !currentStudy.id || aiAnalysisInProgress) return;
-            
-            console.log('Starting AI analysis for study:', currentStudy.id);
-            aiAnalysisInProgress = true;
+            try {
+                if (!currentStudy || !currentStudy.id || aiAnalysisInProgress) return;
+                
+                console.log('Starting AI analysis for study:', currentStudy.id);
+                aiAnalysisInProgress = true;
             
             // Update UI
             const statusDiv = document.getElementById('aiAnalysisStatus');
@@ -3049,6 +3104,7 @@
             } catch (error) {
                 console.error('AI analysis failed:', error);
                 showDicomViewerAiError(error.message);
+                aiAnalysisInProgress = false;
             }
         }
 
@@ -3168,19 +3224,32 @@
             aiAnalysisInProgress = false;
         }
 
-        // Safely integrate with existing click handlers
-        const originalToolBtnClickHandler = function(event) {
-            const tool = event.target.closest('.tool-btn');
-            if (tool && tool.dataset.tool === 'ai-analysis') {
-                event.preventDefault();
-                event.stopPropagation();
-                startDicomViewerAiAnalysis();
-                return;
+        // Safely integrate with existing click handlers - NON-BREAKING IMPLEMENTATION
+        const safeAiToolClickHandler = function(event) {
+            try {
+                const tool = event.target.closest('.tool-btn');
+                if (tool && tool.dataset.tool === 'ai-analysis') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    startDicomViewerAiAnalysis().catch(error => {
+                        console.error('AI analysis start failed:', error);
+                        // Don't break the viewer
+                    });
+                    return;
+                }
+            } catch (error) {
+                console.error('AI tool click handler error:', error);
+                // Silently fail - don't break existing functionality
             }
         };
 
-        // Add event listener for AI analysis button clicks
-        document.addEventListener('click', originalToolBtnClickHandler);
+        // Add event listener for AI analysis button clicks - SAFE ADDITION
+        try {
+            document.addEventListener('click', safeAiToolClickHandler);
+        } catch (error) {
+            console.error('Failed to add AI click handler:', error);
+            // Don't break the DICOM viewer if this fails
+        }
     </script>
 </body>
 </html>
