@@ -5033,6 +5033,133 @@ def create_ct_diagnostic_film_layout(c, image_paths, width, height, print_medium
         logger.error(f"Error creating CT diagnostic film layout: {str(e)}")
 
 @login_required
+@csrf_exempt
+def api_image_data(request, image_id):
+    """API endpoint to get DICOM image pixel data for viewer"""
+    try:
+        image = get_object_or_404(DicomImage, id=image_id)
+        user = request.user
+        
+        # Check facility permissions
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            if image.series.study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Read DICOM file and extract pixel data
+        try:
+            dicom_path = image.file_path.path if hasattr(image.file_path, 'path') else str(image.file_path)
+            
+            if not os.path.exists(dicom_path):
+                return JsonResponse({'error': 'DICOM file not found'}, status=404)
+            
+            # Read DICOM data
+            ds = pydicom.dcmread(dicom_path)
+            
+            # Extract basic image information
+            data = {
+                'id': image.id,
+                'instance_number': image.instance_number,
+                'columns': getattr(ds, 'Columns', 512),
+                'rows': getattr(ds, 'Rows', 512),
+                'window_center': getattr(ds, 'WindowCenter', 128),
+                'window_width': getattr(ds, 'WindowWidth', 256),
+                'pixel_spacing': list(getattr(ds, 'PixelSpacing', [1.0, 1.0])),
+                'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
+                'image_position': list(getattr(ds, 'ImagePositionPatient', [0, 0, 0])),
+                'image_orientation': list(getattr(ds, 'ImageOrientationPatient', [1, 0, 0, 0, 1, 0])),
+            }
+            
+            # Extract pixel data if available
+            if hasattr(ds, 'pixel_array'):
+                pixel_array = ds.pixel_array
+                
+                # Apply rescale slope and intercept if present
+                slope = getattr(ds, 'RescaleSlope', 1)
+                intercept = getattr(ds, 'RescaleIntercept', 0)
+                
+                if slope != 1 or intercept != 0:
+                    pixel_array = pixel_array * slope + intercept
+                
+                # Normalize to 8-bit for display
+                pixel_min = float(np.min(pixel_array))
+                pixel_max = float(np.max(pixel_array))
+                
+                if pixel_max > pixel_min:
+                    pixel_array = ((pixel_array - pixel_min) / (pixel_max - pixel_min) * 255).astype(np.uint8)
+                else:
+                    pixel_array = np.zeros_like(pixel_array, dtype=np.uint8)
+                
+                data['pixel_data'] = pixel_array.flatten().tolist()
+                data['pixel_min'] = pixel_min
+                data['pixel_max'] = pixel_max
+            else:
+                data['pixel_data'] = None
+                data['error'] = 'No pixel data available'
+            
+            return JsonResponse(data)
+            
+        except Exception as e:
+            logger.error(f"Error reading DICOM file {dicom_path}: {str(e)}")
+            return JsonResponse({'error': f'Error reading DICOM file: {str(e)}'}, status=500)
+            
+    except DicomImage.DoesNotExist:
+        return JsonResponse({'error': 'Image not found'}, status=404)
+    except Exception as e:
+        logger.error(f"Error in api_image_data: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def web_study_detail(request, study_id):
+    """Web viewer endpoint to get study details"""
+    return api_study_data(request, study_id)
+
+@login_required
+def web_series_images(request, series_id):
+    """Web viewer endpoint to get series images"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        user = request.user
+        
+        # Check facility permissions
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            if series.study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        images = series.images.all().order_by('instance_number')
+        
+        images_data = []
+        for image in images:
+            images_data.append({
+                'id': image.id,
+                'instance_number': image.instance_number,
+                'sop_instance_uid': image.sop_instance_uid,
+                'slice_location': image.slice_location,
+                'image_position': image.image_position,
+            })
+        
+        return JsonResponse({
+            'series': {
+                'id': series.id,
+                'series_number': series.series_number,
+                'series_description': series.series_description,
+                'modality': series.modality,
+                'body_part': series.body_part,
+            },
+            'images': images_data
+        })
+        
+    except Series.DoesNotExist:
+        return JsonResponse({'error': 'Series not found'}, status=404)
+    except Exception as e:
+        logger.error(f"Error in web_series_images: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def web_dicom_image(request, image_id):
+    """Web viewer endpoint to get DICOM image data"""
+    return api_image_data(request, image_id)
+
+@login_required
 def api_studies_redirect(request):
     """Redirect to the worklist studies API to maintain compatibility"""
     from django.http import HttpResponseRedirect
