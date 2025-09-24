@@ -322,8 +322,8 @@ SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 # Force new session after browser close/reopen
 SESSION_COOKIE_SAMESITE = 'Lax'  # Allow session cookies in reasonable cross-site contexts
 
-# File upload settings - No limits for unlimited DICOM dataset sizes
-FILE_UPLOAD_MAX_MEMORY_SIZE = None  # No memory limit
+# File upload settings - Large limits for DICOM dataset sizes
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 1024  # 1GB memory limit (large for DICOM files)
 DATA_UPLOAD_MAX_MEMORY_SIZE = None  # No data limit
 DATA_UPLOAD_MAX_NUMBER_FIELDS = None  # No field limit
 
