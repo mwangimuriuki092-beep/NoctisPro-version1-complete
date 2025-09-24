@@ -2213,9 +2213,228 @@
             fileInput.addEventListener('change', function(e) {
                 const files = Array.from(e.target.files);
                 if (files.length > 0) {
-                    processDicomFiles(files);
+                    // Check if we can process locally or need to upload
+                    if (typeof dicomParser !== 'undefined' && files.length <= 50) {
+                        processLocalDicomFiles(files);
+                    } else {
+                        processDicomFiles(files);
+                    }
                 }
             });
+        }
+        
+        // Enhanced local DICOM file processing (same as in viewer.html)
+        async function processLocalDicomFiles(files) {
+            if (!files || files.length === 0) return;
+            
+            try {
+                showLoading('Processing local DICOM files...');
+                
+                // Check if dicomParser is available
+                if (typeof dicomParser === 'undefined') {
+                    showToast('DICOM parser not available - uploading to server instead', 'info');
+                    return processDicomFiles(files);
+                }
+                
+                // Filter for DICOM files
+                const dicomFiles = Array.from(files).filter(f => {
+                    const name = (f.name || '').toLowerCase();
+                    return name.endsWith('.dcm') || name.endsWith('.dicom') || f.size > 132;
+                });
+                
+                if (dicomFiles.length === 0) {
+                    hideLoading();
+                    showToast('No DICOM files found in selection', 'warning');
+                    return;
+                }
+                
+                // Process files locally for small datasets
+                const localImages = [];
+                let processedCount = 0;
+                
+                for (const file of dicomFiles) {
+                    try {
+                        const buffer = await file.arrayBuffer();
+                        const byteArray = new Uint8Array(buffer);
+                        const dataSet = dicomParser.parseDicom(byteArray);
+                        
+                        // Extract image information
+                        const rows = dataSet.uint16('x00280010') || 0;
+                        const cols = dataSet.uint16('x00280011') || 0;
+                        const bitsAllocated = dataSet.uint16('x00280100') || 16;
+                        const pixelRepresentation = dataSet.uint16('x00280103') || 0;
+                        const samplesPerPixel = dataSet.uint16('x00280002') || 1;
+                        
+                        // Only handle grayscale images for now
+                        if (samplesPerPixel !== 1 || !rows || !cols) continue;
+                        
+                        const pixelDataElement = dataSet.elements.x7fe00010;
+                        if (!pixelDataElement) continue;
+                        
+                        const pixelData = new Uint8Array(
+                            dataSet.byteArray.buffer, 
+                            pixelDataElement.dataOffset, 
+                            pixelDataElement.length
+                        );
+                        
+                        // Convert pixel data to Float32Array
+                        let pixels;
+                        if (bitsAllocated === 8) {
+                            pixels = new Float32Array(pixelData);
+                        } else if (bitsAllocated === 16) {
+                            const view = new DataView(pixelData.buffer, pixelData.byteOffset, pixelData.byteLength);
+                            const pixelCount = pixelData.byteLength / 2;
+                            pixels = new Float32Array(pixelCount);
+                            
+                            for (let i = 0; i < pixelCount; i++) {
+                                pixels[i] = pixelRepresentation === 1 
+                                    ? view.getInt16(i * 2, true) 
+                                    : view.getUint16(i * 2, true);
+                            }
+                        } else {
+                            continue;
+                        }
+                        
+                        // Extract window/level values
+                        let windowWidth = dataSet.floatString('x00281051') || null;
+                        let windowLevel = dataSet.floatString('x00281050') || null;
+                        
+                        // Calculate automatic window/level if not provided
+                        if (!windowWidth || !windowLevel) {
+                            let min = Infinity, max = -Infinity;
+                            for (let i = 0; i < pixels.length; i++) {
+                                const val = pixels[i];
+                                if (val < min) min = val;
+                                if (val > max) max = val;
+                            }
+                            windowWidth = Math.max(1, max - min);
+                            windowLevel = Math.round(min + windowWidth / 2);
+                        }
+                        
+                        localImages.push({
+                            rows,
+                            cols,
+                            pixels,
+                            windowWidth: parseFloat(windowWidth),
+                            windowLevel: parseFloat(windowLevel),
+                            filename: file.name
+                        });
+                        
+                        processedCount++;
+                        
+                    } catch (parseError) {
+                        console.warn(`Failed to parse ${file.name}:`, parseError);
+                        continue;
+                    }
+                }
+                
+                if (localImages.length === 0) {
+                    hideLoading();
+                    showToast('No valid DICOM images could be processed', 'error');
+                    return;
+                }
+                
+                // Set up local image viewer
+                await setupLocalImageViewer(localImages);
+                hideLoading();
+                showToast(`Successfully loaded ${localImages.length} local DICOM images`, 'success');
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error processing local DICOM files:', error);
+                showToast('Error processing local files - uploading to server instead', 'warning');
+                return processDicomFiles(files);
+            }
+        }
+        
+        // Setup local image viewer
+        async function setupLocalImageViewer(localImages) {
+            // Set up global variables
+            images = localImages.map((img, index) => ({ 
+                id: `local_${index}`, 
+                instance_number: index + 1,
+                local_data: img 
+            }));
+            currentImageIndex = 0;
+            currentSeries = { 
+                series_description: 'Local DICOM Files',
+                modality: 'LOCAL'
+            };
+            currentStudy = {
+                patient_name: 'Local Files',
+                accession_number: 'LOCAL'
+            };
+            
+            // Update UI
+            document.getElementById('studyStatus').textContent = 'Local DICOM Files';
+            document.getElementById('seriesStatus').textContent = `Local Files (${localImages.length} images)`;
+            document.getElementById('imageCount').textContent = localImages.length;
+            
+            // Setup slice slider
+            const sliceSlider = document.getElementById('sliceSlider');
+            if (sliceSlider) {
+                sliceSlider.max = Math.max(0, localImages.length - 1);
+                sliceSlider.value = 0;
+            }
+            
+            // Render first image
+            await renderLocalImage(0);
+        }
+        
+        // Render local image to canvas
+        async function renderLocalImage(index) {
+            if (!images[index] || !images[index].local_data) return;
+            
+            const imageData = images[index].local_data;
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas dimensions
+            canvas.width = imageData.cols;
+            canvas.height = imageData.rows;
+            
+            // Create image data
+            const canvasImageData = ctx.createImageData(imageData.cols, imageData.rows);
+            
+            // Apply window/level
+            const ww = windowWidth || imageData.windowWidth;
+            const wl = windowLevel || imageData.windowLevel;
+            const lowValue = wl - ww / 2;
+            const highValue = wl + ww / 2;
+            const range = highValue - lowValue;
+            
+            for (let i = 0; i < imageData.pixels.length; i++) {
+                const pixelValue = imageData.pixels[i];
+                let displayValue = ((pixelValue - lowValue) / range) * 255;
+                
+                // Clamp to 0-255
+                displayValue = Math.max(0, Math.min(255, displayValue));
+                
+                // Apply inversion if needed
+                if (inverted) {
+                    displayValue = 255 - displayValue;
+                }
+                
+                const byteIndex = i * 4;
+                canvasImageData.data[byteIndex] = displayValue;
+                canvasImageData.data[byteIndex + 1] = displayValue;
+                canvasImageData.data[byteIndex + 2] = displayValue;
+                canvasImageData.data[byteIndex + 3] = 255;
+            }
+            
+            // Draw to canvas
+            ctx.putImageData(canvasImageData, 0, 0);
+            
+            // Update slice info
+            currentImageIndex = index;
+            
+            // Hide the img element and show canvas
+            if (img) img.style.display = 'none';
+            canvas.style.display = 'block';
         }
 
         // Optimized Tool Management - Fast Response
@@ -2435,7 +2654,13 @@
         function updateSlice(value) {
             currentImageIndex = parseInt(value);
             document.getElementById('sliceValue').textContent = `${currentImageIndex + 1}/${images.length}`;
-            updateImageDisplay();
+            
+            // Check if this is a local image
+            if (images[currentImageIndex] && images[currentImageIndex].local_data) {
+                renderLocalImage(currentImageIndex);
+            } else {
+                updateImageDisplay();
+            }
         }
 
         function changeSlice(direction) {
@@ -2444,7 +2669,13 @@
                 currentImageIndex = newIndex;
                 document.getElementById('sliceSlider').value = currentImageIndex;
                 document.getElementById('sliceValue').textContent = `${currentImageIndex + 1}/${images.length}`;
-                updateImageDisplay();
+                
+                // Check if this is a local image
+                if (images[currentImageIndex] && images[currentImageIndex].local_data) {
+                    renderLocalImage(currentImageIndex);
+                } else {
+                    updateImageDisplay();
+                }
             }
         }
 
@@ -2481,7 +2712,18 @@
                         }
                         
                         // Render to high-quality canvas with modality-specific optimization
-                        renderImageToCanvas(dicomImage, dicomCanvas, modality);
+                        try {
+                            renderImageToCanvas(dicomImage, dicomCanvas, modality);
+                            // Hide the img element and show canvas
+                            dicomImage.style.display = 'none';
+                            dicomCanvas.style.display = 'block';
+                            console.log('Image rendered to canvas successfully');
+                        } catch (canvasError) {
+                            console.warn('Canvas rendering failed, using image element:', canvasError);
+                            // Fallback to showing the image element
+                            dicomCanvas.style.display = 'none';
+                            dicomImage.style.display = 'block';
+                        }
                         
                         // Reapply any active transformations
                         if (flipHorizontalState || flipVerticalState || rotationAngle !== 0) {
@@ -4784,5 +5026,8 @@
             }
         });
     </script>
+    
+    <!-- DICOM Parser Library -->
+    <script src="{% static 'js/vendor/dicomParser.min.js' %}"></script>
 </body>
 </html>
