@@ -328,3 +328,11 @@ django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found
 [INFO] 2025-09-24 06:47:57,400 django.utils.autoreload autoreload 9821 140087051784448 Watching for file changes with StatReloader
 [INFO] 2025-09-24 06:48:09,369 django.utils.autoreload autoreload 9821 140087051784448 /workspace/accounts/views.py changed, reloading.
 [INFO] 2025-09-24 06:48:10,728 django.utils.autoreload autoreload 9896 139622659830016 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:49:19,333 django.utils.autoreload autoreload 9896 139622659830016 /workspace/noctis_pro/settings.py changed, reloading.
+[INFO] 2025-09-24 06:49:20,508 django.utils.autoreload autoreload 10663 140068770320640 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:49:36,186 django.utils.autoreload autoreload 10663 140068770320640 /workspace/dicom_viewer/views.py changed, reloading.
+[INFO] 2025-09-24 06:49:37,429 django.utils.autoreload autoreload 10938 140696168661248 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:49:44,848 django.utils.autoreload autoreload 10938 140696168661248 /workspace/dicom_viewer/views.py changed, reloading.
+[INFO] 2025-09-24 06:49:45,976 django.utils.autoreload autoreload 10991 139813462507776 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:49:50,262 django.utils.autoreload autoreload 10991 139813462507776 /workspace/dicom_viewer/views.py changed, reloading.
+[INFO] 2025-09-24 06:49:51,337 django.utils.autoreload autoreload 11023 139678723080448 Watching for file changes with StatReloader
