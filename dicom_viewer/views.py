@@ -208,11 +208,42 @@ def viewer(request):
 @login_required
 def masterpiece_viewer(request):
     """Masterpiece DICOM viewer - THE MAIN DICOM VIEWER with enhanced features."""
+    user = request.user
+    
+    # Get study parameter and validate
+    study_id = request.GET.get('study', '')
+    initial_study = None
+    
+    if study_id:
+        try:
+            initial_study = Study.objects.exclude(
+                patient__patient_id__startswith='TEMP_'
+            ).exclude(accession_number__startswith='TEMP_').get(id=study_id)
+            
+            # Check facility permissions
+            if user.is_facility_user() and getattr(user, 'facility', None):
+                if initial_study.facility != user.facility:
+                    initial_study = None
+        except (Study.DoesNotExist, ValueError):
+            initial_study = None
+    
+    # Get recent studies for quick access - exclude temp studies
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        recent_studies = Study.objects.filter(facility=user.facility).exclude(
+            patient__patient_id__startswith='TEMP_'
+        ).exclude(accession_number__startswith='TEMP_').order_by('-study_date')[:10]
+    else:
+        recent_studies = Study.objects.all().exclude(
+            patient__patient_id__startswith='TEMP_'
+        ).exclude(accession_number__startswith='TEMP_').order_by('-study_date')[:10]
+    
     context = {
-        'study_id': request.GET.get('study', ''),
+        'study_id': study_id,
         'series_id': request.GET.get('series', ''),
         'current_date': timezone.now().strftime('%Y-%m-%d'),
-        'user': request.user
+        'user': user,
+        'initial_study': initial_study,
+        'recent_studies': recent_studies,
     }
     return render(request, 'dicom_viewer/masterpiece_viewer.html', context)
 
@@ -231,13 +262,17 @@ def view_study(request, study_id):
 def api_study_data(request, study_id):
     """API endpoint to get study data for viewer"""
     try:
-        study = get_object_or_404(Study, id=study_id)
+        # Exclude temp studies from viewer
+        study = get_object_or_404(
+            Study.objects.exclude(patient__patient_id__startswith='TEMP_').exclude(accession_number__startswith='TEMP_'),
+            id=study_id
+        )
         user = request.user
         
-        # Check permissions - Allow all authenticated users for now
-        # TODO: Implement proper facility-based permissions after user setup
-        # Simplified permission check to ensure DICOM viewer works
-        pass  # Allow all authenticated users to view studies
+        # Check facility permissions
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            if study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
         
         series_list = study.series_set.all().order_by('series_number')
         

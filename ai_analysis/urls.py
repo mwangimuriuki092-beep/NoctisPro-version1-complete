@@ -20,4 +20,9 @@ urlpatterns = [
 
     # Evidence and references
     path('api/references/', views.api_medical_references, name='api_medical_references'),
+    
+    # Model management and verification
+    path('models/verify/', views.verify_ai_models, name='verify_ai_models'),
+    path('api/model/<int:model_id>/test/', views.run_model_test, name='run_model_test'),
+    path('reporting/', views.ai_reporting_dashboard, name='ai_reporting_dashboard'),
 ]
