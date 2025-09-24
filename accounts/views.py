@@ -67,7 +67,7 @@ def login_view(request):
 
 @login_required
 def logout_view(request):
-    """Custom logout view with session cleanup"""
+    """Custom logout view with complete session cleanup"""
     try:
         # Update session record
         session = UserSession.objects.get(
@@ -81,9 +81,19 @@ def logout_view(request):
     except UserSession.DoesNotExist:
         pass
     
+    # Clear all session data
+    request.session.flush()
+    
+    # Perform Django logout
     logout(request)
-    # Do not show any success/info messages on the login page
-    return redirect('accounts:login')
+    
+    # Redirect to login with cache control headers to prevent back button issues
+    response = redirect('accounts:login')
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    
+    return response
 
 @login_required
 def profile_view(request):

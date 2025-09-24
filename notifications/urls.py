@@ -9,4 +9,5 @@ urlpatterns = [
     path('mark-read/<uuid:notification_id>/', views.mark_notification_read, name='mark_read'),
     # API endpoints
     path('api/test-notification/', views.test_notification_api, name='test_notification_api'),
+    path('api/unread-count/', views.api_unread_count, name='api_unread_count'),
 ]
