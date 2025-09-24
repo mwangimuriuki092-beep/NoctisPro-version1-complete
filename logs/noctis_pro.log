@@ -336,3 +336,9 @@ django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found
 [INFO] 2025-09-24 06:49:45,976 django.utils.autoreload autoreload 10991 139813462507776 Watching for file changes with StatReloader
 [INFO] 2025-09-24 06:49:50,262 django.utils.autoreload autoreload 10991 139813462507776 /workspace/dicom_viewer/views.py changed, reloading.
 [INFO] 2025-09-24 06:49:51,337 django.utils.autoreload autoreload 11023 139678723080448 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:50:32,710 django.utils.autoreload autoreload 11023 139678723080448 /workspace/dicom_viewer/views.py changed, reloading.
+[INFO] 2025-09-24 06:50:33,886 django.utils.autoreload autoreload 11441 140253050974464 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:50:55,924 django.utils.autoreload autoreload 11441 140253050974464 /workspace/dicom_viewer/views.py changed, reloading.
+[INFO] 2025-09-24 06:50:57,196 django.utils.autoreload autoreload 11730 139762332520704 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:52:59,435 django.utils.autoreload autoreload 11730 139762332520704 /workspace/dicom_viewer/views.py changed, reloading.
+[INFO] 2025-09-24 06:53:00,692 django.utils.autoreload autoreload 12952 139662587248896 Watching for file changes with StatReloader
