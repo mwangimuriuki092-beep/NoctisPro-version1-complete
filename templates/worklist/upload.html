@@ -698,7 +698,7 @@
                     <i class="fas fa-cloud-upload-alt"></i>
                 </div>
                 <h3 class="text-light" style="margin-bottom: 0.25rem;">Upload DICOM Studies</h3>
-                <div class="helper-text">Drag and drop DICOM files or choose a folder. Max 5,000 images (5GB).</div>
+                <div class="helper-text">Drag and drop DICOM files or choose a folder. No size limits - upload datasets of any size.</div>
             </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
@@ -739,7 +739,7 @@
                 </div>
                 <h4 class="text-light mb-2" style="font-size: 1.1rem; font-weight: 600;">Professional Medical DICOM Upload</h4>
                 <p class="text-secondary mb-2" style="font-size: 0.95rem; line-height: 1.4;">
-                    <strong>Medical-Grade Upload System</strong> - Supports up to 10GB DICOM datasets<br>
+                    <strong>Medical-Grade Upload System</strong> - No size limits, upload any dataset size<br>
                     Drop files/folders here or use buttons below. Chunked upload with resume capability.
                 </p>
                 <div style="display: flex; gap: 10px; justify-content: center;">
@@ -783,7 +783,7 @@
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="totalSize">0 MB</div>
-                        <div class="stat-label">Total Size (Max: 10GB)</div>
+                        <div class="stat-label">Total Size (No Limit)</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="estimatedStudies">0</div>
@@ -832,9 +832,42 @@
                 <h4 class="text-light mb-2">Upload Successful!</h4>
                 <p class="text-secondary mb-3">Your DICOM studies have been uploaded successfully.</p>
                 <div id="uploadSummary" class="text-light mb-3"></div>
-                <button type="button" class="btn-control primary" onclick="redirectToDashboard()">
-                    <i class="fas fa-arrow-left me-2"></i>Return to Worklist
-                </button>
+                
+                <!-- AI Analysis Section -->
+                <div id="aiAnalysisSection" class="ai-analysis-section" style="margin: 20px 0; padding: 20px; background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 255, 136, 0.05) 100%); border: 1px solid var(--accent-color); border-radius: 12px;">
+                    <h5 class="text-light mb-2"><i class="fas fa-brain me-2"></i>AI Analysis Available</h5>
+                    <p class="text-secondary mb-3">Start automated AI analysis on your uploaded studies for instant insights.</p>
+                    <div class="ai-controls" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <button type="button" class="btn-control primary" id="startAiAnalysisBtn">
+                            <i class="fas fa-robot me-2"></i>Start AI Analysis
+                        </button>
+                        <button type="button" class="btn-control" id="skipAnalysisBtn">
+                            <i class="fas fa-forward me-2"></i>Skip Analysis
+                        </button>
+                    </div>
+                    <div id="aiAnalysisProgress" style="display: none; margin-top: 15px;">
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" 
+                                 style="width: 0%" 
+                                 id="aiProgressBar">
+                            </div>
+                        </div>
+                        <div id="aiProgressText" class="text-secondary text-center" style="font-size: 0.9rem;"></div>
+                    </div>
+                    <div id="aiAnalysisResults" style="display: none; margin-top: 15px;">
+                        <div id="aiResultsContent"></div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                    <button type="button" class="btn-control primary" onclick="redirectToDashboard()">
+                        <i class="fas fa-arrow-left me-2"></i>Return to Worklist
+                    </button>
+                    <button type="button" class="btn-control" id="viewInDicomViewer" style="display: none;">
+                        <i class="fas fa-eye me-2"></i>Open in DICOM Viewer
+                    </button>
+                </div>
             </div>
             
             <div class="upload-actions" id="uploadActions" style="display: none;">
@@ -866,7 +899,7 @@ let createdStudyIds = [];
 
 // Professional medical upload configuration
 const MEDICAL_UPLOAD_CONFIG = {
-    MAX_TOTAL_SIZE: 10 * 1024 * 1024 * 1024, // 10GB in bytes
+    MAX_TOTAL_SIZE: null, // No size limit - upload any size
     CHUNK_SIZE: 10 * 1024 * 1024, // 10MB chunks for large file handling
     MAX_CONCURRENT_UPLOADS: 3, // Concurrent file uploads
     RETRY_ATTEMPTS: 3, // Retry failed chunks
@@ -887,6 +920,7 @@ let uploadSession = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing upload functionality...');
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const folderInput = document.getElementById('folderInput');
@@ -912,23 +946,54 @@ document.addEventListener('DOMContentLoaded', function() {
     const clinicalInfoInput = document.getElementById('clinicalInfoInput');
     const facilitySelect = document.getElementById('facilitySelect');
     const assignToMe = document.getElementById('assignToMe');
+    
+    // Debug: Check if critical elements are found
+    console.log('DOM Elements Check:', {
+        dropZone: !!dropZone,
+        fileInput: !!fileInput,
+        folderInput: !!folderInput,
+        chooseFilesBtn: !!chooseFilesBtn,
+        uploadForm: !!uploadForm
+    });
 
     // Click to browse individual files
     chooseFilesBtn.addEventListener('click', (e) => {
+        console.log('Choose files button clicked');
         e.preventDefault();
         e.stopPropagation();
         if (!isUploading) {
-            fileInput.click();
+            console.log('Triggering file input click');
+            // Ensure the file input exists and is accessible
+            if (fileInput) {
+                fileInput.value = ''; // Clear previous selection
+                fileInput.click();
+                console.log('File input clicked successfully');
+            } else {
+                console.error('File input not found!');
+            }
+        } else {
+            console.log('Upload in progress, ignoring click');
         }
     });
 
     // Click to browse entire folder
     const chooseFolderBtn = document.getElementById('chooseFolderBtn');
     chooseFolderBtn.addEventListener('click', (e) => {
+        console.log('Choose folder button clicked');
         e.preventDefault();
         e.stopPropagation();
         if (!isUploading) {
-            folderInput.click();
+            console.log('Triggering folder input click');
+            // Ensure the folder input exists and is accessible
+            if (folderInput) {
+                folderInput.value = ''; // Clear previous selection
+                folderInput.click();
+                console.log('Folder input clicked successfully');
+            } else {
+                console.error('Folder input not found!');
+            }
+        } else {
+            console.log('Upload in progress, ignoring click');
         }
     });
 
@@ -996,16 +1061,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // File input change handlers
     fileInput.addEventListener('change', (e) => {
+        console.log('File input changed:', e.target.files.length, 'files');
         if (!isUploading) {
             const files = Array.from(e.target.files);
             handleFiles(files);
+        } else {
+            console.log('Upload already in progress, ignoring file input');
         }
     });
 
     folderInput.addEventListener('change', (e) => {
+        console.log('Folder input changed:', e.target.files.length, 'files');
         if (!isUploading) {
             const files = Array.from(e.target.files);
             handleFiles(files);
+        } else {
+            console.log('Upload already in progress, ignoring folder input');
         }
     });
 
@@ -1018,51 +1089,56 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function handleFiles(files) {
+        console.log('handleFiles called with:', files.length, 'files');
         // Professional medical DICOM validation
         const dicomFiles = files.filter(file => {
             const name = file.name.toLowerCase();
-            const ext = name.substring(name.lastIndexOf('.'));
+            const lastDotIndex = name.lastIndexOf('.');
+            const ext = lastDotIndex >= 0 ? name.substring(lastDotIndex) : '';
+            console.log('Checking file:', name, 'ext:', ext, 'size:', file.size, 'type:', file.type);
             
             // Check supported extensions
-            if (MEDICAL_UPLOAD_CONFIG.SUPPORTED_EXTENSIONS.includes(ext)) return true;
+            if (ext && MEDICAL_UPLOAD_CONFIG.SUPPORTED_EXTENSIONS.includes(ext)) {
+                console.log('File accepted by extension:', name);
+                return true;
+            }
             
             // Check DICOM MIME type
-            if (file.type === 'application/dicom') return true;
+            if (file.type === 'application/dicom') {
+                console.log('File accepted by MIME type:', name);
+                return true;
+            }
             
             // Check minimum DICOM file size (must have at least DICOM header)
-            if (file.size < MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) return false;
+            if (file.size < MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) {
+                console.log('File rejected - too small:', name, file.size);
+                return false;
+            }
             
             // Accept files without extension if they're large enough (common in medical imaging)
-            if (!ext && file.size > MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) return true;
+            if (!ext && file.size >= MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) {
+                console.log('File accepted - no extension but large enough:', name);
+                return true;
+            }
             
+            // Accept any file larger than minimum size (relaxed validation)
+            if (file.size >= MEDICAL_UPLOAD_CONFIG.MIN_DICOM_SIZE) {
+                console.log('File accepted - meets minimum size requirement:', name);
+                return true;
+            }
+            
+            console.log('File rejected:', name);
             return false;
         });
 
-        // Professional medical imaging limits
-        const maxFiles = 10000; // Increased for large medical datasets
-        if (dicomFiles.length > maxFiles) {
-            showNotification(`Dataset too large. Maximum allowed: ${maxFiles} DICOM images. You selected ${dicomFiles.length} files.`, 'error');
-            return;
-        }
+        console.log('Filtered files:', dicomFiles.length, 'out of', files.length, 'passed validation');
 
-        // Calculate total size for professional validation
-        const totalSize = dicomFiles.reduce((sum, file) => sum + file.size, 0);
-        if (totalSize > MEDICAL_UPLOAD_CONFIG.MAX_TOTAL_SIZE) {
-            const totalGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2);
-            showNotification(`Dataset too large. Maximum allowed: 10GB. Your dataset: ${totalGB}GB`, 'error');
-            return;
-        }
+        // No file count limits - accept any number of files
+
+        // No size limits - accept any dataset size
 
         if (dicomFiles.length === 0) {
             showNotification('Please select DICOM files or folders. Files without .dcm are allowed; they will be validated during upload.', 'error');
-            return;
-        }
-
-        // Check total size limit (5GB max)
-        const totalSize = dicomFiles.reduce((sum, file) => sum + file.size, 0);
-        const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
-        if (totalSize > maxSize) {
-            showNotification(`Total file size too large. Maximum allowed: 5GB. Your files: ${formatFileSize(totalSize)}`, 'error');
             return;
         }
 
@@ -1076,8 +1152,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Auto-start upload after a brief delay to show stats
         setTimeout(() => {
+            console.log('Auto-upload check:', { selectedFiles: selectedFiles.length, isUploading });
             if (selectedFiles.length > 0 && !isUploading) {
-                uploadFilesInChunks();
+                console.log('Starting auto-upload...');
+                uploadFilesInChunks().catch(error => {
+                    console.error('Auto-upload failed:', error);
+                    showNotification('Auto-upload failed: ' + error.message, 'error');
+                });
+            } else {
+                console.log('Auto-upload conditions not met');
             }
         }, 1000);
     }
@@ -1173,17 +1256,20 @@ document.addEventListener('DOMContentLoaded', function() {
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         const size = parseFloat((bytes / Math.pow(k, i)).toFixed(2));
         
-        // Add professional medical context for large datasets
+        // Add professional medical context for datasets of any size
         let context = '';
         if (i >= 2) { // MB or larger
             const gb = bytes / (1024 * 1024 * 1024);
-            if (gb > 5) context = ' (Large Medical Dataset)';
-            else if (gb > 1) context = ' (Multi-Series Study)';
-            else if (bytes > 100 * 1024 * 1024) context = ' (CT/MRI Series)';
+            const tb = bytes / (1024 * 1024 * 1024 * 1024);
+            if (tb >= 1) context = ' (Enterprise Medical Dataset)';
+            else if (gb >= 100) context = ' (Large Hospital Dataset)';
+            else if (gb >= 10) context = ' (Multi-Study Dataset)';
+            else if (gb >= 1) context = ' (Multi-Series Study)';
+            else if (bytes >= 100 * 1024 * 1024) context = ' (CT/MRI Series)';
         }
         
         return size + ' ' + sizes[i] + context;
@@ -1214,10 +1300,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function uploadFilesInChunks() {
+        console.log('Starting upload process...', { selectedFiles: selectedFiles.length, isUploading });
         const url = '{% url "worklist:upload_study" %}';
         const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
         const totalFiles = selectedFiles.length;
         const totalBytes = selectedFiles.reduce((s, f) => s + (f.size || 0), 0);
+        console.log('Upload configuration:', { url, totalFiles, totalBytes, hasToken: !!token });
 
         // Professional medical dataset chunking - optimized for large DICOM transfers
         const MAX_CHUNK_BYTES = isLargeDataset(totalBytes) ? 50 * 1024 * 1024 : 80 * 1024 * 1024; // Smaller chunks for >1GB datasets
@@ -1276,6 +1364,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (assignToMe) { formData.append('assign_to_me', assignToMe.checked ? '1' : '0'); }
 
                 const xhr = new XMLHttpRequest();
+                console.log('Creating XHR request for chunk', chunkIdx, 'with', chunk.length, 'files');
                 xhr.open('POST', url, true);
                 // Professional timeout management for medical imaging
                 const chunkSize = chunk.reduce((sum, file) => sum + file.size, 0);
@@ -1295,6 +1384,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
 
                 const handleFailure = (reason) => {
+                    console.error('Upload chunk failed:', reason, 'Chunk:', chunkIdx);
                     errors.push(reason || 'Upload failed');
                     resolve({ ok: false });
                 };
@@ -1304,6 +1394,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         try {
                             if (xhr.status >= 200 && xhr.status < 300) {
                                 const data = JSON.parse(xhr.responseText || '{}');
+                                console.log('Upload response for chunk', chunkIdx, ':', data);
                                 if (data && data.success) {
                                     const processed = typeof data.processed_files === 'number' ? data.processed_files : chunk.length;
                                     uploadedCount += processed;
@@ -1437,6 +1528,254 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = '{% url "worklist:dashboard" %}';
         }, 1500);
     };
+
+    // AI Analysis Integration
+    let aiAnalysisInProgress = false;
+    let currentAnalysisIds = [];
+
+    function initializeAiAnalysis() {
+        const startAiBtn = document.getElementById('startAiAnalysisBtn');
+        const skipAiBtn = document.getElementById('skipAnalysisBtn');
+        const viewDicomBtn = document.getElementById('viewInDicomViewer');
+
+        if (startAiBtn) {
+            startAiBtn.addEventListener('click', startAiAnalysis);
+        }
+        if (skipAiBtn) {
+            skipAiBtn.addEventListener('click', skipAiAnalysis);
+        }
+        if (viewDicomBtn && createdStudyIds.length > 0) {
+            viewDicomBtn.style.display = 'inline-flex';
+            viewDicomBtn.onclick = function() {
+                window.location.href = '/dicom-viewer/?study=' + createdStudyIds[0];
+            };
+        }
+    }
+
+    async function startAiAnalysis() {
+        if (aiAnalysisInProgress || createdStudyIds.length === 0) return;
+        
+        console.log('Starting AI analysis for studies:', createdStudyIds);
+        aiAnalysisInProgress = true;
+        
+        // Update UI
+        const startBtn = document.getElementById('startAiAnalysisBtn');
+        const skipBtn = document.getElementById('skipAnalysisBtn');
+        const progressDiv = document.getElementById('aiAnalysisProgress');
+        const progressBar = document.getElementById('aiProgressBar');
+        const progressText = document.getElementById('aiProgressText');
+        
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Starting Analysis...';
+        skipBtn.style.display = 'none';
+        progressDiv.style.display = 'block';
+        progressText.textContent = 'Initializing AI analysis...';
+        
+        try {
+            // Start AI analysis for each uploaded study
+            const analysisPromises = createdStudyIds.map(studyId => startStudyAnalysis(studyId));
+            const analysisResults = await Promise.all(analysisPromises);
+            
+            // Track all analysis IDs
+            currentAnalysisIds = analysisResults
+                .filter(result => result.success)
+                .flatMap(result => result.analysis_ids || []);
+            
+            if (currentAnalysisIds.length > 0) {
+                progressText.textContent = `AI analysis started for ${currentAnalysisIds.length} model(s)...`;
+                updateAiProgress(10);
+                
+                // Monitor progress
+                monitorAiAnalysisProgress();
+            } else {
+                throw new Error('No AI analyses could be started');
+            }
+            
+        } catch (error) {
+            console.error('AI analysis failed:', error);
+            showAiAnalysisError(error.message);
+        }
+    }
+
+    async function getAvailableAiModels(studyId) {
+        // For now, return default model IDs - could be enhanced to query available models
+        return ['1']; // Default to first model
+    }
+
+    async function startStudyAnalysis(studyId) {
+        const url = `/ai/study/${studyId}/analyze/`;
+        const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': token,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: new URLSearchParams({
+                    'ai_models': await getAvailableAiModels(studyId),
+                    'priority': 'high'
+                })
+            });
+            
+            const data = await response.json();
+            console.log('AI analysis response for study', studyId, ':', data);
+            return data;
+            
+        } catch (error) {
+            console.error('Failed to start AI analysis for study', studyId, ':', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async function monitorAiAnalysisProgress() {
+        const maxAttempts = 60; // 5 minutes max
+        let attempts = 0;
+        let completedAnalyses = 0;
+        
+        const checkProgress = async () => {
+            if (attempts >= maxAttempts) {
+                showAiAnalysisError('Analysis timeout - please check AI dashboard for results');
+                return;
+            }
+            
+            attempts++;
+            let allCompleted = true;
+            let hasResults = false;
+            const results = [];
+            
+            for (const analysisId of currentAnalysisIds) {
+                try {
+                    const response = await fetch(`/ai/api/analysis/${analysisId}/status/`);
+                    const data = await response.json();
+                    
+                    if (data.status === 'completed') {
+                        if (!results.find(r => r.id === analysisId)) {
+                            results.push(data);
+                            completedAnalyses++;
+                        }
+                        hasResults = true;
+                    } else if (data.status === 'failed') {
+                        console.error('Analysis failed:', data.error_message);
+                    } else {
+                        allCompleted = false;
+                    }
+                } catch (error) {
+                    console.error('Error checking analysis status:', error);
+                    allCompleted = false;
+                }
+            }
+            
+            // Update progress
+            const progress = (completedAnalyses / currentAnalysisIds.length) * 100;
+            updateAiProgress(Math.max(20, progress));
+            
+            const progressText = document.getElementById('aiProgressText');
+            if (allCompleted) {
+                progressText.textContent = 'AI analysis completed!';
+                updateAiProgress(100);
+                showAiAnalysisResults(results);
+                aiAnalysisInProgress = false;
+            } else {
+                progressText.textContent = `Analyzing... (${completedAnalyses}/${currentAnalysisIds.length} completed)`;
+                setTimeout(checkProgress, 5000); // Check every 5 seconds
+            }
+        };
+        
+        setTimeout(checkProgress, 2000); // Start checking after 2 seconds
+    }
+
+    function updateAiProgress(percentage) {
+        const progressBar = document.getElementById('aiProgressBar');
+        if (progressBar) {
+            progressBar.style.width = percentage + '%';
+        }
+    }
+
+    function showAiAnalysisResults(results) {
+        const resultsDiv = document.getElementById('aiAnalysisResults');
+        const resultsContent = document.getElementById('aiResultsContent');
+        const startBtn = document.getElementById('startAiAnalysisBtn');
+        
+        if (!results || results.length === 0) {
+            resultsContent.innerHTML = '<p class="text-warning">No analysis results available.</p>';
+        } else {
+            let html = '<div class="ai-results-summary">';
+            html += '<h6 class="text-light mb-2"><i class="fas fa-check-circle text-success me-2"></i>Analysis Complete</h6>';
+            
+            results.forEach((result, index) => {
+                const confidence = result.confidence_score ? (result.confidence_score * 100).toFixed(1) : 'N/A';
+                html += `
+                    <div class="ai-result-item" style="background: rgba(255,255,255,0.05); padding: 10px; margin: 5px 0; border-radius: 6px;">
+                        <strong>${result.ai_model.name}</strong> - Confidence: ${confidence}%
+                        ${result.findings ? `<br><small class="text-secondary">${result.findings.substring(0, 100)}...</small>` : ''}
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            html += '<div style="margin-top: 10px; text-align: center;">';
+            html += '<button type="button" class="btn-control" onclick="window.location.href=\'/ai/\'">';
+            html += '<i class="fas fa-chart-line me-2"></i>View Full AI Report</button>';
+            html += '</div>';
+            
+            resultsContent.innerHTML = html;
+        }
+        
+        resultsDiv.style.display = 'block';
+        startBtn.innerHTML = '<i class="fas fa-check me-2"></i>Analysis Complete';
+    }
+
+    function showAiAnalysisError(message) {
+        const resultsDiv = document.getElementById('aiAnalysisResults');
+        const resultsContent = document.getElementById('aiResultsContent');
+        const startBtn = document.getElementById('startAiAnalysisBtn');
+        const progressDiv = document.getElementById('aiAnalysisProgress');
+        
+        resultsContent.innerHTML = `
+            <div class="ai-error" style="background: rgba(255, 68, 68, 0.1); border: 1px solid #ff4444; padding: 10px; border-radius: 6px;">
+                <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                <strong>Analysis Error:</strong> ${message}
+            </div>
+        `;
+        
+        resultsDiv.style.display = 'block';
+        progressDiv.style.display = 'none';
+        startBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Analysis Failed';
+        startBtn.disabled = false;
+        aiAnalysisInProgress = false;
+    }
+
+    function skipAiAnalysis() {
+        const aiSection = document.getElementById('aiAnalysisSection');
+        if (aiSection) {
+            aiSection.style.display = 'none';
+        }
+    }
+
+    // Initialize AI analysis when upload is successful
+    const originalUploadComplete = window.uploadFilesInChunks;
+    if (typeof originalUploadComplete === 'function') {
+        // AI analysis will be initialized when upload success is shown
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                    const uploadSuccess = document.getElementById('uploadSuccess');
+                    if (uploadSuccess && uploadSuccess.style.display !== 'none') {
+                        initializeAiAnalysis();
+                        observer.disconnect();
+                    }
+                }
+            });
+        });
+        
+        const uploadSuccess = document.getElementById('uploadSuccess');
+        if (uploadSuccess) {
+            observer.observe(uploadSuccess, { attributes: true });
+        }
+    }
 });
 </script>
 {% endblock %}

@@ -322,10 +322,10 @@ SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 # Force new session after browser close/reopen
 SESSION_COOKIE_SAMESITE = 'Lax'  # Allow session cookies in reasonable cross-site contexts
 
-# File upload settings - Enhanced for up to 5000 DICOM images
-FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batches
-DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batches
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 15000  # Support for up to 5000 images with metadata
+# File upload settings - No limits for unlimited DICOM dataset sizes
+FILE_UPLOAD_MAX_MEMORY_SIZE = None  # No memory limit
+DATA_UPLOAD_MAX_MEMORY_SIZE = None  # No data limit
+DATA_UPLOAD_MAX_NUMBER_FIELDS = None  # No field limit
 
 # Security settings for internet access
 SECURE_BROWSER_XSS_FILTER = True
@@ -497,7 +497,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # DICOM viewer masterpiece settings
 DICOM_VIEWER_SETTINGS = {
-    'MAX_UPLOAD_SIZE': 100 * 1024 * 1024,  # 100MB
+    'MAX_UPLOAD_SIZE': None,  # No upload size limit
     'SUPPORTED_MODALITIES': ['CT', 'MR', 'CR', 'DX', 'US', 'XA'],
     'CACHE_TIMEOUT': 3600,
     'ENABLE_3D_RECONSTRUCTION': True,
