@@ -762,3 +762,4 @@ django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found
 [INFO] 2025-09-24 07:03:06,994 django.channels.server runserver 17624 140306076604096 [mHTTP GET /worklist/api/studies/ 200 [0.02, 127.0.0.1:35332][0m
 [INFO] 2025-09-24 07:03:07,023 django.channels.server runserver 17624 140306076604096 [mHTTP GET /notifications/api/unread-count/ 200 [0.02, 127.0.0.1:35340][0m
 [INFO] 2025-09-24 07:03:07,047 django.channels.server runserver 17624 140306076604096 [mHTTP GET /api/user-info/ 200 [0.01, 127.0.0.1:35354][0m
+[INFO] 2025-09-24 09:02:49,244 django.utils.autoreload autoreload 2921 140586372186368 Watching for file changes with StatReloader
