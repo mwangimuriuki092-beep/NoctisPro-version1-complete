@@ -52,17 +52,16 @@ urlpatterns = [
     path('', include('accounts.urls')),
     # WORKLIST URLS - ENABLED
     path('worklist/', include('worklist.urls')),  # RESTORED
-    # Alias endpoints expected by the dashboard UI - TEMPORARILY DISABLED TO FIX 500 ERROR
-    # path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # RESTORED
+    # Alias endpoints expected by the dashboard UI
+    path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # RESTORED
     # Removed duplicate 'viewer/' include to avoid namespace clash; keep alias via redirect if needed
-    # path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),  # RESTORED
-    # path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),  # RESTORED
-    # TEMPORARILY DISABLED TO FIX 500 ERROR - MISSING DEPENDENCIES
-    # path('reports/', include('reports.urls')),
-    # path('admin-panel/', include('admin_panel.urls')),
-    # path('chat/', include('chat.urls')),
-    # path('notifications/', include('notifications.urls')),
-    # path('ai/', include('ai_analysis.urls')),
+    path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),  # RESTORED
+    path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),  # RESTORED
+    path('reports/', include('reports.urls')),
+    path('admin-panel/', include('admin_panel.urls')),
+    path('chat/', include('chat.urls')),
+    path('notifications/', include('notifications.urls')),
+    path('ai/', include('ai_analysis.urls')),
     path('system-status/', system_status, name='system_status'),
     path('dicom-test/', lambda request: render(request, 'dicom_viewer_test.html'), name='dicom_test')
 ]

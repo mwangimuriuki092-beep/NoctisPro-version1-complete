@@ -245,3 +245,82 @@ django.urls.exceptions.NoReverseMatch: 'reports' is not a registered namespace
 [WARNING] 2025-09-24 06:11:44,414 django.channels.server runserver 4406 139758285719232 [31;1mHTTP POST /worklist/ 403 [0.03, 127.0.0.1:56822][0m
 [INFO] 2025-09-24 06:11:51,470 django.utils.autoreload autoreload 4406 139758349562112 /workspace/noctis_pro/settings.py changed, reloading.
 [INFO] 2025-09-24 06:11:52,944 django.utils.autoreload autoreload 4541 140122338099456 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:39:32,806 django.utils.autoreload autoreload 4541 140122338099456 /workspace/noctis_pro/urls.py changed, reloading.
+[INFO] 2025-09-24 06:39:34,794 django.utils.autoreload autoreload 5985 140393263382784 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:40:25,873 django.utils.autoreload autoreload 5985 140393263382784 /home/ubuntu/.local/lib/python3.13/site-packages/numpy/_core/_add_newdocs.py changed, reloading.
+[INFO] 2025-09-24 06:40:27,073 django.utils.autoreload autoreload 6383 139885892964608 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:41:28,259 django.utils.autoreload autoreload 6973 140005079036160 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:41:31,227 django.channels.server runserver 6973 140005015193280 [mHTTP GET /login/ 200 [0.17, 127.0.0.1:45452][0m
+[INFO] 2025-09-24 06:41:38,471 django.channels.server runserver 6973 140005015193280 [32mHTTP POST /login/ 302 [0.59, 127.0.0.1:43550][0m
+[WARNING] 2025-09-24 06:41:38,511 django.channels.server runserver 6973 140005015193280 [31;1mHTTP POST /worklist/ 403 [0.04, 127.0.0.1:43550][0m
+[INFO] 2025-09-24 06:41:51,161 django.channels.server runserver 6973 140005015193280 [32mHTTP GET /worklist/ 302 [0.02, 127.0.0.1:47350][0m
+[INFO] 2025-09-24 06:42:18,538 django.utils.autoreload autoreload 6973 140005079036160 /workspace/noctis_pro/settings.py changed, reloading.
+[INFO] 2025-09-24 06:42:19,733 django.utils.autoreload autoreload 7389 140623859769600 Watching for file changes with StatReloader
+[INFO] 2025-09-24 06:42:22,515 django.channels.server runserver 7389 140623795926720 [mHTTP GET /login/ 200 [0.03, 127.0.0.1:57724][0m
+[INFO] 2025-09-24 06:42:27,994 django.channels.server runserver 7389 140623795926720 [32mHTTP POST /login/ 302 [0.55, 127.0.0.1:57740][0m
+[WARNING] 2025-09-24 06:42:28,025 django.channels.server runserver 7389 140623795926720 [31;1mHTTP POST /worklist/ 403 [0.03, 127.0.0.1:57740][0m
+[INFO] 2025-09-24 06:42:55,835 django.channels.server runserver 7389 140623795926720 [mHTTP GET /api/user-info/ 200 [0.05, 127.0.0.1:53308][0m
+[ERROR] 2025-09-24 06:43:08,258 django.request log 7389 140623250986688 Internal Server Error: /worklist/
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/worklist/views.py", line 36, in dashboard
+    return render(request, 'worklist/dashboard.html', {
+    	'user': request.user,
+    	'csrf_token': get_token(request)
+    })
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/loader.py", line 62, in render_to_string
+    return template.render(context, request)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/backends/django.py", line 107, in render
+    return self.template.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 171, in render
+    return self._render(context)
+           ~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 163, in _render
+    return self.nodelist.render(context)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+                               ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/base.py", line 977, in render_annotated
+    return self.render(context)
+           ~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/template/defaulttags.py", line 480, in render
+    url = reverse(view_name, args=args, kwargs=kwargs, current_app=current_app)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/base.py", line 98, in reverse
+    resolved_url = resolver._reverse_with_prefix(view, prefix, *args, **kwargs)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/urls/resolvers.py", line 831, in _reverse_with_prefix
+    raise NoReverseMatch(msg)
+django.urls.exceptions.NoReverseMatch: Reverse for 'notification_list' not found. 'notification_list' is not a valid view function or pattern name.
+[ERROR] 2025-09-24 06:43:08,270 django.channels.server runserver 7389 140623795926720 [35;1mHTTP GET /worklist/ 500 [0.09, 127.0.0.1:34628][0m
+[INFO] 2025-09-24 06:43:55,509 django.channels.server runserver 7389 140623795926720 [mHTTP GET /login/ 200 [0.02, 127.0.0.1:56450][0m
+[INFO] 2025-09-24 06:44:03,636 django.channels.server runserver 7389 140623795926720 [32mHTTP POST /login/ 302 [0.51, 127.0.0.1:39792][0m
+[WARNING] 2025-09-24 06:44:03,661 django.channels.server runserver 7389 140623795926720 [31;1mHTTP POST /worklist/ 403 [0.02, 127.0.0.1:39792][0m
+[INFO] 2025-09-24 06:44:11,973 django.channels.server runserver 7389 140623795926720 [mHTTP GET /worklist/ 200 [0.05, 127.0.0.1:38082][0m
+[INFO] 2025-09-24 06:44:24,669 django.utils.autoreload autoreload 7389 140623859769600 /workspace/noctis_pro/settings.py changed, reloading.
+[INFO] 2025-09-24 06:44:26,000 django.utils.autoreload autoreload 8631 140395622682880 Watching for file changes with StatReloader
