@@ -8,7 +8,7 @@ server {
 	listen [::]:80 default_server;
 	server_name {{SERVER_NAME}};
 
-	client_max_body_size 200M;
+	client_max_body_size 0;  # No limit
 
 	location /static/ {
 		alias {{APP_DIR}}/staticfiles/;

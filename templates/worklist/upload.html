@@ -698,7 +698,7 @@
                     <i class="fas fa-cloud-upload-alt"></i>
                 </div>
                 <h3 class="text-light" style="margin-bottom: 0.25rem;">Upload DICOM Studies</h3>
-                <div class="helper-text">Drag and drop DICOM files or choose a folder. Max 5,000 images (5GB).</div>
+                <div class="helper-text">Drag and drop DICOM files or choose a folder. No size limits - upload datasets of any size.</div>
             </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
@@ -739,7 +739,7 @@
                 </div>
                 <h4 class="text-light mb-2" style="font-size: 1.1rem; font-weight: 600;">Professional Medical DICOM Upload</h4>
                 <p class="text-secondary mb-2" style="font-size: 0.95rem; line-height: 1.4;">
-                    <strong>Medical-Grade Upload System</strong> - Supports up to 10GB DICOM datasets<br>
+                    <strong>Medical-Grade Upload System</strong> - No size limits, upload any dataset size<br>
                     Drop files/folders here or use buttons below. Chunked upload with resume capability.
                 </p>
                 <div style="display: flex; gap: 10px; justify-content: center;">
@@ -783,7 +783,7 @@
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="totalSize">0 MB</div>
-                        <div class="stat-label">Total Size (Max: 10GB)</div>
+                        <div class="stat-label">Total Size (No Limit)</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="estimatedStudies">0</div>
@@ -866,7 +866,7 @@ let createdStudyIds = [];
 
 // Professional medical upload configuration
 const MEDICAL_UPLOAD_CONFIG = {
-    MAX_TOTAL_SIZE: 10 * 1024 * 1024 * 1024, // 10GB in bytes
+    MAX_TOTAL_SIZE: null, // No size limit - upload any size
     CHUNK_SIZE: 10 * 1024 * 1024, // 10MB chunks for large file handling
     MAX_CONCURRENT_UPLOADS: 3, // Concurrent file uploads
     RETRY_ATTEMPTS: 3, // Retry failed chunks
@@ -1069,20 +1069,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         console.log('Filtered files:', dicomFiles.length, 'out of', files.length, 'passed validation');
 
-        // Professional medical imaging limits
-        const maxFiles = 10000; // Increased for large medical datasets
-        if (dicomFiles.length > maxFiles) {
-            showNotification(`Dataset too large. Maximum allowed: ${maxFiles} DICOM images. You selected ${dicomFiles.length} files.`, 'error');
-            return;
-        }
+        // No file count limits - accept any number of files
 
-        // Calculate total size for professional validation
-        const totalSize = dicomFiles.reduce((sum, file) => sum + file.size, 0);
-        if (totalSize > MEDICAL_UPLOAD_CONFIG.MAX_TOTAL_SIZE) {
-            const totalGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2);
-            showNotification(`Dataset too large. Maximum allowed: 10GB. Your dataset: ${totalGB}GB`, 'error');
-            return;
-        }
+        // No size limits - accept any dataset size
 
         if (dicomFiles.length === 0) {
             showNotification('Please select DICOM files or folders. Files without .dcm are allowed; they will be validated during upload.', 'error');
@@ -1200,17 +1189,20 @@ document.addEventListener('DOMContentLoaded', function() {
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         const size = parseFloat((bytes / Math.pow(k, i)).toFixed(2));
         
-        // Add professional medical context for large datasets
+        // Add professional medical context for datasets of any size
         let context = '';
         if (i >= 2) { // MB or larger
             const gb = bytes / (1024 * 1024 * 1024);
-            if (gb > 5) context = ' (Large Medical Dataset)';
-            else if (gb > 1) context = ' (Multi-Series Study)';
-            else if (bytes > 100 * 1024 * 1024) context = ' (CT/MRI Series)';
+            const tb = bytes / (1024 * 1024 * 1024 * 1024);
+            if (tb >= 1) context = ' (Enterprise Medical Dataset)';
+            else if (gb >= 100) context = ' (Large Hospital Dataset)';
+            else if (gb >= 10) context = ' (Multi-Study Dataset)';
+            else if (gb >= 1) context = ' (Multi-Series Study)';
+            else if (bytes >= 100 * 1024 * 1024) context = ' (CT/MRI Series)';
         }
         
         return size + ' ' + sizes[i] + context;

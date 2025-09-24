@@ -100,8 +100,8 @@ CORS_ALLOWED_HEADERS = [
 ]
 
 # File upload settings for DICOM
-FILE_UPLOAD_MAX_MEMORY_SIZE = 200 * 1024 * 1024  # 200MB for large DICOM files
-DATA_UPLOAD_MAX_MEMORY_SIZE = 200 * 1024 * 1024  # 200MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = None  # No limit for unlimited DICOM file sizes
+DATA_UPLOAD_MAX_MEMORY_SIZE = None  # No limit for unlimited dataset sizes
 FILE_UPLOAD_PERMISSIONS = 0o644
 
 # Media files configuration
