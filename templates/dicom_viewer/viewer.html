@@ -4,9 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>Noctis Pro DICOM Viewer - Complete</title>
+    <title>Noctis Pro DICOM Viewer - Masterpiece Edition</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     {% load static %}
+    <script src="{% static 'js/masterpiece_3d_reconstruction.js' %}"></script>
+    <script src="{% static 'js/vendor/dicomParser.min.js' %}"></script>
+    <script src="{% static 'js/dicom-measurements.js' %}"></script>
+    <script src="{% static 'js/session-timeout.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-enhanced.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-fixes.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-canvas-fix.js' %}"></script>
     <style>
         :root {
             --primary-bg: #0a0a0a;
@@ -4520,6 +4529,7 @@
     <script src="{% static 'js/vendor/dicomParser.min.js' %}"></script>
     
     <!-- Professional Keyboard Shortcuts - Safe Enhancement -->
-    <script src="{% load static %}{% static 'js/dicom-viewer-keyboard-shortcuts.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-keyboard-shortcuts.js' %}"></script>
+    <script src="{% static 'js/high-quality-image-renderer.js' %}"></script>
 </body>
 </html>

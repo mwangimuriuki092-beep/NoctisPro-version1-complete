@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Noctis Pro - Python DICOM Viewer Launcher
-=========================================
+Noctis Pro - Python DICOM Viewer Launcher - Masterpiece Edition
+===============================================================
 
-This script launches the Python (PyQt5) standalone DICOM viewer application.
+This script launches the Python (PyQt5) standalone DICOM viewer application with masterpiece-level functionality.
 
 Usage:
     python tools/launch_dicom_viewer.py [options] [dicom_file_or_directory]

@@ -4,9 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>Noctis Pro DICOM Viewer</title>
+    <title>Noctis Pro DICOM Viewer - Masterpiece Edition</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     {% load static %}
+    <script src="{% static 'js/masterpiece_3d_reconstruction.js' %}"></script>
+    <script src="{% static 'js/vendor/dicomParser.min.js' %}"></script>
+    <script src="{% static 'js/dicom-measurements.js' %}"></script>
+    <script src="{% static 'js/session-timeout.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-enhanced.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-fixes.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-canvas-fix.js' %}"></script>
     <link href="{% static 'css/dicom-viewer-buttons.css' %}" rel="stylesheet">
     <link href="{% static 'css/dicom-viewer-fixes.css' %}" rel="stylesheet">
     <link href="{% static 'css/high-quality-medical-imaging.css' %}" rel="stylesheet">
@@ -5029,5 +5038,6 @@
     
     <!-- DICOM Parser Library -->
     <script src="{% static 'js/vendor/dicomParser.min.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-keyboard-shortcuts.js' %}"></script>
 </body>
 </html>
