@@ -197,11 +197,43 @@ def _get_mpr_volume_for_series(series):
 
 @login_required
 def viewer(request):
-    """Complete professional DICOM viewer with MPR, 3D reconstruction, and all medical imaging tools."""
+    """Complete professional DICOM viewer with MPR, 3D reconstruction, and all medical imaging tools - Masterpiece Edition."""
+    user = request.user
+    
+    # Get study parameter and validate
+    study_id = request.GET.get('study', '')
+    initial_study = None
+    
+    if study_id:
+        try:
+            initial_study = Study.objects.exclude(
+                patient__patient_id__startswith='TEMP_'
+            ).exclude(accession_number__startswith='TEMP_').get(id=study_id)
+            
+            # Check facility permissions
+            if user.is_facility_user() and getattr(user, 'facility', None):
+                if initial_study.facility != user.facility:
+                    initial_study = None
+        except (Study.DoesNotExist, ValueError):
+            initial_study = None
+    
+    # Get recent studies for quick access - exclude temp studies
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        recent_studies = Study.objects.filter(facility=user.facility).exclude(
+            patient__patient_id__startswith='TEMP_'
+        ).exclude(accession_number__startswith='TEMP_').order_by('-study_date')[:10]
+    else:
+        recent_studies = Study.objects.all().exclude(
+            patient__patient_id__startswith='TEMP_'
+        ).exclude(accession_number__startswith='TEMP_').order_by('-study_date')[:10]
+    
     context = {
-        'study_id': request.GET.get('study', ''),
+        'study_id': study_id,
         'series_id': request.GET.get('series', ''),
-        'current_date': timezone.now().strftime('%Y-%m-%d')
+        'current_date': timezone.now().strftime('%Y-%m-%d'),
+        'user': user,
+        'initial_study': initial_study,
+        'recent_studies': recent_studies,
     }
     return render(request, 'dicom_viewer/viewer.html', context)
 
@@ -2466,22 +2498,60 @@ def web_index(request):
 
 @login_required
 def web_viewer(request):
-    """Render the web viewer page. Expects ?study_id in query."""
+    """Render the masterpiece web viewer page. Expects ?study_id in query."""
+    user = request.user
+    
+    # Get study parameter and validate
+    study_id = request.GET.get('study_id', '')
+    initial_study = None
+    
     # If an admin/radiologist opens a specific study, mark it in_progress
     try:
-        study_id_param = request.GET.get('study_id')
-        if study_id_param and hasattr(request.user, 'can_edit_reports') and request.user.can_edit_reports():
+        if study_id and hasattr(request.user, 'can_edit_reports') and request.user.can_edit_reports():
             try:
-                study = get_object_or_404(Study, id=int(study_id_param))
+                study = get_object_or_404(Study, id=int(study_id))
                 # Only update if not already completed/cancelled
                 if study.status in ['scheduled', 'suspended']:
                     study.status = 'in_progress'
                     study.save(update_fields=['status'])
+                initial_study = study
             except Exception:
                 pass
     except Exception:
         pass
-    return render(request, 'dicom_viewer/base.html')
+    
+    if study_id and not initial_study:
+        try:
+            initial_study = Study.objects.exclude(
+                patient__patient_id__startswith='TEMP_'
+            ).exclude(accession_number__startswith='TEMP_').get(id=study_id)
+            
+            # Check facility permissions
+            if user.is_facility_user() and getattr(user, 'facility', None):
+                if initial_study.facility != user.facility:
+                    initial_study = None
+        except (Study.DoesNotExist, ValueError):
+            initial_study = None
+    
+    # Get recent studies for quick access - exclude temp studies
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        recent_studies = Study.objects.filter(facility=user.facility).exclude(
+            patient__patient_id__startswith='TEMP_'
+        ).exclude(accession_number__startswith='TEMP_').order_by('-study_date')[:10]
+    else:
+        recent_studies = Study.objects.all().exclude(
+            patient__patient_id__startswith='TEMP_'
+        ).exclude(accession_number__startswith='TEMP_').order_by('-study_date')[:10]
+    
+    context = {
+        'study_id': study_id,
+        'series_id': request.GET.get('series', ''),
+        'current_date': timezone.now().strftime('%Y-%m-%d'),
+        'user': user,
+        'initial_study': initial_study,
+        'recent_studies': recent_studies,
+    }
+    return render(request, 'dicom_viewer/base.html', context)
 
 
 

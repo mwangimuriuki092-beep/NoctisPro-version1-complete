@@ -8,6 +8,26 @@ Specially enhanced for X-ray, CT, MRI, and other medical imaging modalities
 import sys
 import os
 import argparse
+
+# Add Django project to path for masterpiece utilities
+django_project_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if django_project_path not in sys.path:
+    sys.path.insert(0, django_project_path)
+
+try:
+    # Import masterpiece utilities for enhanced processing
+    from dicom_viewer.masterpiece_utils import (
+        MasterpieceDicomProcessor, MasterpieceMPRProcessor, 
+        MasterpieceMIPProcessor, Masterpiece3DProcessor,
+        MasterpieceVolumeBuilder, MasterpieceMeasurementProcessor,
+        MasterpieceImageExporter
+    )
+    MASTERPIECE_UTILS_AVAILABLE = True
+    print("✅ Masterpiece utilities loaded successfully")
+except ImportError as e:
+    MASTERPIECE_UTILS_AVAILABLE = False
+    print(f"⚠️  Masterpiece utilities not available: {e}")
+
 import numpy as np
 import pydicom
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
@@ -140,7 +160,7 @@ class DicomViewer(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Professional DICOM Viewer - Medical Imaging Excellence")
+        self.setWindowTitle("Professional DICOM Viewer - Masterpiece Edition")
         self.setGeometry(50, 50, 1600, 1000)
         
         # Professional dark theme optimized for medical imaging

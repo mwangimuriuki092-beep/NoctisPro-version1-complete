@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Professional DICOM Viewer - Medical Imaging Excellence
+Professional DICOM Viewer - Masterpiece Edition
 Enhanced version with systematic improvements for diagnostic quality
 Optimized for X-ray, CT, MRI, and other medical imaging modalities
+Includes masterpiece-level 3D reconstruction and advanced processing
 """
 
 import sys
@@ -13,6 +14,25 @@ import logging
 # Configure logging for professional debugging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Add Django project to path for masterpiece utilities
+django_project_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if django_project_path not in sys.path:
+    sys.path.insert(0, django_project_path)
+
+try:
+    # Import masterpiece utilities for enhanced processing
+    from dicom_viewer.masterpiece_utils import (
+        MasterpieceDicomProcessor, MasterpieceMPRProcessor, 
+        MasterpieceMIPProcessor, Masterpiece3DProcessor,
+        MasterpieceVolumeBuilder, MasterpieceMeasurementProcessor,
+        MasterpieceImageExporter
+    )
+    MASTERPIECE_UTILS_AVAILABLE = True
+    logger.info("✅ Masterpiece utilities loaded successfully")
+except ImportError as e:
+    MASTERPIECE_UTILS_AVAILABLE = False
+    logger.warning(f"⚠️  Masterpiece utilities not available: {e}")
 
 try:
     import numpy as np
@@ -256,11 +276,11 @@ else:
 
 
 class ProfessionalDicomViewer(QMainWindow):
-    """Professional DICOM Viewer - Medical Imaging Excellence"""
+    """Professional DICOM Viewer - Masterpiece Edition"""
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Professional DICOM Viewer - Medical Imaging Excellence")
+        self.setWindowTitle("Professional DICOM Viewer - Masterpiece Edition")
         self.setGeometry(50, 50, 1600, 1000)
         
         # Professional dark theme optimized for medical imaging
