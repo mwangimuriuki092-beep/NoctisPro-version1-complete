@@ -832,9 +832,42 @@
                 <h4 class="text-light mb-2">Upload Successful!</h4>
                 <p class="text-secondary mb-3">Your DICOM studies have been uploaded successfully.</p>
                 <div id="uploadSummary" class="text-light mb-3"></div>
-                <button type="button" class="btn-control primary" onclick="redirectToDashboard()">
-                    <i class="fas fa-arrow-left me-2"></i>Return to Worklist
-                </button>
+                
+                <!-- AI Analysis Section -->
+                <div id="aiAnalysisSection" class="ai-analysis-section" style="margin: 20px 0; padding: 20px; background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 255, 136, 0.05) 100%); border: 1px solid var(--accent-color); border-radius: 12px;">
+                    <h5 class="text-light mb-2"><i class="fas fa-brain me-2"></i>AI Analysis Available</h5>
+                    <p class="text-secondary mb-3">Start automated AI analysis on your uploaded studies for instant insights.</p>
+                    <div class="ai-controls" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <button type="button" class="btn-control primary" id="startAiAnalysisBtn">
+                            <i class="fas fa-robot me-2"></i>Start AI Analysis
+                        </button>
+                        <button type="button" class="btn-control" id="skipAnalysisBtn">
+                            <i class="fas fa-forward me-2"></i>Skip Analysis
+                        </button>
+                    </div>
+                    <div id="aiAnalysisProgress" style="display: none; margin-top: 15px;">
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" 
+                                 style="width: 0%" 
+                                 id="aiProgressBar">
+                            </div>
+                        </div>
+                        <div id="aiProgressText" class="text-secondary text-center" style="font-size: 0.9rem;"></div>
+                    </div>
+                    <div id="aiAnalysisResults" style="display: none; margin-top: 15px;">
+                        <div id="aiResultsContent"></div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                    <button type="button" class="btn-control primary" onclick="redirectToDashboard()">
+                        <i class="fas fa-arrow-left me-2"></i>Return to Worklist
+                    </button>
+                    <button type="button" class="btn-control" id="viewInDicomViewer" style="display: none;">
+                        <i class="fas fa-eye me-2"></i>Open in DICOM Viewer
+                    </button>
+                </div>
             </div>
             
             <div class="upload-actions" id="uploadActions" style="display: none;">
@@ -1495,6 +1528,254 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = '{% url "worklist:dashboard" %}';
         }, 1500);
     };
+
+    // AI Analysis Integration
+    let aiAnalysisInProgress = false;
+    let currentAnalysisIds = [];
+
+    function initializeAiAnalysis() {
+        const startAiBtn = document.getElementById('startAiAnalysisBtn');
+        const skipAiBtn = document.getElementById('skipAnalysisBtn');
+        const viewDicomBtn = document.getElementById('viewInDicomViewer');
+
+        if (startAiBtn) {
+            startAiBtn.addEventListener('click', startAiAnalysis);
+        }
+        if (skipAiBtn) {
+            skipAiBtn.addEventListener('click', skipAiAnalysis);
+        }
+        if (viewDicomBtn && createdStudyIds.length > 0) {
+            viewDicomBtn.style.display = 'inline-flex';
+            viewDicomBtn.onclick = function() {
+                window.location.href = '/dicom-viewer/?study=' + createdStudyIds[0];
+            };
+        }
+    }
+
+    async function startAiAnalysis() {
+        if (aiAnalysisInProgress || createdStudyIds.length === 0) return;
+        
+        console.log('Starting AI analysis for studies:', createdStudyIds);
+        aiAnalysisInProgress = true;
+        
+        // Update UI
+        const startBtn = document.getElementById('startAiAnalysisBtn');
+        const skipBtn = document.getElementById('skipAnalysisBtn');
+        const progressDiv = document.getElementById('aiAnalysisProgress');
+        const progressBar = document.getElementById('aiProgressBar');
+        const progressText = document.getElementById('aiProgressText');
+        
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Starting Analysis...';
+        skipBtn.style.display = 'none';
+        progressDiv.style.display = 'block';
+        progressText.textContent = 'Initializing AI analysis...';
+        
+        try {
+            // Start AI analysis for each uploaded study
+            const analysisPromises = createdStudyIds.map(studyId => startStudyAnalysis(studyId));
+            const analysisResults = await Promise.all(analysisPromises);
+            
+            // Track all analysis IDs
+            currentAnalysisIds = analysisResults
+                .filter(result => result.success)
+                .flatMap(result => result.analysis_ids || []);
+            
+            if (currentAnalysisIds.length > 0) {
+                progressText.textContent = `AI analysis started for ${currentAnalysisIds.length} model(s)...`;
+                updateAiProgress(10);
+                
+                // Monitor progress
+                monitorAiAnalysisProgress();
+            } else {
+                throw new Error('No AI analyses could be started');
+            }
+            
+        } catch (error) {
+            console.error('AI analysis failed:', error);
+            showAiAnalysisError(error.message);
+        }
+    }
+
+    async function getAvailableAiModels(studyId) {
+        // For now, return default model IDs - could be enhanced to query available models
+        return ['1']; // Default to first model
+    }
+
+    async function startStudyAnalysis(studyId) {
+        const url = `/ai/study/${studyId}/analyze/`;
+        const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': token,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: new URLSearchParams({
+                    'ai_models': await getAvailableAiModels(studyId),
+                    'priority': 'high'
+                })
+            });
+            
+            const data = await response.json();
+            console.log('AI analysis response for study', studyId, ':', data);
+            return data;
+            
+        } catch (error) {
+            console.error('Failed to start AI analysis for study', studyId, ':', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async function monitorAiAnalysisProgress() {
+        const maxAttempts = 60; // 5 minutes max
+        let attempts = 0;
+        let completedAnalyses = 0;
+        
+        const checkProgress = async () => {
+            if (attempts >= maxAttempts) {
+                showAiAnalysisError('Analysis timeout - please check AI dashboard for results');
+                return;
+            }
+            
+            attempts++;
+            let allCompleted = true;
+            let hasResults = false;
+            const results = [];
+            
+            for (const analysisId of currentAnalysisIds) {
+                try {
+                    const response = await fetch(`/ai/api/analysis/${analysisId}/status/`);
+                    const data = await response.json();
+                    
+                    if (data.status === 'completed') {
+                        if (!results.find(r => r.id === analysisId)) {
+                            results.push(data);
+                            completedAnalyses++;
+                        }
+                        hasResults = true;
+                    } else if (data.status === 'failed') {
+                        console.error('Analysis failed:', data.error_message);
+                    } else {
+                        allCompleted = false;
+                    }
+                } catch (error) {
+                    console.error('Error checking analysis status:', error);
+                    allCompleted = false;
+                }
+            }
+            
+            // Update progress
+            const progress = (completedAnalyses / currentAnalysisIds.length) * 100;
+            updateAiProgress(Math.max(20, progress));
+            
+            const progressText = document.getElementById('aiProgressText');
+            if (allCompleted) {
+                progressText.textContent = 'AI analysis completed!';
+                updateAiProgress(100);
+                showAiAnalysisResults(results);
+                aiAnalysisInProgress = false;
+            } else {
+                progressText.textContent = `Analyzing... (${completedAnalyses}/${currentAnalysisIds.length} completed)`;
+                setTimeout(checkProgress, 5000); // Check every 5 seconds
+            }
+        };
+        
+        setTimeout(checkProgress, 2000); // Start checking after 2 seconds
+    }
+
+    function updateAiProgress(percentage) {
+        const progressBar = document.getElementById('aiProgressBar');
+        if (progressBar) {
+            progressBar.style.width = percentage + '%';
+        }
+    }
+
+    function showAiAnalysisResults(results) {
+        const resultsDiv = document.getElementById('aiAnalysisResults');
+        const resultsContent = document.getElementById('aiResultsContent');
+        const startBtn = document.getElementById('startAiAnalysisBtn');
+        
+        if (!results || results.length === 0) {
+            resultsContent.innerHTML = '<p class="text-warning">No analysis results available.</p>';
+        } else {
+            let html = '<div class="ai-results-summary">';
+            html += '<h6 class="text-light mb-2"><i class="fas fa-check-circle text-success me-2"></i>Analysis Complete</h6>';
+            
+            results.forEach((result, index) => {
+                const confidence = result.confidence_score ? (result.confidence_score * 100).toFixed(1) : 'N/A';
+                html += `
+                    <div class="ai-result-item" style="background: rgba(255,255,255,0.05); padding: 10px; margin: 5px 0; border-radius: 6px;">
+                        <strong>${result.ai_model.name}</strong> - Confidence: ${confidence}%
+                        ${result.findings ? `<br><small class="text-secondary">${result.findings.substring(0, 100)}...</small>` : ''}
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            html += '<div style="margin-top: 10px; text-align: center;">';
+            html += '<button type="button" class="btn-control" onclick="window.location.href=\'/ai/\'">';
+            html += '<i class="fas fa-chart-line me-2"></i>View Full AI Report</button>';
+            html += '</div>';
+            
+            resultsContent.innerHTML = html;
+        }
+        
+        resultsDiv.style.display = 'block';
+        startBtn.innerHTML = '<i class="fas fa-check me-2"></i>Analysis Complete';
+    }
+
+    function showAiAnalysisError(message) {
+        const resultsDiv = document.getElementById('aiAnalysisResults');
+        const resultsContent = document.getElementById('aiResultsContent');
+        const startBtn = document.getElementById('startAiAnalysisBtn');
+        const progressDiv = document.getElementById('aiAnalysisProgress');
+        
+        resultsContent.innerHTML = `
+            <div class="ai-error" style="background: rgba(255, 68, 68, 0.1); border: 1px solid #ff4444; padding: 10px; border-radius: 6px;">
+                <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                <strong>Analysis Error:</strong> ${message}
+            </div>
+        `;
+        
+        resultsDiv.style.display = 'block';
+        progressDiv.style.display = 'none';
+        startBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Analysis Failed';
+        startBtn.disabled = false;
+        aiAnalysisInProgress = false;
+    }
+
+    function skipAiAnalysis() {
+        const aiSection = document.getElementById('aiAnalysisSection');
+        if (aiSection) {
+            aiSection.style.display = 'none';
+        }
+    }
+
+    // Initialize AI analysis when upload is successful
+    const originalUploadComplete = window.uploadFilesInChunks;
+    if (typeof originalUploadComplete === 'function') {
+        // AI analysis will be initialized when upload success is shown
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                    const uploadSuccess = document.getElementById('uploadSuccess');
+                    if (uploadSuccess && uploadSuccess.style.display !== 'none') {
+                        initializeAiAnalysis();
+                        observer.disconnect();
+                    }
+                }
+            });
+        });
+        
+        const uploadSuccess = document.getElementById('uploadSuccess');
+        if (uploadSuccess) {
+            observer.observe(uploadSuccess, { attributes: true });
+        }
+    }
 });
 </script>
 {% endblock %}
