@@ -339,22 +339,22 @@ class DicomViewerEnhanced {
                 
                 // Define presets - Enhanced with X-ray specific settings
                 const presets = {
-                    // CT Presets
-                    lung: { windowWidth: 1500, windowCenter: -600 },
-                    bone: { windowWidth: 2000, windowCenter: 300 },
-                    soft: { windowWidth: 400, windowCenter: 40 },
-                    brain: { windowWidth: 80, windowCenter: 40 },
-                    liver: { windowWidth: 150, windowCenter: 30 },
-                    cine: { windowWidth: 600, windowCenter: 200 },
+                    // CT Presets - Enhanced for better visibility
+                    lung: { windowWidth: 1800, windowCenter: -500 },
+                    bone: { windowWidth: 3000, windowCenter: 500 },
+                    soft: { windowWidth: 600, windowCenter: 60 },
+                    brain: { windowWidth: 120, windowCenter: 60 },
+                    liver: { windowWidth: 200, windowCenter: 50 },
+                    cine: { windowWidth: 800, windowCenter: 250 },
                     
-                    // X-ray Presets - Optimized for projection radiography
-                    'chest x-ray': { windowWidth: 2500, windowCenter: 500 },
-                    'bone x-ray': { windowWidth: 4000, windowCenter: 2000 },
-                    'soft x-ray': { windowWidth: 600, windowCenter: 100 },
-                    'extremity': { windowWidth: 3500, windowCenter: 1500 },
-                    'spine': { windowWidth: 3000, windowCenter: 1000 },
-                    'abdomen': { windowWidth: 1500, windowCenter: 200 },
-                    'pediatric': { windowWidth: 2000, windowCenter: 300 },
+                    // X-ray Presets - Enhanced for better visibility and contrast
+                    'chest x-ray': { windowWidth: 3500, windowCenter: 800 },
+                    'bone x-ray': { windowWidth: 5000, windowCenter: 2500 },
+                    'soft x-ray': { windowWidth: 1000, windowCenter: 200 },
+                    'extremity': { windowWidth: 4500, windowCenter: 2000 },
+                    'spine': { windowWidth: 4000, windowCenter: 1500 },
+                    'abdomen': { windowWidth: 2500, windowCenter: 400 },
+                    'pediatric': { windowWidth: 3000, windowCenter: 500 },
                     
                     // Additional useful presets
                     'auto': { windowWidth: 'auto', windowCenter: 'auto' }, // Will trigger auto-windowing

@@ -1,0 +1,340 @@
+/**
+ * DICOM X-Ray Enhancement Styles
+ * Improved styling for X-ray image viewing and enhancement controls
+ */
+
+/* X-Ray Enhancement Panel */
+.xray-enhancement-panel {
+    background: rgba(20, 25, 35, 0.95);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.xray-enhancement-panel h3 {
+    color: #00d4ff;
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.xray-enhancement-panel h3 i {
+    font-size: 16px;
+}
+
+/* Enhancement Controls */
+.enhancement-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.enhancement-level {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.enhancement-level label {
+    color: #b0b8c1;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.enhancement-level select {
+    background: rgba(30, 35, 45, 0.9);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 4px;
+    color: #ffffff;
+    padding: 6px 8px;
+    font-size: 12px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.enhancement-level select:focus {
+    border-color: #00d4ff;
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+}
+
+.enhancement-level select option {
+    background: #1e232d;
+    color: #ffffff;
+}
+
+/* Enhancement Buttons */
+.enhancement-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.enhancement-buttons .btn {
+    flex: 1;
+    padding: 6px 12px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.enhancement-buttons .btn-primary {
+    background: linear-gradient(135deg, #00d4ff, #0099cc);
+    color: #ffffff;
+}
+
+.enhancement-buttons .btn-primary:hover {
+    background: linear-gradient(135deg, #00b8e6, #007aa3);
+    transform: translateY(-1px);
+}
+
+.enhancement-buttons .btn-secondary {
+    background: rgba(60, 70, 80, 0.8);
+    color: #b0b8c1;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.enhancement-buttons .btn-secondary:hover {
+    background: rgba(70, 80, 90, 0.9);
+    color: #ffffff;
+}
+
+/* X-Ray Presets */
+.xray-presets {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 12px;
+}
+
+.xray-presets h4 {
+    color: #b0b8c1;
+    font-size: 12px;
+    font-weight: 500;
+    margin: 0 0 8px 0;
+}
+
+.preset-buttons-xray {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.preset-buttons-xray .btn {
+    background: rgba(40, 50, 60, 0.8);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 4px;
+    color: #b0b8c1;
+    padding: 6px 8px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-buttons-xray .btn:hover {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: #00d4ff;
+    color: #00d4ff;
+    transform: translateY(-1px);
+}
+
+/* Checkbox styling */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #b0b8c1;
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(0, 212, 255, 0.3);
+    border-radius: 3px;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.checkbox-label input[type="checkbox"]:checked {
+    background: #00d4ff;
+    border-color: #00d4ff;
+}
+
+.checkbox-label input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: -2px;
+    left: 2px;
+    color: #000;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.checkbox-label input[type="checkbox"]:hover {
+    border-color: #00d4ff;
+}
+
+/* Enhanced canvas styling for X-ray viewing */
+#dicom-canvas,
+.dicom-canvas {
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+    background: #000000;
+    cursor: crosshair;
+}
+
+/* Improved image container for X-ray viewing */
+.image-container,
+#imageContainer {
+    background: #000000;
+    position: relative;
+    overflow: hidden;
+}
+
+/* X-ray specific viewport enhancements */
+.xray-enhanced {
+    filter: contrast(1.8) brightness(2.2) saturate(0.75);
+    image-rendering: crisp-edges;
+}
+
+.xray-enhanced canvas {
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .preset-buttons-xray {
+        grid-template-columns: 1fr;
+    }
+    
+    .enhancement-buttons {
+        flex-direction: column;
+    }
+    
+    .xray-enhancement-panel {
+        padding: 12px;
+    }
+}
+
+/* Animation for enhancement application */
+@keyframes enhanceFlash {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+.enhancement-applying {
+    animation: enhanceFlash 0.3s ease-in-out;
+}
+
+/* Tooltip styles for enhancement controls */
+.enhancement-controls [title] {
+    position: relative;
+}
+
+.enhancement-controls [title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.enhancement-controls [title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 95%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+/* Status indicators */
+.enhancement-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #b0b8c1;
+    margin-top: 8px;
+}
+
+.enhancement-status.active {
+    color: #00d4ff;
+}
+
+.enhancement-status .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #666;
+}
+
+.enhancement-status.active .status-dot {
+    background: #00d4ff;
+    box-shadow: 0 0 4px rgba(0, 212, 255, 0.5);
+}
+
+/* Quick action buttons */
+.quick-xray-actions {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 1000;
+}
+
+.quick-xray-actions .btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 212, 255, 0.9);
+    color: #ffffff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.quick-xray-actions .btn:hover {
+    background: #00d4ff;
+    transform: scale(1.1);
+}
+
+.quick-xray-actions .btn i {
+    font-size: 16px;
+}
