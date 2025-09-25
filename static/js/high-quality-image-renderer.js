@@ -72,7 +72,7 @@ class HighQualityImageRenderer {
         const canvasAspect = displayWidth / displayHeight;
         
         let drawWidth, drawHeight, drawX, drawY;
-        const fitScale = 0.80; // Scale factor to ensure image fits with margins
+        const fitScale = 0.60; // Scale factor to ensure image fits with margins (reduced for smaller display)
         
         if (imgAspect > canvasAspect) {
             drawWidth = displayWidth * fitScale;
@@ -133,30 +133,30 @@ class HighQualityImageRenderer {
             case 'DX':
             case 'CR':
             case 'MG':
-                // Digital Radiography, Computed Radiography, Mammography - Match reference image
-                this.ctx.filter = 'contrast(1.15) brightness(0.92) saturate(0.85)';
+                // Digital Radiography, Computed Radiography, Mammography - Brighter display
+                this.ctx.filter = 'contrast(1.15) brightness(1.1) saturate(0.85)';
                 break;
             case 'CT':
-                // Computed Tomography - Match reference characteristics
-                this.ctx.filter = 'contrast(1.12) brightness(0.94)';
+                // Computed Tomography - Brighter display
+                this.ctx.filter = 'contrast(1.12) brightness(1.1)';
                 break;
             case 'MR':
             case 'MRI':
-                // Magnetic Resonance - Match reference imaging
-                this.ctx.filter = 'contrast(1.10) brightness(0.93) saturate(0.95)';
+                // Magnetic Resonance - Brighter display
+                this.ctx.filter = 'contrast(1.10) brightness(1.1) saturate(0.95)';
                 break;
             case 'US':
-                // Ultrasound - Match reference brightness
-                this.ctx.filter = 'contrast(1.08) brightness(0.95)';
+                // Ultrasound - Brighter display
+                this.ctx.filter = 'contrast(1.08) brightness(1.1)';
                 break;
             case 'XA':
             case 'RF':
-                // X-Ray Angiography, Radiofluoroscopy - Match reference medical display
-                this.ctx.filter = 'contrast(1.16) brightness(0.91)';
+                // X-Ray Angiography, Radiofluoroscopy - Brighter display
+                this.ctx.filter = 'contrast(1.16) brightness(1.1)';
                 break;
             default:
-                // Default medical imaging - Match reference image
-                this.ctx.filter = 'contrast(1.12) brightness(0.93)';
+                // Default medical imaging - Brighter display
+                this.ctx.filter = 'contrast(1.12) brightness(1.1)';
         }
     }
 
