@@ -336,11 +336,7 @@ class DicomCanvasFix {
             // Store current image
             this.currentImage = image;
             
-            // If transform controls exist, use them for rendering
-            if (window.dicomTransformControls) {
-                window.dicomTransformControls.setImage(image);
-                return;
-            }
+            // Use basic display for all images
             
             // Fallback to basic display
             this.basicDisplayImage(image);
