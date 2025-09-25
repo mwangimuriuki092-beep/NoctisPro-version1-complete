@@ -1391,21 +1391,28 @@
     <script src="{% static 'js/dicom-viewer-enhanced.js' %}" type="text/javascript"></script>
 
     <script>
-        // Global variables - Based on PyQt implementation
+        // Global variables - Enhanced to match HTML file approach
         let currentStudy = null;
         let currentSeries = null;
+        let currentImageData = null; // Store current DICOM pixel data
         let images = [];
         let currentImageIndex = 0;
         let dicomData = [];
         
-        // Display parameters - Professional grade from PyQt
+        // Display parameters - HTML file style
         let windowWidth = 400;
         let windowLevel = 40;
         let defaultWindowWidth = 400;
         let defaultWindowLevel = 40;
-        let zoomFactor = 0.8; // Start with better fit for medical images
+        
+        // Zoom and transformation variables - HTML file style
+        let zoom = 1.0;
+        let zoomFactor = 0.8; // Keep for backward compatibility
         let panX = 0;
         let panY = 0;
+        let rotation = 0;
+        let flipH = false;
+        let flipV = false;
         let inverted = false;
         let showCrosshair = false;
         
@@ -1627,13 +1634,31 @@
         function updateWindowWidth(value) {
             windowWidth = parseInt(value);
             document.getElementById('wwValue').textContent = windowWidth;
-            updateImageDisplay();
+            
+            // If we have pixel data, re-render immediately using HTML-style approach
+            if (currentImageData) {
+                const canvas = document.getElementById('dicomCanvas');
+                if (canvas) {
+                    renderDicomImageData(currentImageData, canvas);
+                }
+            } else {
+                updateImageDisplay();
+            }
         }
 
         function updateWindowLevel(value) {
             windowLevel = parseInt(value);
             document.getElementById('wlValue').textContent = windowLevel;
-            updateImageDisplay();
+            
+            // If we have pixel data, re-render immediately using HTML-style approach
+            if (currentImageData) {
+                const canvas = document.getElementById('dicomCanvas');
+                if (canvas) {
+                    renderDicomImageData(currentImageData, canvas);
+                }
+            } else {
+                updateImageDisplay();
+            }
         }
 
         function applyPreset(preset) {
@@ -1646,7 +1671,16 @@
                 document.getElementById('wwValue').textContent = windowWidth;
                 document.getElementById('wlValue').textContent = windowLevel;
                 
-                updateImageDisplay();
+                // If we have pixel data, re-render immediately using HTML-style approach
+                if (currentImageData) {
+                    const canvas = document.getElementById('dicomCanvas');
+                    if (canvas) {
+                        renderDicomImageData(currentImageData, canvas);
+                    }
+                } else {
+                    updateImageDisplay();
+                }
+                
                 showToast(`Applied ${preset} preset`, 'success');
             }
         }
@@ -1661,7 +1695,15 @@
             document.getElementById('wwValue').textContent = Math.round(windowWidth);
             document.getElementById('wlValue').textContent = Math.round(windowLevel);
             
-            updateImageDisplay();
+            // If we have pixel data, re-render immediately using HTML-style approach
+            if (currentImageData) {
+                const canvas = document.getElementById('dicomCanvas');
+                if (canvas) {
+                    renderDicomImageData(currentImageData, canvas);
+                }
+            } else {
+                updateImageDisplay();
+            }
         }
 
         // Zoom Management
@@ -1757,11 +1799,28 @@
                 // Show loading
                 showLoading('Processing image...');
                 
-                // Get processed image with current window/level settings
-                const url = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                // Get both processed image and raw pixel data for HTML-style rendering
+                const displayUrl = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                const pixelUrl = `/dicom-viewer/api/image/${currentImage.id}/data/`;
                 
-                const response = await fetch(url);
-                const data = await response.json();
+                const [displayResponse, pixelResponse] = await Promise.all([
+                    fetch(displayUrl),
+                    fetch(pixelUrl)
+                ]);
+                
+                const data = await displayResponse.json();
+                
+                // Try to get pixel data for HTML-style rendering
+                try {
+                    const pixelData = await pixelResponse.json();
+                    if (pixelData && pixelData.pixel_data) {
+                        currentImageData = pixelData; // Store for HTML-style rendering
+                        console.log('Pixel data loaded for HTML-style rendering');
+                    }
+                } catch (pixelError) {
+                    console.warn('Could not load pixel data, using image element rendering:', pixelError);
+                    currentImageData = null;
+                }
                 
                 if (data.image_data) {
                     const dicomImage = document.getElementById('dicomImage');
@@ -2425,60 +2484,162 @@
             });
         }
 
-        // Enhanced High-Quality Canvas Rendering Function for Medical Images
+        // Enhanced DICOM Canvas Rendering Function - HTML File Style
         function renderImageToCanvas(imgElement, canvas, modality) {
             if (!imgElement || !canvas || !imgElement.complete) return;
             
+            // Try to get pixel data from the image element's data attribute or from current image data
+            let pixelData = null;
+            let imageWidth = imgElement.naturalWidth;
+            let imageHeight = imgElement.naturalHeight;
+            let windowWidth = 400;
+            let windowLevel = 40;
+            
+            // Check if we have DICOM pixel data available
+            if (currentImageData && currentImageData.pixel_data) {
+                pixelData = currentImageData.pixel_data;
+                imageWidth = currentImageData.columns || currentImageData.width || imageWidth;
+                imageHeight = currentImageData.rows || currentImageData.height || imageHeight;
+                windowWidth = currentImageData.window_width || windowWidth;
+                windowLevel = currentImageData.window_center || windowLevel;
+            }
+            
+            if (pixelData) {
+                // Use HTML file's direct pixel manipulation approach
+                renderDicomImageData({
+                    pixel_data: pixelData,
+                    columns: imageWidth,
+                    rows: imageHeight,
+                    window_width: windowWidth,
+                    window_center: windowLevel
+                }, canvas);
+            } else {
+                // Fallback to image element rendering for non-DICOM images
+                renderImageElementToCanvas(imgElement, canvas, modality);
+            }
+        }
+        
+        // HTML File Style DICOM Rendering - EXACT SAME AS HTML FILE
+        function renderDicomImageData(imageData, canvas) {
+            if (!imageData || !imageData.pixel_data || !canvas) {
+                console.error('Invalid image data or canvas');
+                return false;
+            }
+
             const ctx = canvas.getContext('2d');
             
-            // Get device pixel ratio for high-DPI displays
-            const dpr = window.devicePixelRatio || 1;
+            // Extract image dimensions
+            const width = imageData.columns || imageData.width || 512;
+            const height = imageData.rows || imageData.height || 512;
+            const pixelData = imageData.pixel_data;
+
+            // Update window/level from DICOM data - SAME AS HTML FILE
+            const ww = imageData.window_width || windowWidth;
+            const wl = imageData.window_center || windowLevel;
+
+            // Create ImageData from pixel array - SAME AS HTML FILE
+            const pixels = new Uint8ClampedArray(pixelData.length * 4);
+            
+            for (let i = 0; i < pixelData.length; i++) {
+                let value = pixelData[i];
+                
+                // Apply window/level - SAME AS HTML FILE
+                value = applyWindowing(value, ww, wl);
+                
+                // Apply inversion if needed - SAME AS HTML FILE
+                if (inverted) {
+                    value = 255 - value;
+                }
+                
+                pixels[i * 4] = value;     // R
+                pixels[i * 4 + 1] = value; // G  
+                pixels[i * 4 + 2] = value; // B
+                pixels[i * 4 + 3] = 255;   // A
+            }
+            
+            const imgData = new ImageData(pixels, width, height);
+            
+            // Set canvas size to match container
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            // Clear and draw - SAME AS HTML FILE METHOD
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Enhanced rendering with transformations (matching HTML file)
+            if (zoom !== 1.0 || panX !== 0 || panY !== 0 || rotation !== 0 || flipH || flipV) {
+                ctx.save();
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.scale(zoom, zoom);
+                ctx.translate(panX, panY);
+                
+                if (rotation !== 0) {
+                    ctx.rotate(rotation * Math.PI / 180);
+                }
+                if (flipH || flipV) {
+                    ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+                }
+                
+                ctx.translate(-width / 2, -height / 2);
+                ctx.putImageData(imgData, 0, 0);
+                ctx.restore();
+            } else {
+                // Simple rendering - center the image on canvas
+                const x = (canvas.width - width) / 2;
+                const y = (canvas.height - height) / 2;
+                ctx.putImageData(imgData, x, y);
+            }
+            
+            // Draw overlays (measurements, annotations, etc.)
+            drawMeasurements();
+            drawAnnotations();
+            if (showCrosshair) {
+                drawCrosshair();
+            }
+            
+            console.log('DICOM image rendered using HTML-style direct pixel manipulation');
+            return true;
+        }
+        
+        // Apply windowing - EXACT SAME AS HTML FILE
+        function applyWindowing(pixelValue, ww, wl) {
+            const minVal = wl - ww / 2;
+            const maxVal = wl + ww / 2;
+            
+            if (pixelValue <= minVal) return 0;
+            if (pixelValue >= maxVal) return 255;
+            
+            return Math.round(((pixelValue - minVal) / ww) * 255);
+        }
+        
+        // Fallback rendering for non-DICOM images
+        function renderImageElementToCanvas(imgElement, canvas, modality) {
+            if (!imgElement || !canvas || !imgElement.complete) return;
+            
+            const ctx = canvas.getContext('2d');
             
             // Get display size
             const rect = canvas.getBoundingClientRect();
             const displayWidth = rect.width;
             const displayHeight = rect.height;
             
-            // Set actual canvas size to device pixel ratio
-            canvas.width = displayWidth * dpr;
-            canvas.height = displayHeight * dpr;
-            
-            // Scale canvas back down using CSS
-            canvas.style.width = displayWidth + 'px';
-            canvas.style.height = displayHeight + 'px';
-            
-            // Scale the drawing context to match pixel ratio
-            ctx.scale(dpr, dpr);
-            
-            // Enable highest quality rendering for medical images
-            ctx.imageSmoothingEnabled = false;
-            ctx.imageSmoothingQuality = 'high';
+            // Set canvas size
+            canvas.width = displayWidth;
+            canvas.height = displayHeight;
             
             // Clear canvas with black background
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, displayWidth, displayHeight);
             
-            // Modality-specific rendering optimizations with increased brightness
-            if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
-                // For X-ray images, disable smoothing to preserve sharp edges
-                ctx.imageSmoothingEnabled = false;
-                ctx.filter = 'contrast(1.25) brightness(1.65) saturate(0.85)';
-            } else if (modality && ['CT'].includes(modality.toUpperCase())) {
-                // CT images with enhanced brightness
-                ctx.filter = 'contrast(1.20) brightness(1.60) saturate(0.90)';
-            } else {
-                // Default enhanced brightness for other modalities
-                ctx.filter = 'contrast(1.15) brightness(1.55) saturate(0.95)';
-            }
-            
-            // Calculate image display dimensions - show at actual size unless too large
+            // Calculate image display dimensions
             const maxWidth = displayWidth * 0.95;
             const maxHeight = displayHeight * 0.95;
             
             let drawWidth = imgElement.naturalWidth;
             let drawHeight = imgElement.naturalHeight;
             
-            // Only scale down if image is larger than canvas
+            // Scale to fit if needed
             if (drawWidth > maxWidth || drawHeight > maxHeight) {
                 const scaleX = maxWidth / drawWidth;
                 const scaleY = maxHeight / drawHeight;
@@ -2488,26 +2649,109 @@
                 drawHeight = drawHeight * scale;
             }
             
-            // Apply additional zoom if set
-            if (typeof zoomFactor !== 'undefined' && zoomFactor !== 1.0) {
-                const clampedZoom = Math.max(0.1, Math.min(5.0, zoomFactor));
-                drawWidth *= clampedZoom;
-                drawHeight *= clampedZoom;
-            }
-            
             // Center the image
             let drawX = (displayWidth - drawWidth) / 2;
             let drawY = (displayHeight - drawHeight) / 2;
             
-            // Apply pan offset if available
-            if (typeof panX !== 'undefined') drawX += panX;
-            if (typeof panY !== 'undefined') drawY += panY;
-            
-            // Draw image with high-quality interpolation
+            // Draw image
             ctx.drawImage(imgElement, drawX, drawY, drawWidth, drawHeight);
+        }
+        
+        // Overlay drawing functions - HTML file style
+        function drawMeasurements() {
+            if (!measurements || measurements.length === 0) return;
             
-            // Reset filter
-            ctx.filter = 'none';
+            const canvas = document.getElementById('dicomCanvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = '#ff0000';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            
+            measurements.forEach((measurement) => {
+                if (measurement.type === 'distance') {
+                    // Draw measurement line
+                    ctx.beginPath();
+                    ctx.moveTo(measurement.startX, measurement.startY);
+                    ctx.lineTo(measurement.endX, measurement.endY);
+                    ctx.stroke();
+                    
+                    // Draw measurement points
+                    ctx.fillStyle = '#ff0000';
+                    ctx.beginPath();
+                    ctx.arc(measurement.startX, measurement.startY, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(measurement.endX, measurement.endY, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    // Draw distance text
+                    const distance = calculateDistance(measurement);
+                    const midX = (measurement.startX + measurement.endX) / 2;
+                    const midY = (measurement.startY + measurement.endY) / 2;
+                    
+                    // Text background
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(midX - 30, midY - 20, 60, 16);
+                    
+                    // Text
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillText(distance.text, midX, midY - 8);
+                }
+            });
+        }
+        
+        function drawAnnotations() {
+            if (!annotations || annotations.length === 0) return;
+            
+            const canvas = document.getElementById('dicomCanvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            annotations.forEach(annotation => {
+                ctx.fillStyle = annotation.color || '#ffff00';
+                ctx.font = '14px Arial';
+                ctx.fillText(annotation.text, annotation.x, annotation.y);
+            });
+        }
+        
+        function drawCrosshair() {
+            const canvas = document.getElementById('dicomCanvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            ctx.lineTo(canvas.width, centerY);
+            ctx.moveTo(centerX, 0);
+            ctx.lineTo(centerX, canvas.height);
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
+        }
+        
+        function calculateDistance(measurement) {
+            const deltaX = measurement.endX - measurement.startX;
+            const deltaY = measurement.endY - measurement.startY;
+            const pixelDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            // For now, return pixel distance (could be enhanced with pixel spacing)
+            return {
+                pixels: Math.round(pixelDistance),
+                text: `${Math.round(pixelDistance)} px`
+            };
         }
 
         function loadFromExternalMedia() {
