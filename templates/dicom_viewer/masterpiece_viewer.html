@@ -9,14 +9,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     {% load static %}
-    <script src="{% static 'js/masterpiece_3d_reconstruction.js' %}"></script>
+    <!-- Core DICOM Viewer Scripts -->
     <script src="{% static 'js/vendor/dicomParser.min.js' %}"></script>
     <script src="{% static 'js/dicom-measurements.js' %}"></script>
-    <script src="{% static 'js/session-timeout.js' %}"></script>
     <script src="{% static 'js/dicom-viewer-enhanced.js' %}"></script>
-    <script src="{% static 'js/dicom-viewer-fixes.js' %}"></script>
-    <script src="{% static 'js/dicom-viewer-canvas-fix.js' %}"></script>
-    <script src="{% static 'js/dicom-loading-fix.js' %}"></script>
+    <script src="{% static 'js/masterpiece_3d_reconstruction.js' %}"></script>
+    <script src="{% static 'js/session-timeout.js' %}"></script>
     <style>
         :root {
             --primary-bg: #0a0a0a;

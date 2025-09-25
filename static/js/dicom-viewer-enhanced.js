@@ -896,6 +896,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Global function aliases for DICOM viewer
     window.setTool = (toolName) => dicomViewerEnhanced.setTool(toolName);
+    window.setActiveTool = (toolName) => dicomViewerEnhanced.setTool(toolName);
     window.resetView = () => dicomViewerEnhanced.resetView();
     window.toggleCrosshair = () => dicomViewerEnhanced.toggleCrosshair();
     window.toggleInvert = () => dicomViewerEnhanced.toggleInvert();
@@ -910,6 +911,43 @@ document.addEventListener('DOMContentLoaded', function() {
     window.toggleMPR = () => dicomViewerEnhanced.toggleMPR();
     window.toggleAIPanel = () => dicomViewerEnhanced.toggleAIPanel();
     window.runQuickAI = () => dicomViewerEnhanced.runQuickAI();
+    
+    // Additional compatibility functions
+    window.showLoading = (show, message) => {
+        if (show && message) {
+            dicomViewerEnhanced.showToast(message, 'info', 10000);
+        }
+    };
+    window.showToast = (message, type, duration) => dicomViewerEnhanced.showToast(message, type, duration);
+    window.hideLoading = () => {}; // No-op for compatibility
+    
+    // Studies loading function
+    window.loadStudies = async () => {
+        try {
+            dicomViewerEnhanced.showToast('Loading studies...', 'info');
+            const response = await fetch('/worklist/api/studies/');
+            const data = await response.json();
+            
+            if (data.success && data.studies) {
+                const studySelect = document.getElementById('studySelect');
+                if (studySelect) {
+                    studySelect.innerHTML = '<option value="">Select Study</option>';
+                    data.studies.forEach(study => {
+                        const option = document.createElement('option');
+                        option.value = study.id;
+                        option.textContent = `${study.patient_name} - ${study.accession_number}`;
+                        studySelect.appendChild(option);
+                    });
+                }
+                dicomViewerEnhanced.showToast(`Loaded ${data.studies.length} studies`, 'success');
+            } else {
+                dicomViewerEnhanced.showToast('Failed to load studies', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading studies:', error);
+            dicomViewerEnhanced.showToast('Error loading studies', 'error');
+        }
+    };
 });
 
 // Export for module systems
