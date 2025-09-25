@@ -1430,15 +1430,31 @@
         let annotations = [];
         let currentMeasurement = null;
         
-        // Window presets - Professional medical presets from PyQt
+        // Enhanced window presets - Optimized for better X-ray and medical image visibility
         const windowPresets = {
-            'lung': { ww: 1500, wl: -600 },
-            'bone': { ww: 2000, wl: 300 },
-            'soft': { ww: 400, wl: 40 },
-            'brain': { ww: 100, wl: 50 },
-            'liver': { ww: 160, wl: 60 },
-            'mediastinum': { ww: 350, wl: 50 },
-            'cine': { ww: 800, wl: 200 }
+            // CT Presets - Enhanced for better visibility
+            'lung': { ww: 1800, wl: -500 },
+            'bone': { ww: 3000, wl: 500 },
+            'soft': { ww: 600, wl: 60 },
+            'brain': { ww: 120, wl: 60 },
+            'liver': { ww: 200, wl: 80 },
+            'mediastinum': { ww: 500, wl: 70 },
+            'cine': { ww: 1000, wl: 250 },
+            
+            // X-ray Presets - Significantly enhanced for better X-ray visibility
+            'chest': { ww: 3500, wl: 800 },
+            'chest_xray': { ww: 3500, wl: 800 },
+            'bone_xray': { ww: 5000, wl: 2500 },
+            'extremity': { ww: 4500, wl: 2000 },
+            'spine': { ww: 4000, wl: 1500 },
+            'abdomen': { ww: 2500, wl: 400 },
+            'pediatric': { ww: 3000, wl: 500 },
+            'soft_xray': { ww: 1000, wl: 200 },
+            
+            // Emergency and specialized presets
+            'trauma': { ww: 600, wl: 80 },
+            'angio': { ww: 800, wl: 150 },
+            'cardiac': { ww: 500, wl: 60 }
         };
         
         // Professional caching for performance (PyQt-inspired)
@@ -1868,17 +1884,41 @@
                             try {
                                 renderImageToCanvas(dicomImage, canvas, currentSeries?.modality);
                                 
-                                // Apply modality-specific zoom adjustment for actual size display
-                                const modality = currentSeries?.modality?.toUpperCase();
-                                if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-                                    // X-ray images start at actual size or fit-to-screen
-                                    setZoom(1.0);
-                                    console.log('Applied X-ray specific zoom: 100% (actual size)');
-                                } else if (modality && ['CT', 'MR', 'MRI'].includes(modality)) {
-                                    // CT/MR images start at actual size or fit-to-screen
-                                    setZoom(1.0);
-                                    console.log('Applied CT/MR specific zoom: 100% (actual size)');
+                        // Apply modality-specific zoom and enhancement
+                        const modality = currentSeries?.modality?.toUpperCase();
+                        if (modality && ['DX', 'CR', 'DR', 'XA', 'RF', 'MG'].includes(modality)) {
+                            // X-ray images: optimal zoom and automatic enhancement
+                            setZoom(1.0);
+                            console.log('Applied X-ray specific zoom: 100% with enhanced rendering');
+                            
+                            // Apply additional CSS enhancement and optimal preset for X-ray images
+                            setTimeout(() => {
+                                const imageContainer = document.getElementById('imageContainer');
+                                if (imageContainer) {
+                                    imageContainer.style.filter = 'contrast(1.2) brightness(1.3)';
+                                    console.log('Applied additional X-ray CSS enhancement');
                                 }
+                                
+                                // Auto-apply chest X-ray preset for optimal visibility
+                                if (windowPresets['chest_xray']) {
+                                    applyPreset('chest_xray');
+                                    console.log('Auto-applied chest X-ray preset for optimal visibility');
+                                }
+                            }, 100);
+                        } else if (modality && ['CT', 'MR', 'MRI'].includes(modality)) {
+                            // CT/MR images: optimal zoom with enhancement
+                            setZoom(1.0);
+                            console.log('Applied CT/MR specific zoom: 100% with enhanced rendering');
+                            
+                            // Apply additional CSS enhancement for CT/MR images
+                            setTimeout(() => {
+                                const imageContainer = document.getElementById('imageContainer');
+                                if (imageContainer) {
+                                    imageContainer.style.filter = 'contrast(1.1) brightness(1.2)';
+                                    console.log('Applied additional CT/MR CSS enhancement');
+                                }
+                            }, 100);
+                        }
                                 
                                 // Hide the img element and show canvas
                                 dicomImage.style.display = 'none';
@@ -2619,18 +2659,18 @@
             return Math.round(((pixelValue - minVal) / ww) * 255);
         }
         
-        // Fallback rendering for non-DICOM images
+        // Enhanced rendering for medical images with improved brightness and contrast
         function renderImageElementToCanvas(imgElement, canvas, modality) {
             if (!imgElement || !canvas || !imgElement.complete) return;
             
             const ctx = canvas.getContext('2d');
             
-            // Get display size
+            // Get display size (1:1 ratio for medical images)
             const rect = canvas.getBoundingClientRect();
             const displayWidth = rect.width;
             const displayHeight = rect.height;
             
-            // Set canvas size
+            // Set canvas size exactly to display size
             canvas.width = displayWidth;
             canvas.height = displayHeight;
             
@@ -2638,29 +2678,59 @@
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, displayWidth, displayHeight);
             
-            // Calculate image display dimensions
-            const maxWidth = displayWidth * 0.95;
-            const maxHeight = displayHeight * 0.95;
+            // Calculate image display dimensions (98% utilization for better fitting)
+            const maxWidth = displayWidth * 0.98;
+            const maxHeight = displayHeight * 0.98;
             
             let drawWidth = imgElement.naturalWidth;
             let drawHeight = imgElement.naturalHeight;
             
-            // Scale to fit if needed
-            if (drawWidth > maxWidth || drawHeight > maxHeight) {
-                const scaleX = maxWidth / drawWidth;
-                const scaleY = maxHeight / drawHeight;
-                const scale = Math.min(scaleX, scaleY);
-                
-                drawWidth = drawWidth * scale;
-                drawHeight = drawHeight * scale;
-            }
+            // Scale to fit properly
+            const scaleX = maxWidth / drawWidth;
+            const scaleY = maxHeight / drawHeight;
+            const scale = Math.min(scaleX, scaleY);
+            
+            drawWidth = drawWidth * scale;
+            drawHeight = drawHeight * scale;
             
             // Center the image
             let drawX = (displayWidth - drawWidth) / 2;
             let drawY = (displayHeight - drawHeight) / 2;
             
-            // Draw image
+            // Apply enhanced modality-specific rendering settings
+            if (['DX', 'CR', 'DR', 'XA', 'RF', 'MG'].includes(modality?.toUpperCase())) {
+                // X-ray specific settings - SIGNIFICANTLY ENHANCED for better visibility
+                ctx.filter = 'contrast(1.9) brightness(2.3) saturate(0.75)';
+                ctx.imageSmoothingEnabled = false; // Critical for X-ray detail
+                ctx.imageSmoothingQuality = 'high';
+                console.log('Applied enhanced X-ray rendering: contrast(1.9) brightness(2.3)');
+            } else if (['CT'].includes(modality?.toUpperCase())) {
+                // CT specific settings - ENHANCED for better tissue visibility
+                ctx.filter = 'contrast(1.6) brightness(2.0) saturate(0.80)';
+                ctx.imageSmoothingEnabled = false; // Preserve CT detail
+                ctx.imageSmoothingQuality = 'high';
+                console.log('Applied enhanced CT rendering: contrast(1.6) brightness(2.0)');
+            } else if (['MR', 'MRI'].includes(modality?.toUpperCase())) {
+                // MRI specific settings - ENHANCED for better contrast differentiation
+                ctx.filter = 'contrast(1.5) brightness(1.9) saturate(0.85)';
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                console.log('Applied enhanced MRI rendering: contrast(1.5) brightness(1.9)');
+            } else {
+                // Default enhanced settings for better medical image visibility
+                ctx.filter = 'contrast(1.6) brightness(2.0) saturate(0.80)';
+                ctx.imageSmoothingEnabled = false;
+                ctx.imageSmoothingQuality = 'high';
+                console.log('Applied enhanced default rendering: contrast(1.6) brightness(2.0)');
+            }
+            
+            // Draw image with enhanced settings
             ctx.drawImage(imgElement, drawX, drawY, drawWidth, drawHeight);
+            
+            // Reset filter for overlay elements
+            ctx.filter = 'none';
+            
+            console.log(`Enhanced image rendered: ${drawWidth.toFixed(0)}x${drawHeight.toFixed(0)} at (${drawX.toFixed(0)},${drawY.toFixed(0)}) with ${modality || 'default'} modality`);
         }
         
         // Overlay drawing functions - HTML file style
