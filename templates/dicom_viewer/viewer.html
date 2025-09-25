@@ -231,16 +231,14 @@
         }
 
         .dicom-canvas {
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%;
+            height: 100%;
             image-rendering: -webkit-optimize-contrast;
+            image-rendering: pixelated;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
-            image-rendering: high-quality;
             cursor: crosshair;
             transition: transform 0.1s ease;
-            filter: contrast(1.15) brightness(1.9);
-            -webkit-filter: contrast(1.15) brightness(1.9);
         }
 
         .image-container {
@@ -1075,6 +1073,7 @@
             <div class="viewport-content" id="singleView">
                 <div class="image-container" id="imageContainer">
                     <img class="dicom-image" id="dicomImage" alt="DICOM Image">
+                    <canvas class="dicom-canvas" id="dicomCanvas" style="display: none;"></canvas>
                     <div class="crosshair-overlay" id="crosshairOverlay" style="display: none;">
                         <div class="crosshair-line-h"></div>
                         <div class="crosshair-line-v"></div>
@@ -1800,16 +1799,16 @@
                             try {
                                 renderImageToCanvas(dicomImage, canvas, currentSeries?.modality);
                                 
-                                // Apply modality-specific zoom adjustment
+                                // Apply modality-specific zoom adjustment for actual size display
                                 const modality = currentSeries?.modality?.toUpperCase();
                                 if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-                                    // X-ray images need less zoom for better fit
-                                    setZoom(0.6);
-                                    console.log('Applied X-ray specific zoom: 60%');
+                                    // X-ray images start at actual size or fit-to-screen
+                                    setZoom(1.0);
+                                    console.log('Applied X-ray specific zoom: 100% (actual size)');
                                 } else if (modality && ['CT', 'MR', 'MRI'].includes(modality)) {
-                                    // CT/MR images can use normal zoom
-                                    setZoom(0.8);
-                                    console.log('Applied CT/MR specific zoom: 80%');
+                                    // CT/MR images start at actual size or fit-to-screen
+                                    setZoom(1.0);
+                                    console.log('Applied CT/MR specific zoom: 100% (actual size)');
                                 }
                                 
                                 // Hide the img element and show canvas
@@ -2436,77 +2435,75 @@
             const displayWidth = rect.width;
             const displayHeight = rect.height;
             
-            // Modality-specific resolution enhancement - FIXED for X-ray zoom issue
-            let resolutionMultiplier = 1.2; // Default for CT/MR - reduced from 1.5
-            if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
-                resolutionMultiplier = 1.0; // Lower resolution multiplier for X-ray to reduce zoom
-            }
-            
-            // Set actual canvas size to device pixel ratio with enhanced resolution
-            canvas.width = displayWidth * dpr * resolutionMultiplier;
-            canvas.height = displayHeight * dpr * resolutionMultiplier;
+            // Set actual canvas size to device pixel ratio
+            canvas.width = displayWidth * dpr;
+            canvas.height = displayHeight * dpr;
             
             // Scale canvas back down using CSS
             canvas.style.width = displayWidth + 'px';
             canvas.style.height = displayHeight + 'px';
             
-            // Scale the drawing context to match enhanced pixel ratio
-            ctx.scale(dpr * resolutionMultiplier, dpr * resolutionMultiplier);
+            // Scale the drawing context to match pixel ratio
+            ctx.scale(dpr, dpr);
             
             // Enable highest quality rendering for medical images
-            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingEnabled = false;
             ctx.imageSmoothingQuality = 'high';
-            
-            // Modality-specific rendering optimizations
-            if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
-                // For X-ray images, disable smoothing to preserve sharp edges
-                ctx.imageSmoothingEnabled = false;
-                ctx.filter = 'contrast(1.15) brightness(1.45)'; // Enhanced brightness for better visibility
-            } else {
-                // Additional quality settings for CT/MR imaging
-                ctx.textRenderingOptimization = 'optimizeQuality';
-                ctx.filter = 'none'; // Disable any default filters that might degrade image quality
-            }
-            
-            // Calculate aspect-preserving dimensions
-            const imgAspect = imgElement.naturalWidth / imgElement.naturalHeight;
-            const canvasAspect = displayWidth / displayHeight;
-            
-            let drawWidth, drawHeight, drawX, drawY;
-            
-            if (imgAspect > canvasAspect) {
-                // Image is wider than canvas
-                drawWidth = displayWidth;
-                drawHeight = displayWidth / imgAspect;
-                drawX = 0;
-                drawY = (displayHeight - drawHeight) / 2;
-            } else {
-                // Image is taller than canvas
-                drawWidth = displayHeight * imgAspect;
-                drawHeight = displayHeight;
-                drawX = (displayWidth - drawWidth) / 2;
-                drawY = 0;
-            }
-            
-            // Apply current zoom and pan transformations - IMPROVED
-            ctx.save();
-            
-            // Clamp zoom factor to prevent excessive zooming
-            const clampedZoom = Math.max(0.25, Math.min(3.0, zoomFactor));
-            
-            // Apply transforms with better centering for medical imaging
-            ctx.translate(displayWidth / 2 + panX, displayHeight / 2 + panY);
-            ctx.scale(clampedZoom, clampedZoom);
-            ctx.translate(-displayWidth / 2, -displayHeight / 2);
             
             // Clear canvas with black background
             ctx.fillStyle = '#000000';
-            ctx.fillRect(-displayWidth, -displayHeight, displayWidth * 3, displayHeight * 3);
+            ctx.fillRect(0, 0, displayWidth, displayHeight);
+            
+            // Modality-specific rendering optimizations with increased brightness
+            if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
+                // For X-ray images, disable smoothing to preserve sharp edges
+                ctx.imageSmoothingEnabled = false;
+                ctx.filter = 'contrast(1.25) brightness(1.65) saturate(0.85)';
+            } else if (modality && ['CT'].includes(modality.toUpperCase())) {
+                // CT images with enhanced brightness
+                ctx.filter = 'contrast(1.20) brightness(1.60) saturate(0.90)';
+            } else {
+                // Default enhanced brightness for other modalities
+                ctx.filter = 'contrast(1.15) brightness(1.55) saturate(0.95)';
+            }
+            
+            // Calculate image display dimensions - show at actual size unless too large
+            const maxWidth = displayWidth * 0.95;
+            const maxHeight = displayHeight * 0.95;
+            
+            let drawWidth = imgElement.naturalWidth;
+            let drawHeight = imgElement.naturalHeight;
+            
+            // Only scale down if image is larger than canvas
+            if (drawWidth > maxWidth || drawHeight > maxHeight) {
+                const scaleX = maxWidth / drawWidth;
+                const scaleY = maxHeight / drawHeight;
+                const scale = Math.min(scaleX, scaleY);
+                
+                drawWidth = drawWidth * scale;
+                drawHeight = drawHeight * scale;
+            }
+            
+            // Apply additional zoom if set
+            if (typeof zoomFactor !== 'undefined' && zoomFactor !== 1.0) {
+                const clampedZoom = Math.max(0.1, Math.min(5.0, zoomFactor));
+                drawWidth *= clampedZoom;
+                drawHeight *= clampedZoom;
+            }
+            
+            // Center the image
+            let drawX = (displayWidth - drawWidth) / 2;
+            let drawY = (displayHeight - drawHeight) / 2;
+            
+            // Apply pan offset if available
+            if (typeof panX !== 'undefined') drawX += panX;
+            if (typeof panY !== 'undefined') drawY += panY;
             
             // Draw image with high-quality interpolation
             ctx.drawImage(imgElement, drawX, drawY, drawWidth, drawHeight);
             
-            ctx.restore();
+            // Reset filter
+            ctx.filter = 'none';
         }
 
         function loadFromExternalMedia() {
