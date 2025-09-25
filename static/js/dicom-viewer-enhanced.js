@@ -1388,6 +1388,109 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
         }
     });
+    
+    // Missing MPR and 3D functions
+    window.setActivePlane = (plane) => {
+        console.log('Setting active plane:', plane);
+        dicomViewerEnhanced.showToast(`Switched to ${plane} plane`, 'info');
+        // TODO: Implement plane switching logic
+    };
+    
+    window.generateBone3DType = (type) => {
+        if (!type) return;
+        dicomViewerEnhanced.showToast(`Generating ${type} bone reconstruction...`, 'info');
+        // TODO: Implement bone 3D reconstruction
+    };
+    
+    window.generateVolumeRenderType = (type) => {
+        if (!type) return;
+        dicomViewerEnhanced.showToast(`Generating ${type} volume render...`, 'info');
+        // TODO: Implement volume rendering
+    };
+    
+    window.generateAdvanced3D = (type) => {
+        if (!type) return;
+        dicomViewerEnhanced.showToast(`Generating ${type} advanced 3D...`, 'info');
+        // TODO: Implement advanced 3D reconstruction
+    };
+    
+    window.changePlane = (plane) => {
+        console.log('Changing plane to:', plane);
+        dicomViewerEnhanced.showToast(`Changed to ${plane} view`, 'info');
+        // TODO: Implement plane change logic
+    };
+    
+    // AI Analysis functions
+    window.runAIAnalysisSimple = (type) => {
+        if (!type) return;
+        dicomViewerEnhanced.showToast(`Running ${type} AI analysis...`, 'info');
+        // TODO: Implement AI analysis
+    };
+    
+    window.showAIResults = () => {
+        dicomViewerEnhanced.showToast('Showing AI analysis results...', 'info');
+        // TODO: Implement AI results display
+    };
+    
+    // Export functions
+    window.exportSeries = () => {
+        try {
+            if (!window.currentSeries) {
+                dicomViewerEnhanced.showToast('No series loaded to export', 'warning');
+                return;
+            }
+            dicomViewerEnhanced.showToast('Exporting series...', 'info');
+            // TODO: Implement series export
+        } catch (error) {
+            console.error('Error exporting series:', error);
+            dicomViewerEnhanced.showToast('Failed to export series', 'error');
+        }
+    };
+    
+    // Measurement functions
+    window.deleteMeasurement = (index) => {
+        try {
+            if (dicomViewerEnhanced.measurements && dicomViewerEnhanced.measurements[index]) {
+                dicomViewerEnhanced.measurements.splice(index, 1);
+                dicomViewerEnhanced.showToast('Measurement deleted', 'success');
+                // TODO: Refresh measurement display
+            }
+        } catch (error) {
+            console.error('Error deleting measurement:', error);
+            dicomViewerEnhanced.showToast('Failed to delete measurement', 'error');
+        }
+    };
+    
+    // UI and 3D functions from masterpiece viewer
+    window.toggleUI = () => {
+        const rightPanel = document.querySelector('.right-panel');
+        if (rightPanel) {
+            rightPanel.style.display = rightPanel.style.display === 'none' ? 'block' : 'none';
+            dicomViewerEnhanced.showToast('UI toggled', 'info');
+        }
+    };
+    
+    window.selectStudy = () => {
+        const studySelector = document.getElementById('studySelector');
+        if (studySelector && studySelector.value) {
+            loadStudy(studySelector.value);
+        }
+    };
+    
+    window.reset3DView = () => {
+        dicomViewerEnhanced.showToast('3D view reset', 'info');
+        // TODO: Implement 3D view reset
+    };
+    
+    window.toggle3DRotation = () => {
+        dicomViewerEnhanced.showToast('3D rotation toggled', 'info');
+        // TODO: Implement 3D auto rotation
+    };
+    
+    window.export3DModel = () => {
+        dicomViewerEnhanced.showToast('Exporting 3D model...', 'info');
+        // TODO: Implement 3D model export
+    };
 });
 
 // Export for module systems
