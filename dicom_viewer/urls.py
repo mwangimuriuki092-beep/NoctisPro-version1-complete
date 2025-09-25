@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/studies/', views.api_studies_redirect, name='api_studies_redirect'),
     path('api/study/<int:study_id>/data/', views.api_study_data, name='api_study_data'),
     path('api/image/<int:image_id>/data/', views.api_image_data, name='api_image_data'),
+    path('api/image/<int:image_id>/metadata/', views.api_image_metadata, name='api_image_metadata'),
     path('api/image/<int:image_id>/display/', views.api_dicom_image_display, name='api_dicom_image_display'),
     path('api/image/<int:image_id>/hounsfield/', views.api_image_hounsfield, name='api_image_hounsfield'),
     

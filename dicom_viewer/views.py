@@ -369,8 +369,8 @@ def api_study_data(request, study_id):
 
 @login_required
 @csrf_exempt
-def api_image_data(request, image_id):
-    """API endpoint to get specific image data"""
+def api_image_metadata(request, image_id):
+    """API endpoint to get specific image metadata"""
     image = get_object_or_404(DicomImage, id=image_id)
     user = request.user
     
