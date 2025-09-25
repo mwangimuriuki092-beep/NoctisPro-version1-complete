@@ -80,14 +80,14 @@ class DicomCanvasFix {
         // Detect modality for resolution optimization
         const modality = this.detectModality();
         
-        // Modality-specific resolution multipliers - REDUCED for better display
-        let resolutionMultiplier = 1.0; // Default - no excessive scaling
+        // Modality-specific resolution multipliers - FIXED for proper scaling
+        let resolutionMultiplier = 1.0; // Default - standard scaling
         if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-            resolutionMultiplier = 1.2; // X-ray images - moderate resolution
+            resolutionMultiplier = 1.0; // X-ray images - standard resolution, no extra scaling
         } else if (['CT'].includes(modality)) {
-            resolutionMultiplier = 1.1; // CT - slight resolution boost
+            resolutionMultiplier = 1.0; // CT - standard resolution
         } else if (['MR', 'MRI'].includes(modality)) {
-            resolutionMultiplier = 1.1; // MRI - slight resolution boost
+            resolutionMultiplier = 1.0; // MRI - standard resolution
         } else if (['US'].includes(modality)) {
             resolutionMultiplier = 1.0; // Ultrasound - standard resolution
         }
@@ -450,12 +450,12 @@ class DicomCanvasFix {
         
         let drawWidth, drawHeight, drawX, drawY;
         
-        // Modality-specific scale factors - OPTIMIZED for better fit
-        let scaleFactor = 0.95; // Default - fit better in viewport
+        // Modality-specific scale factors - FIXED for proper fit
+        let scaleFactor = 0.85; // Default - better fit with margins
         if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-            scaleFactor = 0.98; // X-ray images - almost full screen
+            scaleFactor = 0.80; // X-ray images - reduced from 0.98 to fit properly
         } else if (['CT', 'MR', 'MRI'].includes(modality)) {
-            scaleFactor = 0.95; // CT/MR - good balance
+            scaleFactor = 0.85; // CT/MR - reduced for better fit
         }
         
         if (imageAspect > canvasAspect) {
@@ -505,43 +505,43 @@ class DicomCanvasFix {
             this.ctx.imageSmoothingQuality = 'high';
 
             if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-                // X-ray modalities: Preserve sharp edges, BRIGHTER display
+                // X-ray modalities: Match reference image exactly
                 this.ctx.imageSmoothingEnabled = false; // Critical for X-ray detail
-                this.ctx.filter = 'contrast(1.1) brightness(1.3) saturate(0.9)';
-                console.log(`Applied X-ray rendering settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.15) brightness(0.92) saturate(0.85)';
+                console.log(`Applied reference-matched X-ray settings for ${modality}`);
                 
             } else if (['CT'].includes(modality)) {
-                // CT: Balanced smoothing with BRIGHTER contrast enhancement
+                // CT: Match reference medical imaging characteristics
                 this.ctx.imageSmoothingEnabled = false; // Preserve CT detail
-                this.ctx.filter = 'contrast(1.05) brightness(1.4) saturate(0.95)';
-                console.log(`Applied CT rendering settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.12) brightness(0.94) saturate(0.90)';
+                console.log(`Applied reference-matched CT settings for ${modality}`);
                 
             } else if (['MR', 'MRI'].includes(modality)) {
-                // MRI: Slight smoothing acceptable, BRIGHTER display
+                // MRI: Match reference medical imaging display
                 this.ctx.imageSmoothingEnabled = true;
                 this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.08) brightness(1.35) saturate(1.0)';
-                console.log(`Applied MRI rendering settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.10) brightness(0.93) saturate(0.95)';
+                console.log(`Applied reference-matched MRI settings for ${modality}`);
                 
             } else if (['US'].includes(modality)) {
-                // Ultrasound: Smoothing helps with noise, BRIGHTER
+                // Ultrasound: Match reference brightness characteristics
                 this.ctx.imageSmoothingEnabled = true;
                 this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.05) brightness(1.25) saturate(0.9)';
-                console.log(`Applied Ultrasound rendering settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.08) brightness(0.95) saturate(0.88)';
+                console.log(`Applied reference-matched Ultrasound settings for ${modality}`);
                 
             } else if (['NM', 'PT'].includes(modality)) {
-                // Nuclear Medicine/PET: Smoothing for better visualization, BRIGHTER
+                // Nuclear Medicine/PET: Match reference with slight enhancement
                 this.ctx.imageSmoothingEnabled = true;
                 this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.15) brightness(1.3) saturate(1.1)';
-                console.log(`Applied Nuclear Medicine rendering settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.18) brightness(0.91) saturate(1.05)';
+                console.log(`Applied reference-matched Nuclear Medicine settings for ${modality}`);
                 
             } else {
-                // Default/Unknown: Conservative settings that work for all, BRIGHTER
+                // Default/Unknown: Match reference image characteristics
                 this.ctx.imageSmoothingEnabled = false;
-                this.ctx.filter = 'contrast(1.05) brightness(1.3) saturate(0.95)';
-                console.log(`Applied default rendering settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.12) brightness(0.93) saturate(0.90)';
+                console.log(`Applied reference-matched default settings for ${modality}`);
             }
         } catch (error) {
             console.warn('Failed to apply modality rendering settings, using defaults:', error);
@@ -564,7 +564,7 @@ class DicomCanvasFix {
             const imageAspect = image.width / image.height;
             
             let drawWidth, drawHeight, drawX, drawY;
-            const scaleFactor = 0.9; // Safe default
+            const scaleFactor = 0.80; // Reduced from 0.9 for better fit
             
             if (imageAspect > canvasAspect) {
                 drawWidth = this.canvas.width * scaleFactor;
@@ -577,10 +577,10 @@ class DicomCanvasFix {
             drawX = (this.canvas.width - drawWidth) / 2;
             drawY = (this.canvas.height - drawHeight) / 2;
             
-            // Safe rendering settings - BRIGHTER for better visibility
+            // Safe rendering settings - Match reference image exactly
             this.ctx.globalAlpha = 1.0;
             this.ctx.imageSmoothingEnabled = false;
-            this.ctx.filter = 'contrast(1.05) brightness(1.3)';
+            this.ctx.filter = 'contrast(1.12) brightness(0.93)';
             
             // Draw image
             this.ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);

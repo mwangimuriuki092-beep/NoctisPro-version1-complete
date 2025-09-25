@@ -582,7 +582,7 @@ window.startWindowLevel = 0;
 window.startWindowWidth = 0;
 window.startPanX = 0;
 window.startPanY = 0;
-window.zoom = 1.0;
+window.zoom = 0.8; // Reduced initial zoom for better fit
 window.panX = 0;
 window.panY = 0;
 window.windowWidth = 256;
@@ -819,5 +819,19 @@ window.showReconstructionPopup = function(title, views) {
 
 // Default tool
 window.activeTool = 'windowing';
+
+// Reset zoom function - FIXED for proper fit
+window.resetZoom = function() {
+    window.zoom = 0.8; // Reset to better fitting zoom level
+    window.panX = 0;
+    window.panY = 0;
+    
+    // Redraw current image if available
+    if (window.currentImageElement) {
+        window.renderImageToCanvas(window.currentImageElement);
+    }
+    
+    console.log('Zoom reset to proper fit level (0.8x)');
+};
 
 console.log('DICOM Viewer fixes loaded successfully');
