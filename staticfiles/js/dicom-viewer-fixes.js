@@ -129,6 +129,33 @@ function setupMissingFunctions() {
             // Reference search would be implemented here
         }
     };
+    
+    // Add nextImage and previousImage functions if they don't exist
+    window.nextImage = window.nextImage || function() {
+        if (typeof changeSlice === 'function') {
+            changeSlice(1);
+        } else if (window.currentImageIndex !== undefined && window.images) {
+            if (window.currentImageIndex < window.images.length - 1) {
+                window.currentImageIndex++;
+                if (typeof updateImageDisplay === 'function') {
+                    updateImageDisplay();
+                }
+            }
+        }
+    };
+    
+    window.previousImage = window.previousImage || function() {
+        if (typeof changeSlice === 'function') {
+            changeSlice(-1);
+        } else if (window.currentImageIndex !== undefined) {
+            if (window.currentImageIndex > 0) {
+                window.currentImageIndex--;
+                if (typeof updateImageDisplay === 'function') {
+                    updateImageDisplay();
+                }
+            }
+        }
+    };
 }
 
 function integrateMeasurementSystem() {
@@ -203,16 +230,24 @@ function fixCanvasEventHandlers() {
         } else {
             // Scroll through images
             if (e.deltaY > 0) {
-                if (typeof navigateImage === 'function') {
-                    navigateImage(1);
-                } else if (typeof window.navigateImage === 'function') {
-                    window.navigateImage(1);
+                if (typeof nextImage === 'function') {
+                    nextImage();
+                } else if (typeof window.nextImage === 'function') {
+                    window.nextImage();
+                } else if (typeof changeSlice === 'function') {
+                    changeSlice(1);
+                } else if (window.keyboardShortcuts && typeof window.keyboardShortcuts.nextImage === 'function') {
+                    window.keyboardShortcuts.nextImage();
                 }
             } else {
-                if (typeof navigateImage === 'function') {
-                    navigateImage(-1);
-                } else if (typeof window.navigateImage === 'function') {
-                    window.navigateImage(-1);
+                if (typeof previousImage === 'function') {
+                    previousImage();
+                } else if (typeof window.previousImage === 'function') {
+                    window.previousImage();
+                } else if (typeof changeSlice === 'function') {
+                    changeSlice(-1);
+                } else if (window.keyboardShortcuts && typeof window.keyboardShortcuts.previousImage === 'function') {
+                    window.keyboardShortcuts.previousImage();
                 }
             }
         }
