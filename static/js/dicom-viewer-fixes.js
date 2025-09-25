@@ -360,10 +360,10 @@ function fixCanvasEventHandlers() {
                 const zoomDelta = e.deltaY > 0 ? 0.98 : 1.02; // Very gentle zoom steps
                 if (typeof window.zoom !== 'undefined') {
                     window.zoom *= zoomDelta;
-                    window.zoom = Math.max(0.1, Math.min(2.0, window.zoom)); // Reduced max zoom to 2.0x
+                    window.zoom = Math.max(0.25, Math.min(3.0, window.zoom)); // Optimized zoom range: 25% to 300%
                 } else if (typeof window.zoomFactor !== 'undefined') {
                     window.zoomFactor *= zoomDelta;
-                    window.zoomFactor = Math.max(0.1, Math.min(2.0, window.zoomFactor));
+                    window.zoomFactor = Math.max(0.25, Math.min(3.0, window.zoomFactor));
                 }
                 if (typeof redrawCurrentImage === 'function') {
                     redrawCurrentImage();
@@ -459,10 +459,10 @@ function handleZoomClick(x, y, isShiftKey) {
     
     if (typeof window.zoom !== 'undefined') {
         window.zoom *= zoomDelta;
-        window.zoom = Math.max(0.1, Math.min(2.0, window.zoom)); // Reduced max to 2.0x
+        window.zoom = Math.max(0.25, Math.min(3.0, window.zoom)); // Optimized zoom range
     } else if (typeof window.zoomFactor !== 'undefined') {
         window.zoomFactor *= zoomDelta;
-        window.zoomFactor = Math.max(0.1, Math.min(2.0, window.zoomFactor));
+        window.zoomFactor = Math.max(0.25, Math.min(3.0, window.zoomFactor));
     }
     
     // Zoom towards cursor position - reduced sensitivity
@@ -582,7 +582,7 @@ window.startWindowLevel = 0;
 window.startWindowWidth = 0;
 window.startPanX = 0;
 window.startPanY = 0;
-window.zoom = 0.8; // Reduced initial zoom for better fit
+window.zoom = 0.8; // Optimized initial zoom for medical imaging
 window.panX = 0;
 window.panY = 0;
 window.windowWidth = 256;
@@ -822,7 +822,7 @@ window.activeTool = 'windowing';
 
 // Reset zoom function - FIXED for proper fit
 window.resetZoom = function() {
-    window.zoom = 0.8; // Reset to better fitting zoom level
+    window.zoom = 0.8; // Reset to optimized zoom level for medical imaging
     window.panX = 0;
     window.panY = 0;
     
@@ -832,6 +832,32 @@ window.resetZoom = function() {
     }
     
     console.log('Zoom reset to proper fit level (0.8x)');
+};
+
+// Add modality-specific zoom adjustment function
+window.adjustZoomForModality = function(modality) {
+    if (!modality) return;
+    
+    const modalityUpper = modality.toUpperCase();
+    let targetZoom = 0.8; // Default
+    
+    if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modalityUpper)) {
+        targetZoom = 0.6; // X-ray images need less zoom
+        console.log('Applied X-ray specific zoom adjustment: 60%');
+    } else if (['CT', 'MR', 'MRI'].includes(modalityUpper)) {
+        targetZoom = 0.8; // CT/MR can use normal zoom
+        console.log('Applied CT/MR specific zoom adjustment: 80%');
+    }
+    
+    // Apply the zoom
+    if (typeof setZoom === 'function') {
+        setZoom(targetZoom);
+    } else if (typeof window.zoomFactor !== 'undefined') {
+        window.zoomFactor = targetZoom;
+        if (typeof updateImageDisplay === 'function') {
+            updateImageDisplay();
+        }
+    }
 };
 
 console.log('DICOM Viewer fixes loaded successfully');

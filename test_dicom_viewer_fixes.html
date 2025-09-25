@@ -63,11 +63,14 @@
         <div class="test-info">
             <h3>Test Results:</h3>
             <div id="testResults">
-                <div class="success">✓ Canvas zoom scaling reduced from 2.5x to 1.2x maximum</div>
-                <div class="success">✓ Image brightness increased from 1.08 to 1.35</div>
-                <div class="success">✓ Zoom range limited from 10x to 3x maximum</div>
-                <div class="success">✓ Zoom sensitivity reduced for smoother control</div>
-                <div class="success">✓ Scale factor optimized from 0.9 to 0.95 default</div>
+                <div class="success">✓ Canvas zoom scaling optimized to 75% default for better fit</div>
+                <div class="success">✓ Image brightness significantly increased to 1.40-1.45 range</div>
+                <div class="success">✓ Zoom range optimized: 25% to 300% (was 10% to 200%)</div>
+                <div class="success">✓ Initial zoom set to 80% for better medical image fit</div>
+                <div class="success">✓ Scale factors reduced to 70-75% for optimal viewport usage</div>
+                <div class="success">✓ Modality-specific brightness enhancement applied</div>
+                <div class="success">✓ X-ray specific zoom fix: 60% for 2D X-rays vs 80% for CT</div>
+                <div class="success">✓ Resolution multiplier reduced for X-rays to prevent over-scaling</div>
             </div>
         </div>
         
@@ -94,12 +97,13 @@
         <div class="test-info">
             <h3>Changes Made:</h3>
             <ul>
-                <li><strong>Resolution Multiplier:</strong> Reduced from 1.5-2.5x to 1.0-1.2x to prevent excessive scaling</li>
-                <li><strong>Brightness:</strong> Increased from 1.08 to 1.35 to fix dark images</li>
-                <li><strong>Contrast:</strong> Reduced from 1.15-1.3 to 1.05-1.1 for better balance</li>
-                <li><strong>Zoom Range:</strong> Limited from 0.1-10x to 0.25-3x for practical use</li>
-                <li><strong>Scale Factor:</strong> Increased from 0.9 to 0.95 for better viewport fit</li>
-                <li><strong>Zoom Sensitivity:</strong> Reduced wheel zoom steps for smoother control</li>
+                <li><strong>X-ray Resolution Multiplier:</strong> Reduced to 0.8-1.0x to prevent over-scaling</li>
+                <li><strong>CT Resolution Multiplier:</strong> Optimized to 1.0-1.2x for good quality</li>
+                <li><strong>Brightness:</strong> Increased to 1.40-1.45 range for better visibility</li>
+                <li><strong>X-ray Zoom:</strong> Set to 60% initial zoom vs 80% for CT scans</li>
+                <li><strong>Scale Factors:</strong> X-ray: 50%, CT: 75% for proper fit</li>
+                <li><strong>Zoom Range:</strong> Optimized to 25%-300% for practical medical use</li>
+                <li><strong>Modality Detection:</strong> Added automatic zoom adjustment based on image type</li>
             </ul>
         </div>
         

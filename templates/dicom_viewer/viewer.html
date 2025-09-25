@@ -16,6 +16,16 @@
     <script src="{% static 'js/dicom-viewer-enhanced.js' %}"></script>
     <script src="{% static 'js/dicom-viewer-fixes.js' %}"></script>
     <script src="{% static 'js/dicom-viewer-canvas-fix.js' %}"></script>
+    
+    <!-- Enhanced DICOM Systems -->
+    <script src="{% static 'js/dicom-measurements-enhanced.js' %}"></script>
+    <script src="{% static 'js/dicom-windowing-enhanced.js' %}"></script>
+    <script src="{% static 'js/dicom-keyboard-shortcuts.js' %}"></script>
+    <script src="{% static 'js/dicom-3d-enhanced.js' %}"></script>
+    <script src="{% static 'js/dicom-export-enhanced.js' %}"></script>
+    <script src="{% static 'js/dicom-navigation-enhanced.js' %}"></script>
+    <script src="{% static 'js/dicom-cine-mode.js' %}"></script>
+    <script src="{% static 'js/dicom-responsive-ui.js' %}"></script>
     <style>
         :root {
             --primary-bg: #0a0a0a;
@@ -229,8 +239,8 @@
             image-rendering: high-quality;
             cursor: crosshair;
             transition: transform 0.1s ease;
-            filter: contrast(1.15) brightness(1.5);
-            -webkit-filter: contrast(1.15) brightness(1.5);
+            filter: contrast(1.15) brightness(1.6);
+            -webkit-filter: contrast(1.15) brightness(1.6);
         }
 
         .image-container {
@@ -268,8 +278,8 @@
             user-select: none;
             transition: none;
             /* Medical-grade image enhancement - BRIGHTER */
-            filter: contrast(1.15) brightness(1.5);
-            -webkit-filter: contrast(1.15) brightness(1.5);
+            filter: contrast(1.15) brightness(1.6);
+            -webkit-filter: contrast(1.15) brightness(1.6);
             /* Transform origin for zoom/pan */
             transform-origin: center center;
         }
@@ -1149,9 +1159,9 @@
                 <div class="control">
                     <div class="control-label">
                         <span>Zoom</span>
-                        <span id="zoomValue">100%</span>
+                        <span id="zoomValue">80%</span>
                     </div>
-                    <input type="range" class="slider" id="zoomSlider" min="10" max="200" value="100" oninput="updateZoom(this.value)">
+                    <input type="range" class="slider" id="zoomSlider" min="25" max="300" value="80" oninput="updateZoom(this.value)">
                 </div>
             </div>
 
@@ -1390,7 +1400,7 @@
         let windowLevel = 40;
         let defaultWindowWidth = 400;
         let defaultWindowLevel = 40;
-        let zoomFactor = 1.0;
+        let zoomFactor = 0.8; // Start with better fit for medical images
         let panX = 0;
         let panY = 0;
         let inverted = false;
@@ -1657,7 +1667,7 @@
         }
 
         function setZoom(factor) {
-            zoomFactor = Math.max(0.1, Math.min(2.0, factor)); // FURTHER REDUCED max zoom to 2.0 for medical imaging
+            zoomFactor = Math.max(0.25, Math.min(3.0, factor)); // Optimized zoom range: 25% to 300%
             const zoomPercent = Math.round(zoomFactor * 100);
             
             document.getElementById('zoomSlider').value = zoomPercent;
@@ -1683,7 +1693,7 @@
             const dicomImage = document.getElementById('dicomImage');
             if (dicomImage) {
                 // Clamp zoom factor to prevent excessive zooming
-                const clampedZoom = Math.max(0.1, Math.min(2.0, zoomFactor));
+                const clampedZoom = Math.max(0.25, Math.min(3.0, zoomFactor));
                 
                 // Apply transform with improved centering
                 dicomImage.style.transform = `translate(${panX}px, ${panY}px) scale(${clampedZoom})`;
@@ -1789,6 +1799,19 @@
                         if (canvas && dicomImage.complete && dicomImage.naturalWidth > 0) {
                             try {
                                 renderImageToCanvas(dicomImage, canvas, currentSeries?.modality);
+                                
+                                // Apply modality-specific zoom adjustment
+                                const modality = currentSeries?.modality?.toUpperCase();
+                                if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
+                                    // X-ray images need less zoom for better fit
+                                    setZoom(0.6);
+                                    console.log('Applied X-ray specific zoom: 60%');
+                                } else if (modality && ['CT', 'MR', 'MRI'].includes(modality)) {
+                                    // CT/MR images can use normal zoom
+                                    setZoom(0.8);
+                                    console.log('Applied CT/MR specific zoom: 80%');
+                                }
+                                
                                 // Hide the img element and show canvas
                                 dicomImage.style.display = 'none';
                                 canvas.style.display = 'block';
@@ -2413,10 +2436,10 @@
             const displayWidth = rect.width;
             const displayHeight = rect.height;
             
-            // Modality-specific resolution enhancement
-            let resolutionMultiplier = 1.5; // Default for CT/MR
+            // Modality-specific resolution enhancement - FIXED for X-ray zoom issue
+            let resolutionMultiplier = 1.2; // Default for CT/MR - reduced from 1.5
             if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
-                resolutionMultiplier = 2.0; // Higher resolution for X-ray images
+                resolutionMultiplier = 1.0; // Lower resolution multiplier for X-ray to reduce zoom
             }
             
             // Set actual canvas size to device pixel ratio with enhanced resolution
@@ -2438,7 +2461,7 @@
             if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
                 // For X-ray images, disable smoothing to preserve sharp edges
                 ctx.imageSmoothingEnabled = false;
-                ctx.filter = 'contrast(1.1) brightness(1.05)'; // Slight enhancement for X-rays
+                ctx.filter = 'contrast(1.15) brightness(1.45)'; // Enhanced brightness for better visibility
             } else {
                 // Additional quality settings for CT/MR imaging
                 ctx.textRenderingOptimization = 'optimizeQuality';
@@ -2469,7 +2492,7 @@
             ctx.save();
             
             // Clamp zoom factor to prevent excessive zooming
-            const clampedZoom = Math.max(0.1, Math.min(2.0, zoomFactor));
+            const clampedZoom = Math.max(0.25, Math.min(3.0, zoomFactor));
             
             // Apply transforms with better centering for medical imaging
             ctx.translate(displayWidth / 2 + panX, displayHeight / 2 + panY);
@@ -2692,13 +2715,13 @@
         }
 
         function resetView() {
-            zoomFactor = 1.0;
+            zoomFactor = 0.8; // Reset to better fitting zoom level
             panX = 0;
             panY = 0;
             
-            document.getElementById('zoomSlider').value = 100;
-            document.getElementById('zoomValue').textContent = '100%';
-            document.getElementById('zoomInfo').textContent = 'Zoom: 100%';
+            document.getElementById('zoomSlider').value = 80;
+            document.getElementById('zoomValue').textContent = '80%';
+            document.getElementById('zoomInfo').textContent = 'Zoom: 80%';
             
             applyTransform();
             updateZoomInfo();
