@@ -582,7 +582,7 @@ window.startWindowLevel = 0;
 window.startWindowWidth = 0;
 window.startPanX = 0;
 window.startPanY = 0;
-window.zoom = 0.8; // Optimized initial zoom for medical imaging
+window.zoom = 1.0; // Normal initial zoom - let the canvas fit handle proper sizing
 window.panX = 0;
 window.panY = 0;
 window.windowWidth = 256;
@@ -822,16 +822,25 @@ window.activeTool = 'windowing';
 
 // Reset zoom function - FIXED for proper fit
 window.resetZoom = function() {
-    window.zoom = 0.8; // Reset to optimized zoom level for medical imaging
+    // Use the canvas fix's reset method if available
+    if (window.dicomCanvasFix && typeof window.dicomCanvasFix.resetZoomToFit === 'function') {
+        window.dicomCanvasFix.resetZoomToFit();
+        return;
+    }
+    
+    // Fallback method
+    window.zoom = 1.0; // Reset to normal zoom level
     window.panX = 0;
     window.panY = 0;
     
     // Redraw current image if available
     if (window.currentImageElement) {
         window.renderImageToCanvas(window.currentImageElement);
+    } else if (typeof updateImageDisplay === 'function') {
+        updateImageDisplay();
     }
     
-    console.log('Zoom reset to proper fit level (0.8x)');
+    console.log('Zoom reset to fit properly');
 };
 
 // Add modality-specific zoom adjustment function

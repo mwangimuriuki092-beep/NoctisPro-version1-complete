@@ -973,6 +973,10 @@
                     <i class="fas fa-search-plus"></i>
                     <span>Zoom</span>
                 </button>
+                <button class="tool" onclick="resetZoom()" title="Reset Zoom to Fit">
+                    <i class="fas fa-expand-arrows-alt"></i>
+                    <span>Fit</span>
+                </button>
                 <button class="tool" data-tool="pan" onclick="setTool('pan')" title="Pan">
                     <i class="fas fa-hand-paper"></i>
                     <span>Pan</span>
@@ -2712,13 +2716,13 @@
         }
 
         function resetView() {
-            zoomFactor = 0.8; // Reset to better fitting zoom level
+            zoomFactor = 1.0; // Reset to normal zoom level - let canvas fix handle proper fit
             panX = 0;
             panY = 0;
             
-            document.getElementById('zoomSlider').value = 80;
-            document.getElementById('zoomValue').textContent = '80%';
-            document.getElementById('zoomInfo').textContent = 'Zoom: 80%';
+            document.getElementById('zoomSlider').value = 100;
+            document.getElementById('zoomValue').textContent = '100%';
+            document.getElementById('zoomInfo').textContent = 'Zoom: 100%';
             
             applyTransform();
             updateZoomInfo();

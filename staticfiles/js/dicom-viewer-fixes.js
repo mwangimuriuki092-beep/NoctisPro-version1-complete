@@ -351,35 +351,38 @@ function fixCanvasEventHandlers() {
         handleCanvasMouseUp(e);
     });
     
-    // Mouse wheel for scrolling through images
-    canvas.addEventListener('wheel', function(e) {
-        e.preventDefault();
-        
-        if (e.ctrlKey) {
-            // Zoom
-            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-            if (typeof window.zoom !== 'undefined') {
-                window.zoom *= zoomFactor;
-                window.zoom = Math.max(0.1, Math.min(10, window.zoom));
-            }
-            if (typeof redrawCurrentImage === 'function') {
-                redrawCurrentImage();
-            } else if (typeof updateImageDisplay === 'function') {
-                updateImageDisplay();
-            }
-        } else {
-            // Scroll through images - use the functions we defined
-            if (e.deltaY > 0) {
-                if (typeof window.nextImage === 'function') {
-                    window.nextImage();
+        // Mouse wheel for scrolling through images
+        canvas.addEventListener('wheel', function(e) {
+            e.preventDefault();
+            
+            if (e.ctrlKey) {
+                // Zoom - MUCH MORE GENTLE for medical imaging
+                const zoomDelta = e.deltaY > 0 ? 0.98 : 1.02; // Very gentle zoom steps
+                if (typeof window.zoom !== 'undefined') {
+                    window.zoom *= zoomDelta;
+                    window.zoom = Math.max(0.25, Math.min(3.0, window.zoom)); // Optimized zoom range: 25% to 300%
+                } else if (typeof window.zoomFactor !== 'undefined') {
+                    window.zoomFactor *= zoomDelta;
+                    window.zoomFactor = Math.max(0.25, Math.min(3.0, window.zoomFactor));
+                }
+                if (typeof redrawCurrentImage === 'function') {
+                    redrawCurrentImage();
+                } else if (typeof updateImageDisplay === 'function') {
+                    updateImageDisplay();
                 }
             } else {
-                if (typeof window.previousImage === 'function') {
-                    window.previousImage();
+                // Scroll through images - use the functions we defined
+                if (e.deltaY > 0) {
+                    if (typeof window.nextImage === 'function') {
+                        window.nextImage();
+                    }
+                } else {
+                    if (typeof window.previousImage === 'function') {
+                        window.previousImage();
+                    }
                 }
             }
-        }
-    });
+        });
 }
 
 function handleCanvasMouseDown(e, x, y) {
@@ -452,19 +455,31 @@ function updatePanning(x, y) {
 }
 
 function handleZoomClick(x, y, isShiftKey) {
-    const zoomFactor = isShiftKey ? 0.8 : 1.25;
-    zoom *= zoomFactor;
-    zoom = Math.max(0.1, Math.min(10, zoom));
+    const zoomDelta = isShiftKey ? 0.9 : 1.1; // Gentle zoom steps for click
     
-    // Zoom towards cursor position
+    if (typeof window.zoom !== 'undefined') {
+        window.zoom *= zoomDelta;
+        window.zoom = Math.max(0.25, Math.min(3.0, window.zoom)); // Optimized zoom range
+    } else if (typeof window.zoomFactor !== 'undefined') {
+        window.zoomFactor *= zoomDelta;
+        window.zoomFactor = Math.max(0.25, Math.min(3.0, window.zoomFactor));
+    }
+    
+    // Zoom towards cursor position - reduced sensitivity
     const canvas = document.getElementById('dicomCanvas');
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     
-    panX += (centerX - x) * 0.1;
-    panY += (centerY - y) * 0.1;
+    if (typeof window.panX !== 'undefined') {
+        window.panX += (centerX - x) * 0.05; // Reduced from 0.1 to 0.05
+        window.panY += (centerY - y) * 0.05;
+    }
     
-    redrawCurrentImage();
+    if (typeof redrawCurrentImage === 'function') {
+        redrawCurrentImage();
+    } else if (typeof updateImageDisplay === 'function') {
+        updateImageDisplay();
+    }
 }
 
 function updateCursorPosition(x, y) {
@@ -567,7 +582,7 @@ window.startWindowLevel = 0;
 window.startWindowWidth = 0;
 window.startPanX = 0;
 window.startPanY = 0;
-window.zoom = 1.0;
+window.zoom = 1.0; // Normal initial zoom - let the canvas fit handle proper sizing
 window.panX = 0;
 window.panY = 0;
 window.windowWidth = 256;
@@ -804,5 +819,54 @@ window.showReconstructionPopup = function(title, views) {
 
 // Default tool
 window.activeTool = 'windowing';
+
+// Reset zoom function - FIXED for proper fit
+window.resetZoom = function() {
+    // Use the canvas fix's reset method if available
+    if (window.dicomCanvasFix && typeof window.dicomCanvasFix.resetZoomToFit === 'function') {
+        window.dicomCanvasFix.resetZoomToFit();
+        return;
+    }
+    
+    // Fallback method
+    window.zoom = 1.0; // Reset to normal zoom level
+    window.panX = 0;
+    window.panY = 0;
+    
+    // Redraw current image if available
+    if (window.currentImageElement) {
+        window.renderImageToCanvas(window.currentImageElement);
+    } else if (typeof updateImageDisplay === 'function') {
+        updateImageDisplay();
+    }
+    
+    console.log('Zoom reset to fit properly');
+};
+
+// Add modality-specific zoom adjustment function
+window.adjustZoomForModality = function(modality) {
+    if (!modality) return;
+    
+    const modalityUpper = modality.toUpperCase();
+    let targetZoom = 0.8; // Default
+    
+    if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modalityUpper)) {
+        targetZoom = 0.6; // X-ray images need less zoom
+        console.log('Applied X-ray specific zoom adjustment: 60%');
+    } else if (['CT', 'MR', 'MRI'].includes(modalityUpper)) {
+        targetZoom = 0.8; // CT/MR can use normal zoom
+        console.log('Applied CT/MR specific zoom adjustment: 80%');
+    }
+    
+    // Apply the zoom
+    if (typeof setZoom === 'function') {
+        setZoom(targetZoom);
+    } else if (typeof window.zoomFactor !== 'undefined') {
+        window.zoomFactor = targetZoom;
+        if (typeof updateImageDisplay === 'function') {
+            updateImageDisplay();
+        }
+    }
+};
 
 console.log('DICOM Viewer fixes loaded successfully');

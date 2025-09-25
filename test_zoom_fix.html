@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Zoom Fix Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .test-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .canvas-container {
+            border: 2px solid #333;
+            width: 800px;
+            height: 600px;
+            position: relative;
+            background: #111;
+        }
+        #dicom-canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #00d4ff;
+            color: black;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #00b4df;
+        }
+        .info {
+            background: #222;
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 800px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>DICOM Viewer Zoom Fix Test</h1>
+        
+        <div class="info">
+            <h3>Test Status:</h3>
+            <p id="status">Loading canvas fix...</p>
+            <p><strong>Expected Result:</strong> Images should display at normal size, fitting properly within the canvas without appearing zoomed in.</p>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="dicom-canvas"></canvas>
+        </div>
+
+        <div class="controls">
+            <button onclick="testImageDisplay()">Test Image Display</button>
+            <button onclick="resetZoom()">Reset Zoom</button>
+            <button onclick="testHighDPR()">Test High DPR</button>
+        </div>
+
+        <div class="info">
+            <h3>Test Results:</h3>
+            <ul id="results"></ul>
+        </div>
+    </div>
+
+    <script src="/static/js/dicom-viewer-canvas-fix.js"></script>
+    <script src="/static/js/dicom-viewer-fixes.js"></script>
+    <script>
+        let testResults = [];
+
+        function addResult(test, result, details = '') {
+            testResults.push({test, result, details});
+            updateResults();
+        }
+
+        function updateResults() {
+            const resultsEl = document.getElementById('results');
+            resultsEl.innerHTML = '';
+            testResults.forEach(r => {
+                const li = document.createElement('li');
+                li.innerHTML = `<strong>${r.test}:</strong> <span style="color: ${r.result === 'PASS' ? '#00ff88' : '#ff4444'}">${r.result}</span> ${r.details}`;
+                resultsEl.appendChild(li);
+            });
+        }
+
+        function testImageDisplay() {
+            // Create a test image
+            const img = new Image();
+            img.onload = function() {
+                // Test if canvas fix is working
+                if (window.dicomCanvasFix) {
+                    addResult('Canvas Fix Loaded', 'PASS', 'DicomCanvasFix instance available');
+                    
+                    // Test image display
+                    try {
+                        window.dicomCanvasFix.displayImage(img);
+                        addResult('Image Display', 'PASS', `Image displayed: ${img.width}x${img.height}`);
+                        
+                        // Check if image info is stored correctly
+                        if (window.dicomCanvasFix.imageInfo) {
+                            const info = window.dicomCanvasFix.imageInfo;
+                            addResult('Scale Factor', info.scaleFactor < 1.2 && info.scaleFactor > 0.5 ? 'PASS' : 'FAIL', 
+                                     `Scale: ${info.scaleFactor.toFixed(3)}`);
+                        }
+                    } catch (error) {
+                        addResult('Image Display', 'FAIL', error.message);
+                    }
+                } else {
+                    addResult('Canvas Fix Loaded', 'FAIL', 'DicomCanvasFix not available');
+                }
+            };
+            
+            // Create a test pattern image
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw test pattern
+            ctx.fillStyle = '#444';
+            ctx.fillRect(0, 0, 512, 512);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(50, 50, 412, 412);
+            ctx.fillStyle = '#000';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Test DICOM Image', 256, 256);
+            ctx.fillText('512x512 pixels', 256, 300);
+            
+            img.src = canvas.toDataURL();
+        }
+
+        function testHighDPR() {
+            const dpr = window.devicePixelRatio || 1;
+            addResult('Device Pixel Ratio', 'INFO', `DPR: ${dpr}`);
+            
+            if (window.dicomCanvasFix && window.dicomCanvasFix.canvas) {
+                const canvas = window.dicomCanvasFix.canvas;
+                const displayWidth = canvas.offsetWidth;
+                const displayHeight = canvas.offsetHeight;
+                const internalWidth = canvas.width;
+                const internalHeight = canvas.height;
+                
+                addResult('Canvas Dimensions', 'INFO', 
+                         `Display: ${displayWidth}x${displayHeight}, Internal: ${internalWidth}x${internalHeight}`);
+                
+                const scalingRatio = internalWidth / displayWidth;
+                addResult('Canvas Scaling', scalingRatio <= 2 ? 'PASS' : 'FAIL', 
+                         `Scaling ratio: ${scalingRatio.toFixed(2)} (should be ≤2)`);
+            }
+        }
+
+        // Initialize tests
+        setTimeout(() => {
+            if (window.dicomCanvasFix) {
+                document.getElementById('status').textContent = 'Canvas fix loaded successfully!';
+                addResult('Initialization', 'PASS', 'DICOM canvas fix initialized');
+            } else {
+                document.getElementById('status').textContent = 'Canvas fix failed to load!';
+                addResult('Initialization', 'FAIL', 'DICOM canvas fix not found');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
