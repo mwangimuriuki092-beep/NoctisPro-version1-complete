@@ -67,6 +67,68 @@ class DicomViewerEnhanced {
                 this.applyPreset(presetName);
             }
         });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Only activate shortcuts when not in input fields
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            switch (e.key.toLowerCase()) {
+                case 'w':
+                    e.preventDefault();
+                    this.setTool('window');
+                    break;
+                case 'z':
+                    e.preventDefault();
+                    this.setTool('zoom');
+                    break;
+                case 'p':
+                    e.preventDefault();
+                    this.setTool('pan');
+                    break;
+                case 'm':
+                    e.preventDefault();
+                    this.setTool('measure');
+                    break;
+                case 'a':
+                    e.preventDefault();
+                    this.setTool('annotate');
+                    break;
+                case 'r':
+                    e.preventDefault();
+                    this.resetView();
+                    break;
+                case 'i':
+                    e.preventDefault();
+                    this.setTool('invert');
+                    break;
+                case '1':
+                    e.preventDefault();
+                    this.applyPreset('chest x-ray');
+                    break;
+                case '2':
+                    e.preventDefault();
+                    this.applyPreset('bone x-ray');
+                    break;
+                case '3':
+                    e.preventDefault();
+                    this.applyPreset('soft x-ray');
+                    break;
+                case '4':
+                    e.preventDefault();
+                    this.applyPreset('extremity');
+                    break;
+                case '0':
+                    e.preventDefault();
+                    this.applyPreset('auto');
+                    break;
+                case 'escape':
+                    this.setTool('window');
+                    break;
+            }
+        });
     }
 
     setupUI() {
@@ -275,21 +337,44 @@ class DicomViewerEnhanced {
             if (typeof cornerstone !== 'undefined' && this.currentElement) {
                 const viewport = cornerstone.getViewport(this.currentElement);
                 
-                // Define presets
+                // Define presets - Enhanced with X-ray specific settings
                 const presets = {
+                    // CT Presets
                     lung: { windowWidth: 1500, windowCenter: -600 },
                     bone: { windowWidth: 2000, windowCenter: 300 },
                     soft: { windowWidth: 400, windowCenter: 40 },
                     brain: { windowWidth: 80, windowCenter: 40 },
                     liver: { windowWidth: 150, windowCenter: 30 },
-                    cine: { windowWidth: 600, windowCenter: 200 }
+                    cine: { windowWidth: 600, windowCenter: 200 },
+                    
+                    // X-ray Presets - Optimized for projection radiography
+                    'chest x-ray': { windowWidth: 2500, windowCenter: 500 },
+                    'bone x-ray': { windowWidth: 4000, windowCenter: 2000 },
+                    'soft x-ray': { windowWidth: 600, windowCenter: 100 },
+                    'extremity': { windowWidth: 3500, windowCenter: 1500 },
+                    'spine': { windowWidth: 3000, windowCenter: 1000 },
+                    'abdomen': { windowWidth: 1500, windowCenter: 200 },
+                    'pediatric': { windowWidth: 2000, windowCenter: 300 },
+                    
+                    // Additional useful presets
+                    'auto': { windowWidth: 'auto', windowCenter: 'auto' }, // Will trigger auto-windowing
+                    'full range': { windowWidth: 65535, windowCenter: 32767 }
                 };
 
                 if (presets[presetName]) {
-                    viewport.voi.windowWidth = presets[presetName].windowWidth;
-                    viewport.voi.windowCenter = presets[presetName].windowCenter;
-                    cornerstone.setViewport(this.currentElement, viewport);
-                    this.showToast(`${presetName.toUpperCase()} preset applied`, 'success', 1500);
+                    const preset = presets[presetName];
+                    
+                    // Handle auto-windowing
+                    if (preset.windowWidth === 'auto' || preset.windowCenter === 'auto') {
+                        // Trigger automatic windowing by reloading the image
+                        this.reloadImageWithAutoWindowing();
+                        this.showToast('Auto windowing applied', 'success', 1500);
+                    } else {
+                        viewport.voi.windowWidth = preset.windowWidth;
+                        viewport.voi.windowCenter = preset.windowCenter;
+                        cornerstone.setViewport(this.currentElement, viewport);
+                        this.showToast(`${presetName.toUpperCase()} preset applied`, 'success', 1500);
+                    }
                 } else {
                     this.showToast(`Unknown preset: ${presetName}`, 'warning');
                 }
@@ -299,6 +384,31 @@ class DicomViewerEnhanced {
         } catch (error) {
             this.showToast(`Failed to apply ${presetName} preset`, 'error');
             console.error('Preset error:', error);
+        }
+    }
+
+    reloadImageWithAutoWindowing() {
+        try {
+            // Reload the current image with automatic windowing
+            if (this.currentImageId) {
+                // Add auto-windowing parameter to the image request
+                const baseUrl = this.currentImageId.replace(/[?&](window_width|window_level)=[^&]*/g, '');
+                const separator = baseUrl.includes('?') ? '&' : '?';
+                const autoWindowUrl = `${baseUrl}${separator}auto_window=true`;
+                
+                // Reload the image
+                if (typeof cornerstone !== 'undefined' && this.currentElement) {
+                    cornerstone.loadImage(autoWindowUrl).then(image => {
+                        cornerstone.displayImage(this.currentElement, image);
+                    }).catch(error => {
+                        console.error('Failed to reload image with auto windowing:', error);
+                        this.showToast('Failed to apply auto windowing', 'error');
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Auto windowing error:', error);
+            this.showToast('Failed to apply auto windowing', 'error');
         }
     }
 
@@ -626,6 +736,136 @@ class DicomViewerEnhanced {
         this.currentElement = e.target;
         this.currentImageId = e.detail.imageId;
         console.log('Image loaded:', this.currentImageId);
+        
+        // Update modality badge and image info
+        this.updateModalityBadge(e.detail.image);
+        this.updateImageInfo(e.detail.image);
+    }
+
+    updateModalityBadge(image) {
+        try {
+            const modalityBadge = document.getElementById('modalityBadge');
+            const modalityText = document.getElementById('modalityText');
+            
+            if (!modalityBadge || !modalityText) return;
+            
+            // Extract modality from image metadata or URL
+            let modality = 'Unknown';
+            let icon = 'fas fa-question';
+            let badgeClass = '';
+            
+            // Try to get modality from image data or metadata
+            if (image && image.data && image.data.string) {
+                try {
+                    const modalityTag = image.data.string('x00080060');
+                    if (modalityTag) {
+                        modality = modalityTag.toUpperCase();
+                    }
+                } catch (e) {
+                    // Fallback: try to extract from URL or other sources
+                    console.log('Could not extract modality from DICOM tags');
+                }
+            }
+            
+            // Set appropriate icon and class based on modality
+            switch (modality.toUpperCase()) {
+                case 'CR':
+                case 'DX':
+                case 'RF':
+                case 'XA':
+                case 'MG':
+                    icon = 'fas fa-x-ray';
+                    badgeClass = 'xray';
+                    modalityText.textContent = modality === 'CR' ? 'X-Ray' : 
+                                             modality === 'DX' ? 'Digital X-Ray' :
+                                             modality === 'MG' ? 'Mammography' : 'X-Ray';
+                    break;
+                case 'CT':
+                    icon = 'fas fa-circle-dot';
+                    badgeClass = 'ct';
+                    modalityText.textContent = 'CT';
+                    break;
+                case 'MR':
+                    icon = 'fas fa-magnet';
+                    badgeClass = 'mr';
+                    modalityText.textContent = 'MRI';
+                    break;
+                case 'US':
+                    icon = 'fas fa-wave-square';
+                    badgeClass = 'us';
+                    modalityText.textContent = 'Ultrasound';
+                    break;
+                default:
+                    modalityText.textContent = modality || 'Unknown';
+            }
+            
+            // Update badge
+            modalityBadge.className = `modality-badge ${badgeClass}`;
+            const iconElement = modalityBadge.querySelector('i');
+            if (iconElement) {
+                iconElement.className = icon;
+            }
+            
+        } catch (error) {
+            console.error('Error updating modality badge:', error);
+        }
+    }
+
+    updateImageInfo(image) {
+        try {
+            // Update image dimensions
+            const dimensionsEl = document.getElementById('imageDimensions');
+            if (dimensionsEl && image) {
+                const width = image.width || 'Unknown';
+                const height = image.height || 'Unknown';
+                dimensionsEl.textContent = `${width} × ${height}`;
+            }
+            
+            // Update pixel spacing
+            const pixelSpacingEl = document.getElementById('pixelSpacing');
+            if (pixelSpacingEl && image && image.data && image.data.string) {
+                try {
+                    const spacing = image.data.string('x00280030');
+                    if (spacing) {
+                        const spacingValues = spacing.split('\\');
+                        if (spacingValues.length >= 2) {
+                            pixelSpacingEl.textContent = `${parseFloat(spacingValues[0]).toFixed(2)} × ${parseFloat(spacingValues[1]).toFixed(2)} mm`;
+                        } else {
+                            pixelSpacingEl.textContent = spacing;
+                        }
+                    } else {
+                        pixelSpacingEl.textContent = 'Unknown';
+                    }
+                } catch (e) {
+                    pixelSpacingEl.textContent = 'Unknown';
+                }
+            }
+            
+            // Update body part
+            const bodyPartEl = document.getElementById('bodyPart');
+            if (bodyPartEl && image && image.data && image.data.string) {
+                try {
+                    const bodyPart = image.data.string('x00180015');
+                    bodyPartEl.textContent = bodyPart || 'Unknown';
+                } catch (e) {
+                    bodyPartEl.textContent = 'Unknown';
+                }
+            }
+            
+            // Update series description
+            const seriesDescEl = document.getElementById('seriesDescription');
+            if (seriesDescEl && image && image.data && image.data.string) {
+                try {
+                    const seriesDesc = image.data.string('x0008103e');
+                    seriesDescEl.textContent = seriesDesc || 'Unknown';
+                } catch (e) {
+                    seriesDescEl.textContent = 'Unknown';
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error updating image info:', error);
+        }
     }
 
     onImageLoadProgress(e) {

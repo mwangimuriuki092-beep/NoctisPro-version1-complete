@@ -519,27 +519,67 @@
         .preset-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-top: 12px;
+            gap: 6px;
+            margin-top: 10px;
         }
 
         .preset-btn {
             background: linear-gradient(135deg, #404040, var(--border-color));
             color: #e0e0e0;
             border: none;
-            padding: 10px 12px;
+            padding: 8px 10px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
             transition: all 0.3s ease;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
 
         .preset-btn:hover {
             background: linear-gradient(135deg, #555, #444);
             transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
             box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Modality Badge */
+        .modality-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(135deg, var(--accent-color), #106ebe);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: auto;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .modality-badge.xray {
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+        }
+
+        .modality-badge.ct {
+            background: linear-gradient(135deg, #e94b3c, #c0392b);
+        }
+
+        .modality-badge.mr {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+        }
+
+        .modality-badge.us {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+        }
+
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         /* Info Cards */
@@ -836,19 +876,19 @@
         <button class="ui-toggle" onclick="toggleUI()"><i class="fas fa-eye-slash"></i> UI</button>
         <!-- Left Toolbar -->
         <div class="toolbar">
-            <button class="tool-btn active" data-tool="windowing" title="Window/Level">
+            <button class="tool-btn active" data-tool="windowing" title="Window/Level (W) - Adjust image contrast and brightness">
                 <i class="fas fa-adjust"></i>
                 <span>Window</span>
             </button>
-            <button class="tool-btn" data-tool="zoom" title="Zoom">
+            <button class="tool-btn" data-tool="zoom" title="Zoom (Z) - Magnify or shrink the image">
                 <i class="fas fa-search-plus"></i>
                 <span>Zoom</span>
             </button>
-            <button class="tool-btn" data-tool="pan" title="Pan">
+            <button class="tool-btn" data-tool="pan" title="Pan (P) - Move the image around">
                 <i class="fas fa-hand-paper"></i>
                 <span>Pan</span>
             </button>
-            <button class="tool-btn" data-tool="measure" title="Measure">
+            <button class="tool-btn" data-tool="measure" title="Measure (M) - Make distance and angle measurements">
                 <i class="fas fa-ruler"></i>
                 <span>Measure</span>
             </button>
@@ -860,7 +900,7 @@
                 <i class="fas fa-vector-square"></i>
                 <span>Area</span>
             </button>
-            <button class="tool-btn" data-tool="annotate" title="Annotate">
+            <button class="tool-btn" data-tool="annotate" title="Annotate (A) - Add text annotations to the image">
                 <i class="fas fa-comment"></i>
                 <span>Note</span>
             </button>
@@ -876,7 +916,7 @@
                 <i class="fas fa-play"></i>
                 <span>Cine</span>
             </button>
-            <button class="tool-btn" data-tool="invert" title="Invert">
+            <button class="tool-btn" data-tool="invert" title="Invert (I) - Invert image colors (useful for X-rays)">
                 <i class="fas fa-adjust"></i>
                 <span>Invert</span>
             </button>
@@ -888,7 +928,7 @@
                 <i class="fas fa-exchange-alt"></i>
                 <span>Flip</span>
             </button>
-            <button class="tool-btn" data-tool="reset" title="Reset View">
+            <button class="tool-btn" data-tool="reset" title="Reset View (R)">
                 <i class="fas fa-undo"></i>
                 <span>Reset</span>
             </button>
@@ -1037,10 +1077,21 @@
                 </div>
 
                 <div class="preset-grid">
-                    <button class="preset-btn" onclick="applyPreset('lung')">Lung</button>
-                    <button class="preset-btn" onclick="applyPreset('bone')">Bone</button>
-                    <button class="preset-btn" onclick="applyPreset('soft')">Soft Tissue</button>
-                    <button class="preset-btn" onclick="applyPreset('brain')">Brain</button>
+                    <!-- CT Presets -->
+                    <button class="preset-btn" onclick="applyPreset('lung')" title="Lung parenchyma (WW:1500, WL:-600)">Lung</button>
+                    <button class="preset-btn" onclick="applyPreset('bone')" title="Bone structures (WW:2000, WL:300)">Bone</button>
+                    <button class="preset-btn" onclick="applyPreset('soft')" title="Soft tissue (WW:400, WL:40)">Soft Tissue</button>
+                    <button class="preset-btn" onclick="applyPreset('brain')" title="Brain tissue (WW:80, WL:40)">Brain</button>
+                    
+                    <!-- X-ray Presets -->
+                    <button class="preset-btn" onclick="applyPreset('chest x-ray')" title="Chest X-ray (WW:2500, WL:500)" style="background: linear-gradient(135deg, #4a90e2, #357abd);">Chest XR</button>
+                    <button class="preset-btn" onclick="applyPreset('bone x-ray')" title="Bone X-ray (WW:4000, WL:2000)" style="background: linear-gradient(135deg, #e94b3c, #c0392b);">Bone XR</button>
+                    <button class="preset-btn" onclick="applyPreset('extremity')" title="Extremity X-ray (WW:3500, WL:1500)" style="background: linear-gradient(135deg, #f39c12, #e67e22);">Extremity</button>
+                    <button class="preset-btn" onclick="applyPreset('spine')" title="Spine X-ray (WW:3000, WL:1000)" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">Spine XR</button>
+                    
+                    <!-- Auto and Utility -->
+                    <button class="preset-btn" onclick="applyPreset('auto')" title="Automatic windowing" style="background: linear-gradient(135deg, #27ae60, #2ecc71); font-weight: bold;">Auto</button>
+                    <button class="preset-btn" onclick="applyPreset('soft x-ray')" title="X-ray soft tissue (WW:600, WL:100)" style="background: linear-gradient(135deg, #34495e, #2c3e50);">Soft XR</button>
                 </div>
             </div>
 
@@ -1122,6 +1173,10 @@
                 <div class="panel-title">
                     <i class="fas fa-info-circle"></i>
                     Image Info
+                    <div class="modality-badge" id="modalityBadge" title="Image modality">
+                        <i class="fas fa-x-ray"></i>
+                        <span id="modalityText">-</span>
+                    </div>
                 </div>
                 
                 <div class="info-card">
@@ -1135,7 +1190,12 @@
                 </div>
                 
                 <div class="info-card">
-                    <div class="info-label">Series</div>
+                    <div class="info-label">Body Part</div>
+                    <div class="info-value" id="bodyPart">-</div>
+                </div>
+                
+                <div class="info-card">
+                    <div class="info-label">Series Description</div>
                     <div class="info-value" id="seriesDescription">-</div>
                 </div>
                 

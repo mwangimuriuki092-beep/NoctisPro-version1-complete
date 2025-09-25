@@ -50,13 +50,16 @@ class DicomProcessor:
             'fat': {'ww': 200, 'wl': -100, 'description': 'Adipose tissue'},
             
             # X-ray specific presets for optimal visualization
-            'xray_chest': {'ww': 2000, 'wl': 0, 'description': 'Chest X-ray - lungs and mediastinum'},
-            'xray_bone': {'ww': 3000, 'wl': 500, 'description': 'X-ray bone structures'},
-            'xray_soft': {'ww': 400, 'wl': 50, 'description': 'X-ray soft tissue detail'},
-            'xray_pediatric': {'ww': 1500, 'wl': 0, 'description': 'Pediatric X-ray imaging'},
-            'xray_extremity': {'ww': 2500, 'wl': 300, 'description': 'Extremity X-rays'},
-            'xray_spine': {'ww': 2000, 'wl': 200, 'description': 'Spine X-ray imaging'},
-            'xray_abdomen': {'ww': 1000, 'wl': 50, 'description': 'Abdominal X-ray'},
+            'xray_chest': {'ww': 2500, 'wl': 500, 'description': 'Chest X-ray - lungs and mediastinum'},
+            'xray_bone': {'ww': 4000, 'wl': 2000, 'description': 'X-ray bone structures'},
+            'xray_soft': {'ww': 600, 'wl': 100, 'description': 'X-ray soft tissue detail'},
+            'xray_pediatric': {'ww': 2000, 'wl': 300, 'description': 'Pediatric X-ray imaging'},
+            'xray_extremity': {'ww': 3500, 'wl': 1500, 'description': 'Extremity X-rays'},
+            'xray_spine': {'ww': 3000, 'wl': 1000, 'description': 'Spine X-ray imaging'},
+            'xray_abdomen': {'ww': 1500, 'wl': 200, 'description': 'Abdominal X-ray'},
+            'xray_ankle': {'ww': 3500, 'wl': 1500, 'description': 'Ankle and foot X-ray'},
+            'xray_knee': {'ww': 3000, 'wl': 1200, 'description': 'Knee X-ray imaging'},
+            'xray_hip': {'ww': 3500, 'wl': 1800, 'description': 'Hip and pelvis X-ray'},
             'vessels': {'ww': 600, 'wl': 100, 'description': 'Vascular structures'},
             'kidney': {'ww': 400, 'wl': 30, 'description': 'Renal parenchyma'},
             'pancreas': {'ww': 200, 'wl': 30, 'description': 'Pancreatic tissue'},
@@ -101,8 +104,8 @@ class DicomProcessor:
             'noise_threshold': 10  # HU units standard deviation
         }
 
-    def apply_windowing(self, pixel_array, window_width, window_level, invert=False, enhanced_contrast=True):
-        """Apply advanced windowing to DICOM pixel array with enhanced tissue contrast"""
+    def apply_windowing(self, pixel_array, window_width, window_level, invert=False, enhanced_contrast=True, modality='CT'):
+        """Apply advanced windowing to DICOM pixel array with enhanced tissue contrast optimized for X-ray images"""
         image_data = pixel_array.astype(np.float32)
 
         # Calculate window bounds
@@ -111,23 +114,28 @@ class DicomProcessor:
 
         if enhanced_contrast:
             # Enhanced windowing with improved tissue differentiation
-            # Apply multi-stage enhancement for better X-ray visualization
+            # Apply multi-stage enhancement optimized for X-ray visualization
             
-            # Stage 1: Noise reduction with edge preservation
+            # Stage 1: Modality-specific preprocessing
+            if modality in ['CR', 'DX', 'RF', 'XA', 'MG']:  # X-ray modalities
+                # For X-ray images, apply specialized preprocessing
+                image_data = self._apply_xray_preprocessing(image_data)
+            
+            # Stage 2: Noise reduction with edge preservation
             image_data = self._apply_edge_preserving_filter(image_data)
             
-            # Stage 2: Adaptive histogram equalization for local contrast
+            # Stage 3: Adaptive histogram equalization for local contrast
             image_data = self._apply_adaptive_histogram_equalization(image_data, min_val, max_val)
             
-            # Stage 3: Normalize to window range
+            # Stage 4: Normalize to window range
             normalized = np.clip((image_data - min_val) / max(1.0, max_val - min_val), 0.0, 1.0)
             
-            # Stage 4: Apply contrast enhancement curve
+            # Stage 5: Apply contrast enhancement curve
             # This provides better tissue differentiation by stretching contrast in mid-range
-            enhanced = self._apply_contrast_curve(normalized, window_width, window_level)
+            enhanced = self._apply_contrast_curve(normalized, window_width, window_level, modality)
             
-            # Stage 5: Apply unsharp masking for edge enhancement
-            enhanced = self._apply_unsharp_masking(enhanced)
+            # Stage 6: Apply unsharp masking for edge enhancement (stronger for X-rays)
+            enhanced = self._apply_unsharp_masking(enhanced, modality)
             
             # Scale to display range
             image_data = enhanced * 255.0
@@ -139,9 +147,9 @@ class DicomProcessor:
             else:
                 image_data = np.zeros_like(image_data)
 
-        # Apply gamma correction for medical displays (optional)
+        # Apply gamma correction for medical displays (modality-specific)
         if enhanced_contrast:
-            gamma = self._get_optimal_gamma(window_width, window_level)
+            gamma = self._get_optimal_gamma(window_width, window_level, modality)
             image_data = np.power(image_data / 255.0, gamma) * 255.0
 
         if invert:
@@ -151,40 +159,156 @@ class DicomProcessor:
         image_data = np.clip(image_data, 0, 255)
         return image_data.astype(np.uint8)
 
-    def _apply_contrast_curve(self, normalized_data, window_width, window_level):
-        """Apply contrast enhancement curve for better tissue differentiation"""
-        # Adaptive contrast enhancement based on window settings
-        if window_width > 1000:  # Wide window (e.g., lung, bone)
-            # Use moderate S-curve for wide windows
-            contrast_factor = 1.2
-        elif window_width < 200:  # Narrow window (e.g., brain)
-            # Use stronger enhancement for narrow windows
-            contrast_factor = 1.8
-        else:  # Medium window (soft tissue)
-            contrast_factor = 1.5
+    def _apply_contrast_curve(self, normalized_data, window_width, window_level, modality='CT'):
+        """Apply contrast enhancement curve for better tissue differentiation with modality-specific optimization"""
+        # Adaptive contrast enhancement based on window settings and modality
+        if modality in ['CR', 'DX', 'RF', 'XA', 'MG']:  # X-ray modalities
+            # X-ray images benefit from stronger contrast enhancement
+            if window_width > 2000:  # Wide X-ray window (bone)
+                contrast_factor = 1.4
+            elif window_width < 500:  # Narrow X-ray window (soft tissue)
+                contrast_factor = 2.2
+            else:  # Medium X-ray window
+                contrast_factor = 1.8
+        else:  # CT and other modalities
+            if window_width > 1000:  # Wide window (e.g., lung, bone)
+                contrast_factor = 1.2
+            elif window_width < 200:  # Narrow window (e.g., brain)
+                contrast_factor = 1.8
+            else:  # Medium window (soft tissue)
+                contrast_factor = 1.5
         
         # Apply sigmoid-based contrast enhancement
         # This creates an S-curve that enhances mid-range contrast
         center = 0.5
         steepness = contrast_factor * 4.0
         
-        # Sigmoid function: 1 / (1 + exp(-steepness * (x - center)))
-        enhanced = 1.0 / (1.0 + np.exp(-steepness * (normalized_data - center)))
+        # For X-ray images, use a modified sigmoid that enhances bone-soft tissue contrast
+        if modality in ['CR', 'DX', 'RF', 'XA', 'MG']:
+            # Use a double sigmoid for better bone-soft tissue differentiation
+            enhanced1 = 1.0 / (1.0 + np.exp(-steepness * (normalized_data - 0.3)))
+            enhanced2 = 1.0 / (1.0 + np.exp(-steepness * (normalized_data - 0.7)))
+            enhanced = 0.5 * enhanced1 + 0.5 * enhanced2
+        else:
+            # Standard sigmoid for CT and other modalities
+            enhanced = 1.0 / (1.0 + np.exp(-steepness * (normalized_data - center)))
         
         # Normalize to 0-1 range
-        enhanced = (enhanced - enhanced.min()) / (enhanced.max() - enhanced.min() + 1e-8)
+        if enhanced.max() > enhanced.min():
+            enhanced = (enhanced - enhanced.min()) / (enhanced.max() - enhanced.min())
         
         return enhanced
-
-    def _get_optimal_gamma(self, window_width, window_level):
-        """Get optimal gamma correction for medical imaging display"""
-        # Adaptive gamma based on window settings
-        if window_level < -200:  # Lung window
-            return 0.8  # Brighten dark areas
-        elif window_level > 200:  # Bone window  
-            return 1.2  # Darken bright areas slightly
-        else:  # Soft tissue
-            return 1.0  # Standard gamma
+    
+    def get_optimal_xray_windowing(self, pixel_array, body_part='', series_description=''):
+        """Determine optimal windowing for X-ray images based on content analysis"""
+        try:
+            # Analyze pixel value distribution
+            p1, p5, p50, p95, p99 = np.percentile(pixel_array.flatten(), [1, 5, 50, 95, 99])
+            pixel_range = p99 - p1
+            
+            # Determine body part from description if not provided
+            body_part = body_part.lower()
+            series_desc = series_description.lower()
+            
+            # Body part detection from series description
+            if not body_part:
+                if any(term in series_desc for term in ['chest', 'thorax', 'lung']):
+                    body_part = 'chest'
+                elif any(term in series_desc for term in ['spine', 'cervical', 'lumbar', 'thoracic']):
+                    body_part = 'spine'
+                elif any(term in series_desc for term in ['ankle', 'foot']):
+                    body_part = 'ankle'
+                elif any(term in series_desc for term in ['knee']):
+                    body_part = 'knee'
+                elif any(term in series_desc for term in ['hip', 'pelvis']):
+                    body_part = 'hip'
+                elif any(term in series_desc for term in ['hand', 'wrist', 'elbow', 'shoulder', 'arm']):
+                    body_part = 'extremity'
+                elif any(term in series_desc for term in ['abdomen', 'abdominal']):
+                    body_part = 'abdomen'
+            
+            # Select optimal preset based on body part and pixel characteristics
+            if body_part == 'chest':
+                if pixel_range > 3000:  # High dynamic range - likely chest with lungs
+                    return self.window_presets['xray_chest']['ww'], self.window_presets['xray_chest']['wl']
+                else:
+                    return self.window_presets['xray_soft']['ww'], self.window_presets['xray_soft']['wl']
+            elif body_part in ['spine', 'ankle', 'knee', 'hip', 'extremity']:
+                # Bone-focused areas
+                return self.window_presets[f'xray_{body_part}']['ww'], self.window_presets[f'xray_{body_part}']['wl']
+            elif body_part == 'abdomen':
+                return self.window_presets['xray_abdomen']['ww'], self.window_presets['xray_abdomen']['wl']
+            else:
+                # Auto-determine based on pixel distribution
+                if pixel_range > 4000:  # Very high dynamic range
+                    # Likely bone imaging
+                    ww = min(4000, pixel_range * 0.8)
+                    wl = p50 + (p95 - p50) * 0.3
+                elif pixel_range > 2000:  # High dynamic range
+                    # Likely chest or mixed tissue
+                    ww = min(3000, pixel_range * 0.7)
+                    wl = p50
+                else:  # Lower dynamic range
+                    # Likely soft tissue focus
+                    ww = min(1500, pixel_range * 0.9)
+                    wl = p50
+                
+                return float(ww), float(wl)
+                
+        except Exception as e:
+            logger.warning(f"Failed to determine optimal X-ray windowing: {e}")
+            # Default X-ray windowing
+            return 2500.0, 500.0
+    
+    def _apply_xray_preprocessing(self, image_data):
+        """Apply X-ray specific preprocessing for better visualization"""
+        try:
+            # X-ray images often benefit from logarithmic transformation
+            # This helps with the wide dynamic range typical in X-ray images
+            
+            # Ensure positive values for log transformation
+            min_val = np.min(image_data)
+            if min_val <= 0:
+                image_data = image_data - min_val + 1
+            
+            # Apply logarithmic transformation to compress dynamic range
+            # This is similar to what film does naturally
+            log_transformed = np.log1p(image_data)  # log1p(x) = log(1 + x)
+            
+            # Normalize back to original range
+            log_min, log_max = np.min(log_transformed), np.max(log_transformed)
+            if log_max > log_min:
+                normalized_log = (log_transformed - log_min) / (log_max - log_min)
+                # Scale to match original data range
+                orig_min, orig_max = np.min(image_data), np.max(image_data)
+                result = normalized_log * (orig_max - orig_min) + orig_min
+            else:
+                result = image_data
+            
+            return result.astype(np.float32)
+            
+        except Exception as e:
+            logger.warning(f"X-ray preprocessing failed: {e}")
+            return image_data
+    
+    def _get_optimal_gamma(self, window_width, window_level, modality='CT'):
+        """Get optimal gamma correction for medical imaging display with modality-specific optimization"""
+        # Adaptive gamma based on window settings and modality
+        if modality in ['CR', 'DX', 'RF', 'XA', 'MG']:  # X-ray modalities
+            # X-ray images typically benefit from different gamma correction
+            if window_level < 0:  # Low-density structures (lungs in chest X-ray)
+                return 0.7  # Brighten dark areas more aggressively
+            elif window_level > 1000:  # High-density structures (bones)
+                return 1.3  # Darken bright areas to show bone detail
+            else:  # Soft tissue X-ray
+                return 0.9  # Slight brightening for better soft tissue contrast
+        else:  # CT and other modalities
+            if window_level < -200:  # Lung window
+                return 0.8  # Brighten dark areas
+            elif window_level > 200:  # Bone window  
+                return 1.2  # Darken bright areas slightly
+            else:  # Soft tissue
+                return 1.0  # Standard gamma
     
     def _apply_edge_preserving_filter(self, image_data):
         """Apply edge-preserving noise reduction filter for better image quality"""
@@ -272,21 +396,27 @@ class DicomProcessor:
             logger.warning(f"Adaptive histogram equalization failed: {e}")
             return image_data
     
-    def _apply_unsharp_masking(self, normalized_data):
-        """Apply unsharp masking for edge enhancement"""
+    def _apply_unsharp_masking(self, normalized_data, modality='CT'):
+        """Apply unsharp masking for edge enhancement with modality-specific parameters"""
         try:
             from scipy.ndimage import gaussian_filter
             
+            # Modality-specific parameters
+            if modality in ['CR', 'DX', 'RF', 'XA', 'MG']:  # X-ray modalities
+                # X-ray images benefit from stronger edge enhancement
+                sigma = 1.2  # Slightly larger blur radius for X-rays
+                amount = 0.8  # Stronger sharpening for bone-soft tissue contrast
+                threshold = 0.015  # Lower threshold to enhance more edges
+            else:  # CT and other modalities
+                sigma = 1.0  # Standard blur radius
+                amount = 0.5  # Standard sharpening strength
+                threshold = 0.02  # Standard threshold
+            
             # Create blurred version
-            sigma = 1.0  # Blur radius
             blurred = gaussian_filter(normalized_data, sigma=sigma)
             
             # Create unsharp mask
             mask = normalized_data - blurred
-            
-            # Apply sharpening
-            amount = 0.5  # Sharpening strength
-            threshold = 0.02  # Threshold to prevent noise amplification
             
             # Only sharpen where the mask is above threshold
             mask_strong = np.abs(mask) > threshold

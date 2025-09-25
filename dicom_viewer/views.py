@@ -901,8 +901,8 @@ def api_study_progress(request, study_id):
         'last_updated': study.last_updated.isoformat()
     })
 
-def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False):
-    """Convert numpy array to base64 encoded image with proper windowing"""
+def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False, modality='CT', enhanced_contrast=True):
+    """Convert numpy array to base64 encoded image with enhanced medical imaging processing"""
     try:
         # Validate input
         if array is None or array.size == 0:
@@ -930,44 +930,83 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
             logger.warning("_array_to_base64_image: array contains NaN or inf values")
             image_data = np.nan_to_num(image_data, nan=0.0, posinf=0.0, neginf=0.0)
         
-        # Apply windowing if parameters provided
-        if window_width is not None and window_level is not None:
-            # Apply window/level
-            min_val = window_level - window_width / 2
-            max_val = window_level + window_width / 2
-            
-            # Clip and normalize
-            image_data = np.clip(image_data, min_val, max_val)
-            if max_val > min_val:
-                image_data = (image_data - min_val) / (max_val - min_val) * 255
-            else:
-                image_data = np.zeros_like(image_data)
+        # Use enhanced DICOM processing for medical images
+        if window_width is not None and window_level is not None and enhanced_contrast:
+            try:
+                processor = DicomProcessor()
+                processed_array = processor.apply_windowing(
+                    image_data, 
+                    window_width, 
+                    window_level, 
+                    invert=inverted, 
+                    enhanced_contrast=True,
+                    modality=modality
+                )
+                # Convert to PIL Image directly from processed array
+                img = Image.fromarray(processed_array, mode='L')
+            except Exception as e:
+                logger.warning(f"Enhanced processing failed: {e}, falling back to standard windowing")
+                # Fallback to standard windowing
+                if window_width is not None and window_level is not None:
+                    min_val = window_level - window_width / 2
+                    max_val = window_level + window_width / 2
+                    image_data = np.clip(image_data, min_val, max_val)
+                    if max_val > min_val:
+                        image_data = (image_data - min_val) / (max_val - min_val) * 255
+                    else:
+                        image_data = np.zeros_like(image_data)
+                else:
+                    data_min, data_max = image_data.min(), image_data.max()
+                    if data_max > data_min:
+                        image_data = ((image_data - data_min) / (data_max - data_min) * 255)
+                    else:
+                        image_data = np.zeros_like(image_data)
+                
+                if inverted:
+                    image_data = 255 - image_data
+                
+                normalized = np.clip(image_data, 0, 255).astype(np.uint8)
+                img = Image.fromarray(normalized, mode='L')
         else:
-            # Default normalization
-            data_min, data_max = image_data.min(), image_data.max()
-            if data_max > data_min:
-                image_data = ((image_data - data_min) / (data_max - data_min) * 255)
+            # Standard processing for non-medical images or when enhanced processing is disabled
+            if window_width is not None and window_level is not None:
+                min_val = window_level - window_width / 2
+                max_val = window_level + window_width / 2
+                image_data = np.clip(image_data, min_val, max_val)
+                if max_val > min_val:
+                    image_data = (image_data - min_val) / (max_val - min_val) * 255
+                else:
+                    image_data = np.zeros_like(image_data)
             else:
-                image_data = np.zeros_like(image_data)
+                data_min, data_max = image_data.min(), image_data.max()
+                if data_max > data_min:
+                    image_data = ((image_data - data_min) / (data_max - data_min) * 255)
+                else:
+                    image_data = np.zeros_like(image_data)
+            
+            if inverted:
+                image_data = 255 - image_data
+            
+            normalized = np.clip(image_data, 0, 255).astype(np.uint8)
+            img = Image.fromarray(normalized, mode='L')
         
-        # Apply inversion if requested
-        if inverted:
-            image_data = 255 - image_data
-        
-        # Convert to uint8
-        normalized = np.clip(image_data, 0, 255).astype(np.uint8)
-        
-        # Convert to PIL Image
-        img = Image.fromarray(normalized, mode='L')
-        
-        # Convert to base64
+        # Convert to base64 with optimized compression
         buffer = BytesIO()
         try:
-            # Favor speed over size
-            img.save(buffer, format='PNG', optimize=False, compress_level=1)
+            # For X-ray images, use higher quality PNG settings for better detail
+            if modality in ['CR', 'DX', 'RF', 'XA', 'MG']:
+                img.save(buffer, format='PNG', optimize=True, compress_level=6, pnginfo=None)
+            else:
+                # For CT/MR, balance speed and quality
+                img.save(buffer, format='PNG', optimize=True, compress_level=3, pnginfo=None)
         except Exception as save_err:
             logger.warning(f"PNG save with optimization failed: {save_err}, trying basic save")
-            img.save(buffer, format='PNG')
+            try:
+                img.save(buffer, format='PNG', optimize=False, compress_level=1)
+            except Exception as fallback_err:
+                logger.error(f"Basic PNG save also failed: {fallback_err}")
+                # Last resort: try JPEG for compatibility
+                img.save(buffer, format='JPEG', quality=85, optimize=True)
         
         img_str = base64.b64encode(buffer.getvalue()).decode()
         
@@ -1102,19 +1141,30 @@ def api_dicom_image_display(request, image_id):
             try:
                 processor = DicomProcessor()
                 modality = str(getattr(ds, 'Modality', '')).upper() if ds is not None else 'CT'
-                ww, wl = processor.auto_window_from_data(arr, percentile_range=(2, 98), modality=modality)
                 
-                # Apply modality-specific adjustments
-                modality = str(getattr(ds, 'Modality', '')).upper() if ds is not None else ''
-                if modality == 'CT':
-                    # For CT, suggest optimal preset based on HU range
-                    suggested_preset = processor.get_optimal_preset_for_hu_range(
-                        arr.min(), arr.max(), modality
-                    )
-                    if suggested_preset in processor.window_presets:
-                        preset = processor.window_presets[suggested_preset]
-                        ww = preset['ww']
-                        wl = preset['wl']
+                # Use modality-specific windowing
+                if modality in ['CR', 'DX', 'RF', 'XA', 'MG']:  # X-ray modalities
+                    # Use X-ray specific windowing
+                    body_part = str(getattr(ds, 'BodyPartExamined', '')) if ds is not None else ''
+                    series_desc = str(getattr(ds, 'SeriesDescription', '')) if ds is not None else ''
+                    ww, wl = processor.get_optimal_xray_windowing(arr, body_part, series_desc)
+                else:
+                    # Use general auto-windowing for CT and other modalities
+                    ww, wl = processor.auto_window_from_data(arr, percentile_range=(2, 98), modality=modality)
+                    
+                    # Apply modality-specific adjustments
+                    if modality == 'CT':
+                        # For CT, suggest optimal preset based on HU range
+                        try:
+                            suggested_preset = processor.get_optimal_preset_for_hu_range(
+                                arr.min(), arr.max(), modality
+                            )
+                            if suggested_preset in processor.window_presets:
+                                preset = processor.window_presets[suggested_preset]
+                                ww = preset['ww']
+                                wl = preset['wl']
+                        except:
+                            pass
                 
                 return ww, wl
             except Exception:
@@ -1189,7 +1239,15 @@ def api_dicom_image_display(request, image_id):
         image_data_url = None
         if pixel_array is not None:
             try:
-                image_data_url = _array_to_base64_image(pixel_array, window_width, window_level, inverted)
+                modality = str(getattr(ds, 'Modality', 'CT')).upper() if ds is not None else 'CT'
+                image_data_url = _array_to_base64_image(
+                    pixel_array, 
+                    window_width, 
+                    window_level, 
+                    inverted,
+                    modality=modality,
+                    enhanced_contrast=True
+                )
             except Exception as e:
                 warnings['render_error'] = str(e)
                 image_data_url = None
@@ -1229,7 +1287,18 @@ def api_dicom_image_display(request, image_id):
             },
             'warnings': ({'pixel_decode_error': pixel_decode_error, **warnings} if (pixel_decode_error or warnings) else None)
         }
-        return JsonResponse(payload)
+        
+        response = JsonResponse(payload)
+        
+        # Add caching headers for better performance
+        # Cache for 5 minutes for processed images (windowing may change)
+        response['Cache-Control'] = 'public, max-age=300'
+        response['Vary'] = 'window_width, window_level, inverted'
+        
+        # Add compression hint
+        response['Content-Encoding-Hint'] = 'gzip'
+        
+        return response
     except Exception as e:
         # Last-resort: never 500; return minimal defaults
         minimal = {
