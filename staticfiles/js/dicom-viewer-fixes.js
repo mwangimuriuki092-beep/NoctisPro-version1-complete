@@ -94,20 +94,154 @@ function setupMissingFunctions() {
         }
     };
     
-    window.generateMPR = window.generateMPR || function() {
-        if (!currentSeries) {
+    window.generateMPR = window.generateMPR || async function() {
+        if (!window.currentSeries && !window.currentStudy) {
             showToast('Please load a series first', 'warning');
             return;
         }
-        showToast('MPR reconstruction would be implemented here', 'info');
+        
+        const seriesId = window.currentSeries?.id || window.currentStudy?.series?.[0]?.id;
+        if (!seriesId) {
+            showToast('No series available for MPR reconstruction', 'error');
+            return;
+        }
+        
+        try {
+            showLoading('Generating MPR views...');
+            
+            const response = await fetch(`/dicom-viewer/api/series/${seriesId}/mpr/`, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRFToken': window.dicomCanvasFix ? window.dicomCanvasFix.getCSRFToken() : ''
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast(`MPR reconstruction completed - ${data.axial_count + data.sagittal_count + data.coronal_count} views generated`, 'success');
+                
+                // Display MPR results
+                if (data.mpr_views) {
+                    displayMPRResults(data.mpr_views);
+                }
+            } else {
+                throw new Error(data.error || 'MPR reconstruction failed');
+            }
+            
+        } catch (error) {
+            console.error('MPR reconstruction error:', error);
+            showToast(`MPR reconstruction failed: ${error.message}`, 'error');
+        } finally {
+            showLoading(false);
+        }
     };
     
-    window.generateMIP = window.generateMIP || function() {
-        if (!currentSeries) {
+    window.generateMIP = window.generateMIP || async function() {
+        if (!window.currentSeries && !window.currentStudy) {
             showToast('Please load a series first', 'warning');
             return;
         }
-        showToast('MIP reconstruction would be implemented here', 'info');
+        
+        const seriesId = window.currentSeries?.id || window.currentStudy?.series?.[0]?.id;
+        if (!seriesId) {
+            showToast('No series available for MIP reconstruction', 'error');
+            return;
+        }
+        
+        try {
+            showLoading('Generating MIP views...');
+            
+            const response = await fetch(`/dicom-viewer/api/series/${seriesId}/mip/`, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRFToken': window.dicomCanvasFix ? window.dicomCanvasFix.getCSRFToken() : ''
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast('MIP reconstruction completed successfully', 'success');
+                
+                // Display MIP results
+                if (data.mip_views) {
+                    displayMIPResults(data.mip_views);
+                }
+            } else {
+                throw new Error(data.error || 'MIP reconstruction failed');
+            }
+            
+        } catch (error) {
+            console.error('MIP reconstruction error:', error);
+            showToast(`MIP reconstruction failed: ${error.message}`, 'error');
+        } finally {
+            showLoading(false);
+        }
+    };
+    
+    window.generateBone3D = window.generateBone3D || async function(threshold = 300) {
+        if (!window.currentSeries && !window.currentStudy) {
+            showToast('Please load a series first', 'warning');
+            return;
+        }
+        
+        const seriesId = window.currentSeries?.id || window.currentStudy?.series?.[0]?.id;
+        if (!seriesId) {
+            showToast('No series available for bone reconstruction', 'error');
+            return;
+        }
+        
+        try {
+            showLoading('Generating 3D bone reconstruction...');
+            
+            const response = await fetch(`/dicom-viewer/api/series/${seriesId}/bone/?threshold=${threshold}&mesh=true`, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRFToken': window.dicomCanvasFix ? window.dicomCanvasFix.getCSRFToken() : ''
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast(`3D bone reconstruction completed - ${data.bone_views ? Object.keys(data.bone_views).length : 0} views generated`, 'success');
+                
+                // Display bone reconstruction results
+                if (data.bone_views) {
+                    displayBone3DResults(data.bone_views);
+                }
+            } else {
+                throw new Error(data.error || '3D bone reconstruction failed');
+            }
+            
+        } catch (error) {
+            console.error('Bone 3D reconstruction error:', error);
+            showToast(`3D bone reconstruction failed: ${error.message}`, 'error');
+        } finally {
+            showLoading(false);
+        }
     };
     
     window.reset3DView = window.reset3DView || function() {
@@ -525,6 +659,147 @@ window.showLoading = window.showLoading || function(show, message = 'Loading...'
             window.dicomLoadingFix.hideLoadingIndicator();
         }
     }
+};
+
+// 3D Reconstruction display functions
+window.displayMPRResults = function(mprViews) {
+    // Try to find MPR display containers
+    const mprContainer = document.getElementById('mprView') || 
+                        document.querySelector('.mpr-container') ||
+                        document.querySelector('.mpr-views');
+    
+    if (mprContainer) {
+        // Show MPR container
+        mprContainer.style.display = 'grid';
+        
+        // Hide single view if exists
+        const singleView = document.getElementById('singleView');
+        if (singleView) singleView.style.display = 'none';
+        
+        // Update MPR images
+        if (mprViews.axial) {
+            const axialImg = document.getElementById('mprAxial') || document.querySelector('.mpr-axial img');
+            if (axialImg) axialImg.src = mprViews.axial;
+        }
+        if (mprViews.sagittal) {
+            const sagittalImg = document.getElementById('mprSagittal') || document.querySelector('.mpr-sagittal img');
+            if (sagittalImg) sagittalImg.src = mprViews.sagittal;
+        }
+        if (mprViews.coronal) {
+            const coronalImg = document.getElementById('mprCoronal') || document.querySelector('.mpr-coronal img');
+            if (coronalImg) coronalImg.src = mprViews.coronal;
+        }
+    } else {
+        // Create a simple popup to display results
+        showReconstructionPopup('MPR Reconstruction', mprViews);
+    }
+};
+
+window.displayMIPResults = function(mipViews) {
+    // Similar to MPR but for MIP results
+    const mprContainer = document.getElementById('mprView') || 
+                        document.querySelector('.mpr-container');
+    
+    if (mprContainer) {
+        mprContainer.style.display = 'grid';
+        
+        // Update with MIP images
+        if (mipViews.axial) {
+            const axialImg = document.getElementById('mprAxial');
+            if (axialImg) axialImg.src = mipViews.axial;
+        }
+        if (mipViews.sagittal) {
+            const sagittalImg = document.getElementById('mprSagittal');
+            if (sagittalImg) sagittalImg.src = mipViews.sagittal;
+        }
+        if (mipViews.coronal) {
+            const coronalImg = document.getElementById('mprCoronal');
+            if (coronalImg) coronalImg.src = mipViews.coronal;
+        }
+    } else {
+        showReconstructionPopup('MIP Reconstruction', mipViews);
+    }
+};
+
+window.displayBone3DResults = function(boneViews) {
+    // Display bone reconstruction results
+    const mprContainer = document.getElementById('mprView') || 
+                        document.querySelector('.mpr-container');
+    
+    if (mprContainer) {
+        mprContainer.style.display = 'grid';
+        
+        // Update with bone 3D images
+        if (boneViews.axial) {
+            const axialImg = document.getElementById('mprAxial');
+            if (axialImg) axialImg.src = boneViews.axial;
+        }
+        if (boneViews.sagittal) {
+            const sagittalImg = document.getElementById('mprSagittal');
+            if (sagittalImg) sagittalImg.src = boneViews.sagittal;
+        }
+        if (boneViews.coronal) {
+            const coronalImg = document.getElementById('mprCoronal');
+            if (coronalImg) coronalImg.src = boneViews.coronal;
+        }
+    } else {
+        showReconstructionPopup('3D Bone Reconstruction', boneViews);
+    }
+};
+
+window.showReconstructionPopup = function(title, views) {
+    // Create popup for displaying reconstruction results
+    const popup = document.createElement('div');
+    popup.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    const content = document.createElement('div');
+    content.style.cssText = `
+        background: #2a2a2a;
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 90%;
+        max-height: 90%;
+        overflow: auto;
+        color: white;
+    `;
+    
+    let html = `<h3 style="color: #00d4ff; margin-bottom: 20px;">${title}</h3>`;
+    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
+    
+    Object.entries(views).forEach(([view, url]) => {
+        html += `
+            <div style="text-align: center;">
+                <h4 style="color: #ccc; margin-bottom: 10px;">${view.charAt(0).toUpperCase() + view.slice(1)}</h4>
+                <img src="${url}" style="max-width: 100%; max-height: 300px; border: 1px solid #555; border-radius: 4px;" />
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    html += '<button onclick="this.closest(\'.reconstruction-popup\').remove()" style="margin-top: 20px; padding: 10px 20px; background: #00d4ff; color: black; border: none; border-radius: 4px; cursor: pointer;">Close</button>';
+    
+    content.innerHTML = html;
+    popup.appendChild(content);
+    popup.className = 'reconstruction-popup';
+    document.body.appendChild(popup);
+    
+    // Close on click outside
+    popup.addEventListener('click', (e) => {
+        if (e.target === popup) {
+            popup.remove();
+        }
+    });
 };
 
 // Default tool
