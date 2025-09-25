@@ -378,50 +378,65 @@ class DicomCanvasFix {
             // Store current image
             this.currentImage = image;
             
-            // Detect modality from various sources
-            const modality = this.detectModality(metadata);
-            
-            // Use modality-specific display
-            this.modalitySpecificDisplayImage(image, modality);
+            try {
+                // Detect modality from various sources (with fallback)
+                const modality = this.detectModality(metadata);
+                
+                // Use modality-specific display
+                this.modalitySpecificDisplayImage(image, modality);
+            } catch (error) {
+                console.warn('Modality-specific display failed, using basic display:', error);
+                // Fallback to basic display if modality-specific fails
+                this.basicDisplayImage(image);
+            }
         }
     }
 
     detectModality(metadata = null) {
-        // Try to detect modality from metadata
-        if (metadata && metadata.modality) {
-            return metadata.modality.toUpperCase();
-        }
-
-        // Try to detect from current study/series info
-        if (this.currentStudy && this.currentStudy.modality) {
-            return this.currentStudy.modality.toUpperCase();
-        }
-
-        if (this.currentSeries && this.currentSeries.modality) {
-            return this.currentSeries.modality.toUpperCase();
-        }
-
-        // Try to detect from canvas data attributes
-        if (this.canvas && this.canvas.dataset.modality) {
-            return this.canvas.dataset.modality.toUpperCase();
-        }
-
-        // Try to detect from page elements
-        const modalityElement = document.querySelector('[data-modality]') || 
-                               document.querySelector('.modality') ||
-                               document.querySelector('#modality');
-        
-        if (modalityElement) {
-            const modality = modalityElement.dataset.modality || 
-                            modalityElement.textContent || 
-                            modalityElement.value;
-            if (modality) {
-                return modality.toUpperCase();
+        try {
+            // Try to detect modality from metadata
+            if (metadata && metadata.modality) {
+                return metadata.modality.toUpperCase();
             }
-        }
 
-        // Default to CT if unknown
-        return 'CT';
+            // Try to detect from current study/series info
+            if (this.currentStudy && this.currentStudy.modality) {
+                return this.currentStudy.modality.toUpperCase();
+            }
+
+            if (this.currentSeries && this.currentSeries.modality) {
+                return this.currentSeries.modality.toUpperCase();
+            }
+
+            // Try to detect from canvas data attributes
+            if (this.canvas && this.canvas.dataset.modality) {
+                return this.canvas.dataset.modality.toUpperCase();
+            }
+
+            // Try to detect from page elements (safely)
+            try {
+                const modalityElement = document.querySelector('[data-modality]') || 
+                                       document.querySelector('.modality') ||
+                                       document.querySelector('#modality');
+                
+                if (modalityElement) {
+                    const modality = modalityElement.dataset.modality || 
+                                    modalityElement.textContent || 
+                                    modalityElement.value;
+                    if (modality && typeof modality === 'string') {
+                        return modality.toUpperCase();
+                    }
+                }
+            } catch (domError) {
+                console.warn('DOM query for modality failed:', domError);
+            }
+
+            // Default to CT if unknown (safe fallback)
+            return 'CT';
+        } catch (error) {
+            console.warn('Modality detection failed, defaulting to CT:', error);
+            return 'CT';
+        }
     }
 
     modalitySpecificDisplayImage(image, modality = 'CT') {
@@ -482,56 +497,119 @@ class DicomCanvasFix {
     }
 
     applyModalityRenderingSettings(modality) {
-        // Reset to defaults first
-        this.ctx.globalAlpha = 1.0;
-        this.ctx.filter = 'none';
-        this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'high';
+        try {
+            // Reset to defaults first
+            this.ctx.globalAlpha = 1.0;
+            this.ctx.filter = 'none';
+            this.ctx.imageSmoothingEnabled = true;
+            this.ctx.imageSmoothingQuality = 'high';
 
-        if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-            // X-ray modalities: Preserve sharp edges, enhance contrast
-            this.ctx.imageSmoothingEnabled = false; // Critical for X-ray detail
-            this.ctx.filter = 'contrast(1.3) brightness(1.05) saturate(0.9)';
-            console.log(`Applied X-ray rendering settings for ${modality}`);
-            
-        } else if (['CT'].includes(modality)) {
-            // CT: Balanced smoothing with contrast enhancement
-            this.ctx.imageSmoothingEnabled = false; // Preserve CT detail
-            this.ctx.filter = 'contrast(1.2) brightness(1.1) saturate(0.95)';
-            console.log(`Applied CT rendering settings for ${modality}`);
-            
-        } else if (['MR', 'MRI'].includes(modality)) {
-            // MRI: Slight smoothing acceptable, enhance contrast
-            this.ctx.imageSmoothingEnabled = true;
-            this.ctx.imageSmoothingQuality = 'high';
-            this.ctx.filter = 'contrast(1.15) brightness(1.08) saturate(1.0)';
-            console.log(`Applied MRI rendering settings for ${modality}`);
-            
-        } else if (['US'].includes(modality)) {
-            // Ultrasound: Smoothing helps with noise
-            this.ctx.imageSmoothingEnabled = true;
-            this.ctx.imageSmoothingQuality = 'high';
-            this.ctx.filter = 'contrast(1.1) brightness(1.05) saturate(0.9)';
-            console.log(`Applied Ultrasound rendering settings for ${modality}`);
-            
-        } else if (['NM', 'PT'].includes(modality)) {
-            // Nuclear Medicine/PET: Smoothing for better visualization
-            this.ctx.imageSmoothingEnabled = true;
-            this.ctx.imageSmoothingQuality = 'high';
-            this.ctx.filter = 'contrast(1.25) brightness(1.1) saturate(1.1)';
-            console.log(`Applied Nuclear Medicine rendering settings for ${modality}`);
-            
-        } else {
-            // Default/Unknown: Conservative settings
+            if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
+                // X-ray modalities: Preserve sharp edges, enhance contrast
+                this.ctx.imageSmoothingEnabled = false; // Critical for X-ray detail
+                this.ctx.filter = 'contrast(1.3) brightness(1.05) saturate(0.9)';
+                console.log(`Applied X-ray rendering settings for ${modality}`);
+                
+            } else if (['CT'].includes(modality)) {
+                // CT: Balanced smoothing with contrast enhancement
+                this.ctx.imageSmoothingEnabled = false; // Preserve CT detail
+                this.ctx.filter = 'contrast(1.2) brightness(1.1) saturate(0.95)';
+                console.log(`Applied CT rendering settings for ${modality}`);
+                
+            } else if (['MR', 'MRI'].includes(modality)) {
+                // MRI: Slight smoothing acceptable, enhance contrast
+                this.ctx.imageSmoothingEnabled = true;
+                this.ctx.imageSmoothingQuality = 'high';
+                this.ctx.filter = 'contrast(1.15) brightness(1.08) saturate(1.0)';
+                console.log(`Applied MRI rendering settings for ${modality}`);
+                
+            } else if (['US'].includes(modality)) {
+                // Ultrasound: Smoothing helps with noise
+                this.ctx.imageSmoothingEnabled = true;
+                this.ctx.imageSmoothingQuality = 'high';
+                this.ctx.filter = 'contrast(1.1) brightness(1.05) saturate(0.9)';
+                console.log(`Applied Ultrasound rendering settings for ${modality}`);
+                
+            } else if (['NM', 'PT'].includes(modality)) {
+                // Nuclear Medicine/PET: Smoothing for better visualization
+                this.ctx.imageSmoothingEnabled = true;
+                this.ctx.imageSmoothingQuality = 'high';
+                this.ctx.filter = 'contrast(1.25) brightness(1.1) saturate(1.1)';
+                console.log(`Applied Nuclear Medicine rendering settings for ${modality}`);
+                
+            } else {
+                // Default/Unknown: Conservative settings that work for all
+                this.ctx.imageSmoothingEnabled = false;
+                this.ctx.filter = 'contrast(1.1) brightness(1.05) saturate(0.95)';
+                console.log(`Applied default rendering settings for ${modality}`);
+            }
+        } catch (error) {
+            console.warn('Failed to apply modality rendering settings, using defaults:', error);
+            // Safe fallback
+            this.ctx.globalAlpha = 1.0;
+            this.ctx.filter = 'none';
             this.ctx.imageSmoothingEnabled = false;
-            this.ctx.filter = 'contrast(1.1) brightness(1.05) saturate(0.95)';
-            console.log(`Applied default rendering settings for ${modality}`);
         }
     }
 
-    // Keep the old method for backwards compatibility
+    // Keep the old method for backwards compatibility - SAFE VERSION
     basicDisplayImage(image) {
-        this.modalitySpecificDisplayImage(image, 'CT');
+        try {
+            // Clear canvas with black background
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Calculate image dimensions and positioning
+            const canvasAspect = this.canvas.width / this.canvas.height;
+            const imageAspect = image.width / image.height;
+            
+            let drawWidth, drawHeight, drawX, drawY;
+            const scaleFactor = 0.9; // Safe default
+            
+            if (imageAspect > canvasAspect) {
+                drawWidth = this.canvas.width * scaleFactor;
+                drawHeight = drawWidth / imageAspect;
+            } else {
+                drawHeight = this.canvas.height * scaleFactor;
+                drawWidth = drawHeight * imageAspect;
+            }
+            
+            drawX = (this.canvas.width - drawWidth) / 2;
+            drawY = (this.canvas.height - drawHeight) / 2;
+            
+            // Safe rendering settings
+            this.ctx.globalAlpha = 1.0;
+            this.ctx.imageSmoothingEnabled = false;
+            this.ctx.filter = 'contrast(1.1) brightness(1.05)';
+            
+            // Draw image
+            this.ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+            
+            // Reset filter
+            this.ctx.filter = 'none';
+            
+            // Store image info
+            this.imageInfo = {
+                x: drawX,
+                y: drawY,
+                width: drawWidth,
+                height: drawHeight,
+                originalWidth: image.width,
+                originalHeight: image.height,
+                scaleFactor: Math.min(drawWidth / image.width, drawHeight / image.height)
+            };
+            
+            console.log('Image displayed successfully with safe basic rendering');
+        } catch (error) {
+            console.error('Basic image display failed:', error);
+            // Ultra-safe fallback - just draw the image as-is
+            try {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.drawImage(image, 0, 0, this.canvas.width, this.canvas.height);
+            } catch (fallbackError) {
+                console.error('Even fallback display failed:', fallbackError);
+            }
+        }
     }
 
     displayCachedImage(imageId, metadata = null) {
