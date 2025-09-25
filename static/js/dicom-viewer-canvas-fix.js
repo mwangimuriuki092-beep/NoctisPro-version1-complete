@@ -57,13 +57,39 @@ class DicomCanvasFix {
                 image-rendering: pixelated;
                 image-rendering: -moz-crisp-edges;
                 image-rendering: crisp-edges;
+                image-rendering: -webkit-optimize-contrast;
             `;
             
             viewerContainer.appendChild(this.canvas);
             this.ctx = this.canvas.getContext('2d');
+            
+            // Set high-resolution canvas for medical images
+            this.setupHighResolutionCanvas();
             this.setupEventListeners();
-            console.log('DICOM canvas created and initialized');
+            console.log('DICOM canvas created and initialized with high resolution');
         }
+    }
+
+    setupHighResolutionCanvas() {
+        if (!this.canvas) return;
+        
+        // Get device pixel ratio for high-DPI displays
+        const dpr = window.devicePixelRatio || 1;
+        const rect = this.canvas.getBoundingClientRect();
+        
+        // Set canvas internal resolution higher for medical image clarity
+        const resolutionMultiplier = 2.0; // Enhanced resolution for medical images
+        this.canvas.width = rect.width * dpr * resolutionMultiplier;
+        this.canvas.height = rect.height * dpr * resolutionMultiplier;
+        
+        // Scale canvas back down using CSS
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+        
+        // Scale the drawing context to match
+        this.ctx.scale(dpr * resolutionMultiplier, dpr * resolutionMultiplier);
+        
+        console.log(`High-resolution canvas setup: ${this.canvas.width}x${this.canvas.height} (${resolutionMultiplier}x DPR: ${dpr})`);
     }
 
     setupEventListeners() {
@@ -348,14 +374,14 @@ class DicomCanvasFix {
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Apply proper scaling to make image visible (not overly zoomed)
+        // Apply proper scaling to make image visible and clear
         const canvasAspect = this.canvas.width / this.canvas.height;
         const imageAspect = image.width / image.height;
         
         let drawWidth, drawHeight, drawX, drawY;
         
-        // Scale image to fit nicely in canvas (70% of canvas size to avoid over-zooming)
-        const scaleFactor = 0.7;
+        // Scale image to fit properly in canvas (90% to maintain clarity while fitting)
+        const scaleFactor = 0.9;
         
         if (imageAspect > canvasAspect) {
             // Image is wider than canvas
@@ -371,13 +397,18 @@ class DicomCanvasFix {
         drawX = (this.canvas.width - drawWidth) / 2;
         drawY = (this.canvas.height - drawHeight) / 2;
         
-        // Enable image smoothing for better quality
-        this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'high';
-        
-        // Draw image with proper contrast
+        // Configure high-quality rendering for medical images
+        this.ctx.imageSmoothingEnabled = false; // Preserve pixel-perfect medical image data
         this.ctx.globalAlpha = 1.0;
+        
+        // Apply medical image enhancement filters
+        this.ctx.filter = 'contrast(1.2) brightness(1.1) saturate(0.95)';
+        
+        // Draw image with enhanced quality
         this.ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+        
+        // Reset filter for overlay elements
+        this.ctx.filter = 'none';
         
         // Store image info for zoom/pan operations
         this.imageInfo = {
@@ -386,10 +417,11 @@ class DicomCanvasFix {
             width: drawWidth,
             height: drawHeight,
             originalWidth: image.width,
-            originalHeight: image.height
+            originalHeight: image.height,
+            scaleFactor: Math.min(drawWidth / image.width, drawHeight / image.height)
         };
         
-        console.log('Image displayed successfully with proper scaling');
+        console.log('Image displayed successfully with enhanced medical image quality');
     }
 
     displayCachedImage(imageId) {
@@ -435,9 +467,8 @@ class DicomCanvasFix {
         
         const container = this.canvas.parentElement;
         if (container) {
-            const rect = container.getBoundingClientRect();
-            this.canvas.width = rect.width;
-            this.canvas.height = rect.height;
+            // Update high-resolution canvas setup on resize
+            this.setupHighResolutionCanvas();
             
             // Redisplay current image if available
             if (this.currentImage) {

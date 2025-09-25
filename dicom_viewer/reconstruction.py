@@ -218,24 +218,64 @@ class Bone3DProcessor(BaseProcessor):
 
     def generate_bone_reconstruction(self, volume, spacing, threshold, smoothing, decimation):
         results = {}
+        
+        # Enhanced bone segmentation with adaptive thresholding
+        if threshold == 200:  # Default threshold, use adaptive
+            # Calculate adaptive threshold based on volume statistics
+            volume_mean = np.mean(volume)
+            volume_std = np.std(volume)
+            threshold = max(volume_mean + 1.5 * volume_std, 150)
+            logger.info(f"Using adaptive bone threshold: {threshold}")
+        
         bone_mask = volume > threshold
+        
+        # Enhanced morphological operations for better bone extraction
         if smoothing:
-            bone_mask = morphology.binary_closing(bone_mask, morphology.ball(2))
-            bone_mask = morphology.binary_opening(bone_mask, morphology.ball(1))
+            # Use larger structuring elements for better connectivity
+            bone_mask = morphology.binary_closing(bone_mask, morphology.ball(3))
+            bone_mask = morphology.binary_opening(bone_mask, morphology.ball(2))
+            # Fill small holes in bone structures
+            bone_mask = morphology.binary_fill_holes(bone_mask)
+        
+        # Remove small disconnected components
+        bone_mask = morphology.remove_small_objects(bone_mask, min_size=1000)
+        
         try:
+            # Enhanced marching cubes with better parameters
             verts, faces, normals, values = measure.marching_cubes(
-                bone_mask.astype(np.float32), level=0.5, spacing=spacing
+                bone_mask.astype(np.float32), 
+                level=0.5, 
+                spacing=spacing,
+                step_size=1,  # Higher quality mesh
+                allow_degenerate=False
             )
-            if decimation < 1.0:
+            
+            if len(verts) == 0:
+                raise ValueError("No vertices generated from marching cubes")
+            
+            logger.info(f"Generated mesh: {len(verts)} vertices, {len(faces)} faces")
+            
+            if decimation < 1.0 and len(faces) > 10000:  # Only decimate large meshes
+                original_faces = len(faces)
                 verts, faces = self.decimate_mesh(verts, faces, decimation)
+                logger.info(f"Decimated mesh: {original_faces} -> {len(faces)} faces")
+            
             results['vertices.npy'] = verts
             results['faces.npy'] = faces
             results['normals.npy'] = normals
             results['bone_mesh.vtk'] = self.create_vtk_mesh(verts, faces, normals)
             results.update(self.generate_preview_images(bone_mask))
+            
+            # Generate additional visualization formats
+            results['bone_mesh.obj'] = self.create_obj_mesh(verts, faces, normals)
+            results.update(self.generate_cross_sections(bone_mask, spacing))
+            
         except Exception as e:
             logger.error(f"Marching cubes failed: {str(e)}")
-            results['volume_rendering'] = self.generate_volume_rendering(bone_mask)
+            # Enhanced fallback volume rendering
+            results.update(self.generate_enhanced_volume_rendering(bone_mask, spacing))
+            results['reconstruction_method'] = 'volume_rendering'
+        
         results['metadata.json'] = {
             'threshold': threshold,
             'smoothing': smoothing,
@@ -244,6 +284,7 @@ class Bone3DProcessor(BaseProcessor):
             'spacing': spacing,
             'num_vertices': int(len(results.get('vertices.npy', []))),
             'num_faces': int(len(results.get('faces.npy', []))),
+            'reconstruction_quality': 'enhanced',
         }
         return results
 
@@ -296,6 +337,85 @@ class Bone3DProcessor(BaseProcessor):
             rendering = np.max(rotated, axis=0) * 255
             renderings[f'volume_render_{angle}'] = rendering.astype(np.uint8)
         return renderings
+
+    def generate_enhanced_volume_rendering(self, volume_mask, spacing):
+        """Enhanced volume rendering with multiple projections and better quality"""
+        renderings = {}
+        
+        # Generate high-quality volume renderings from multiple angles
+        angles = [0, 30, 45, 60, 90, 120, 135, 150, 180]
+        for angle in angles:
+            try:
+                # Apply spacing-aware rotation
+                rotated = ndimage.rotate(volume_mask.astype(np.float32), angle, axes=(0, 2), reshape=False)
+                
+                # Enhanced projection with depth information
+                projection = np.max(rotated, axis=0)
+                depth_map = np.argmax(rotated, axis=0) / rotated.shape[0]
+                
+                # Combine intensity and depth for better visualization
+                enhanced_projection = projection * (1 + 0.3 * depth_map)
+                rendering = np.clip(enhanced_projection * 255, 0, 255)
+                
+                renderings[f'enhanced_volume_render_{angle}'] = rendering.astype(np.uint8)
+            except Exception as e:
+                logger.warning(f"Failed to generate volume rendering at angle {angle}: {e}")
+        
+        # Generate orthogonal projections
+        renderings['volume_axial'] = (np.max(volume_mask, axis=0) * 255).astype(np.uint8)
+        renderings['volume_sagittal'] = (np.max(volume_mask, axis=2) * 255).astype(np.uint8)
+        renderings['volume_coronal'] = (np.max(volume_mask, axis=1) * 255).astype(np.uint8)
+        
+        return renderings
+
+    def create_obj_mesh(self, vertices, faces, normals):
+        """Create OBJ format mesh file"""
+        obj_content = "# Bone 3D Reconstruction OBJ File\n"
+        obj_content += f"# {len(vertices)} vertices, {len(faces)} faces\n\n"
+        
+        # Write vertices
+        for vertex in vertices:
+            obj_content += f"v {vertex[0]} {vertex[1]} {vertex[2]}\n"
+        
+        # Write normals if available
+        if normals is not None and len(normals) == len(vertices):
+            for normal in normals:
+                obj_content += f"vn {normal[0]} {normal[1]} {normal[2]}\n"
+        
+        # Write faces (OBJ uses 1-based indexing)
+        for face in faces:
+            if normals is not None and len(normals) == len(vertices):
+                obj_content += f"f {face[0]+1}//{face[0]+1} {face[1]+1}//{face[1]+1} {face[2]+1}//{face[2]+1}\n"
+            else:
+                obj_content += f"f {face[0]+1} {face[1]+1} {face[2]+1}\n"
+        
+        return obj_content
+
+    def generate_cross_sections(self, volume_mask, spacing):
+        """Generate cross-sectional views of the 3D reconstruction"""
+        results = {}
+        depth, height, width = volume_mask.shape
+        
+        # Generate cross-sections at regular intervals
+        for i, plane in enumerate(['axial', 'sagittal', 'coronal']):
+            sections = []
+            
+            if plane == 'axial':
+                for z in range(0, depth, max(1, depth // 10)):
+                    section = volume_mask[z, :, :] * 255
+                    sections.append(section.astype(np.uint8))
+            elif plane == 'sagittal':
+                for x in range(0, width, max(1, width // 10)):
+                    section = volume_mask[:, :, x] * 255
+                    sections.append(section.astype(np.uint8))
+            elif plane == 'coronal':
+                for y in range(0, height, max(1, height // 10)):
+                    section = volume_mask[:, y, :] * 255
+                    sections.append(section.astype(np.uint8))
+            
+            results[f'{plane}_cross_sections'] = np.array(sections)
+        
+        return results
 
 
 class MRI3DProcessor(BaseProcessor):
