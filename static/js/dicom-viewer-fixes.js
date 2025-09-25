@@ -129,6 +129,33 @@ function setupMissingFunctions() {
             // Reference search would be implemented here
         }
     };
+    
+    // Add nextImage and previousImage functions if they don't exist
+    window.nextImage = window.nextImage || function() {
+        if (typeof changeSlice === 'function') {
+            changeSlice(1);
+        } else if (window.currentImageIndex !== undefined && window.images) {
+            if (window.currentImageIndex < window.images.length - 1) {
+                window.currentImageIndex++;
+                if (typeof updateImageDisplay === 'function') {
+                    updateImageDisplay();
+                }
+            }
+        }
+    };
+    
+    window.previousImage = window.previousImage || function() {
+        if (typeof changeSlice === 'function') {
+            changeSlice(-1);
+        } else if (window.currentImageIndex !== undefined) {
+            if (window.currentImageIndex > 0) {
+                window.currentImageIndex--;
+                if (typeof updateImageDisplay === 'function') {
+                    updateImageDisplay();
+                }
+            }
+        }
+    };
 }
 
 function integrateMeasurementSystem() {
@@ -203,16 +230,24 @@ function fixCanvasEventHandlers() {
         } else {
             // Scroll through images
             if (e.deltaY > 0) {
-                if (typeof navigateImage === 'function') {
-                    navigateImage(1);
-                } else if (typeof window.navigateImage === 'function') {
-                    window.navigateImage(1);
+                if (typeof nextImage === 'function') {
+                    nextImage();
+                } else if (typeof window.nextImage === 'function') {
+                    window.nextImage();
+                } else if (typeof changeSlice === 'function') {
+                    changeSlice(1);
+                } else if (window.keyboardShortcuts && typeof window.keyboardShortcuts.nextImage === 'function') {
+                    window.keyboardShortcuts.nextImage();
                 }
             } else {
-                if (typeof navigateImage === 'function') {
-                    navigateImage(-1);
-                } else if (typeof window.navigateImage === 'function') {
-                    window.navigateImage(-1);
+                if (typeof previousImage === 'function') {
+                    previousImage();
+                } else if (typeof window.previousImage === 'function') {
+                    window.previousImage();
+                } else if (typeof changeSlice === 'function') {
+                    changeSlice(-1);
+                } else if (window.keyboardShortcuts && typeof window.keyboardShortcuts.previousImage === 'function') {
+                    window.keyboardShortcuts.previousImage();
                 }
             }
         }
@@ -345,11 +380,37 @@ function applyPreset(preset) {
     };
     
     if (presets[preset]) {
-        windowWidth = presets[preset].windowWidth;
-        windowLevel = presets[preset].windowLevel;
+        // Update global window/level variables
+        if (typeof window.windowWidth !== 'undefined') {
+            window.windowWidth = presets[preset].windowWidth;
+            window.windowLevel = presets[preset].windowLevel;
+        } else {
+            windowWidth = presets[preset].windowWidth;
+            windowLevel = presets[preset].windowLevel;
+        }
+        
+        // Update UI sliders if they exist
+        const wwSlider = document.getElementById('windowWidth');
+        const wlSlider = document.getElementById('windowLevel');
+        const wwValue = document.getElementById('wwValue');
+        const wlValue = document.getElementById('wlValue');
+        
+        if (wwSlider) wwSlider.value = presets[preset].windowWidth;
+        if (wlSlider) wlSlider.value = presets[preset].windowLevel;
+        if (wwValue) wwValue.textContent = presets[preset].windowWidth;
+        if (wlValue) wlValue.textContent = presets[preset].windowLevel;
+        
+        // Update display functions
         updateWindowLevelDisplay();
-        redrawCurrentImage();
-        showToast(`Applied ${preset} preset`, 'success');
+        
+        // Refresh image with new settings
+        if (typeof updateImageDisplay === 'function') {
+            updateImageDisplay();
+        } else if (typeof redrawCurrentImage === 'function') {
+            redrawCurrentImage();
+        }
+        
+        showToast(`Applied ${preset} preset (W:${presets[preset].windowWidth} L:${presets[preset].windowLevel})`, 'success');
     }
 }
 

@@ -301,7 +301,12 @@ class SessionTimeoutManager {
                 method: 'GET',
                 credentials: 'same-origin'
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (!data.valid) {
                     this.performLogout();
@@ -309,6 +314,11 @@ class SessionTimeoutManager {
             })
             .catch(error => {
                 console.warn('Session check failed:', error);
+                // Only log out on authentication-related errors (401, 403)
+                // Don't log out on network errors or server issues
+                if (error.message.includes('401') || error.message.includes('403')) {
+                    this.performLogout();
+                }
             });
         }, 5 * 60 * 1000); // 5 minutes
     }
