@@ -73,39 +73,31 @@ class DicomCanvasFix {
     setupHighResolutionCanvas() {
         if (!this.canvas) return;
         
-        // Get device pixel ratio for high-DPI displays
-        const dpr = window.devicePixelRatio || 1;
+        // Get device pixel ratio for high-DPI displays but limit it for medical imaging
+        const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap DPR at 2 to prevent over-scaling
         const rect = this.canvas.getBoundingClientRect();
         
         // Detect modality for resolution optimization
         const modality = this.detectModality();
         
-        // Modality-specific resolution multipliers - OPTIMIZED for X-ray vs CT
-        let resolutionMultiplier = 1.0; // Default - standard scaling
-        if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-            resolutionMultiplier = 0.8; // X-ray images - reduced scaling to prevent over-zoom
-        } else if (['CT'].includes(modality)) {
-            resolutionMultiplier = 1.0; // CT - standard resolution
-        } else if (['MR', 'MRI'].includes(modality)) {
-            resolutionMultiplier = 1.0; // MRI - standard resolution
-        } else if (['US'].includes(modality)) {
-            resolutionMultiplier = 1.0; // Ultrasound - standard resolution
-        }
+        // Simplified resolution multipliers - FIXED for normal display
+        let resolutionMultiplier = 1.0; // Standard scaling for all modalities
         
-        this.canvas.width = rect.width * dpr * resolutionMultiplier;
-        this.canvas.height = rect.height * dpr * resolutionMultiplier;
+        // Set canvas internal dimensions
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
         
         // Scale canvas back down using CSS
         this.canvas.style.width = rect.width + 'px';
         this.canvas.style.height = rect.height + 'px';
         
-        // Scale the drawing context to match
-        this.ctx.scale(dpr * resolutionMultiplier, dpr * resolutionMultiplier);
+        // Scale the drawing context to match - IMPORTANT: Only scale by DPR, not resolution multiplier
+        this.ctx.scale(dpr, dpr);
         
         // Set canvas modality attribute for future reference
         this.canvas.dataset.modality = modality;
         
-        console.log(`High-resolution canvas setup for ${modality}: ${this.canvas.width}x${this.canvas.height} (${resolutionMultiplier}x DPR: ${dpr})`);
+        console.log(`High-resolution canvas setup for ${modality}: ${this.canvas.width}x${this.canvas.height} (DPR: ${dpr}, Display: ${rect.width}x${rect.height})`);
     }
 
     setupEventListeners() {
@@ -375,20 +367,29 @@ class DicomCanvasFix {
         }
 
         if (image instanceof HTMLImageElement) {
-            // Store current image
-            this.currentImage = image;
+        // Store current image
+        this.currentImage = image;
+        
+        // Reset any existing zoom/pan to ensure proper fit
+        if (typeof window.zoom !== 'undefined') {
+            window.zoom = 1.0;
+        }
+        if (typeof window.panX !== 'undefined') {
+            window.panX = 0;
+            window.panY = 0;
+        }
+        
+        try {
+            // Detect modality from various sources (with fallback)
+            const modality = this.detectModality(metadata);
             
-            try {
-                // Detect modality from various sources (with fallback)
-                const modality = this.detectModality(metadata);
-                
-                // Use modality-specific display
-                this.modalitySpecificDisplayImage(image, modality);
-            } catch (error) {
-                console.warn('Modality-specific display failed, using basic display:', error);
-                // Fallback to basic display if modality-specific fails
-                this.basicDisplayImage(image);
-            }
+            // Use modality-specific display
+            this.modalitySpecificDisplayImage(image, modality);
+        } catch (error) {
+            console.warn('Modality-specific display failed, using basic display:', error);
+            // Fallback to basic display if modality-specific fails
+            this.basicDisplayImage(image);
+        }
         }
     }
 
@@ -444,33 +445,31 @@ class DicomCanvasFix {
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Calculate image dimensions and positioning
-        const canvasAspect = this.canvas.width / this.canvas.height;
+        // Get the actual canvas display dimensions (not the high-resolution internal dimensions)
+        const canvasDisplayWidth = this.canvas.offsetWidth || this.canvas.clientWidth;
+        const canvasDisplayHeight = this.canvas.offsetHeight || this.canvas.clientHeight;
+        
+        // Calculate image dimensions and positioning for normal fit
+        const canvasAspect = canvasDisplayWidth / canvasDisplayHeight;
         const imageAspect = image.width / image.height;
         
         let drawWidth, drawHeight, drawX, drawY;
         
-        // Display image at actual size - no scaling unless it exceeds canvas bounds
-        const maxWidth = this.canvas.width * 0.95; // 95% of canvas width max
-        const maxHeight = this.canvas.height * 0.95; // 95% of canvas height max
+        // Fit image to canvas with proper aspect ratio - NORMAL SIZE FIT
+        const maxWidth = canvasDisplayWidth * 0.9; // 90% of display width
+        const maxHeight = canvasDisplayHeight * 0.9; // 90% of display height
         
-        // Start with actual image dimensions
-        drawWidth = image.width;
-        drawHeight = image.height;
+        // Calculate scale to fit image properly
+        const scaleX = maxWidth / image.width;
+        const scaleY = maxHeight / image.height;
+        const scale = Math.min(scaleX, scaleY); // Always scale to fit
         
-        // Only scale down if image is larger than canvas
-        if (drawWidth > maxWidth || drawHeight > maxHeight) {
-            const scaleX = maxWidth / drawWidth;
-            const scaleY = maxHeight / drawHeight;
-            const scale = Math.min(scaleX, scaleY);
-            
-            drawWidth = drawWidth * scale;
-            drawHeight = drawHeight * scale;
-        }
+        drawWidth = image.width * scale;
+        drawHeight = image.height * scale;
         
-        // Center the image
-        drawX = (this.canvas.width - drawWidth) / 2;
-        drawY = (this.canvas.height - drawHeight) / 2;
+        // Center the image on the display canvas
+        drawX = (canvasDisplayWidth - drawWidth) / 2;
+        drawY = (canvasDisplayHeight - drawHeight) / 2;
         
         // Apply modality-specific rendering settings
         this.applyModalityRenderingSettings(modality);
@@ -489,8 +488,10 @@ class DicomCanvasFix {
             height: drawHeight,
             originalWidth: image.width,
             originalHeight: image.height,
-            scaleFactor: Math.min(drawWidth / image.width, drawHeight / image.height),
-            modality: modality
+            scaleFactor: scale, // Use the calculated fit scale
+            modality: modality,
+            displayWidth: canvasDisplayWidth,
+            displayHeight: canvasDisplayHeight
         };
         
         console.log(`Image displayed successfully with ${modality}-specific rendering`);
@@ -559,23 +560,29 @@ class DicomCanvasFix {
             this.ctx.fillStyle = '#000';
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-            // Calculate image dimensions and positioning
-            const canvasAspect = this.canvas.width / this.canvas.height;
+            // Get the actual canvas display dimensions
+            const canvasDisplayWidth = this.canvas.offsetWidth || this.canvas.clientWidth;
+            const canvasDisplayHeight = this.canvas.offsetHeight || this.canvas.clientHeight;
+            
+            // Calculate image dimensions and positioning for proper fit
+            const canvasAspect = canvasDisplayWidth / canvasDisplayHeight;
             const imageAspect = image.width / image.height;
             
             let drawWidth, drawHeight, drawX, drawY;
-            const scaleFactor = 0.60; // Reduced for better fit in basic display mode
             
-            if (imageAspect > canvasAspect) {
-                drawWidth = this.canvas.width * scaleFactor;
-                drawHeight = drawWidth / imageAspect;
-            } else {
-                drawHeight = this.canvas.height * scaleFactor;
-                drawWidth = drawHeight * imageAspect;
-            }
+            // Fit image to 85% of display canvas to ensure it's not too large
+            const maxWidth = canvasDisplayWidth * 0.85;
+            const maxHeight = canvasDisplayHeight * 0.85;
             
-            drawX = (this.canvas.width - drawWidth) / 2;
-            drawY = (this.canvas.height - drawHeight) / 2;
+            const scaleX = maxWidth / image.width;
+            const scaleY = maxHeight / image.height;
+            const scale = Math.min(scaleX, scaleY);
+            
+            drawWidth = image.width * scale;
+            drawHeight = image.height * scale;
+            
+            drawX = (canvasDisplayWidth - drawWidth) / 2;
+            drawY = (canvasDisplayHeight - drawHeight) / 2;
             
             // Safe rendering settings - Increased brightness for better visibility
             this.ctx.globalAlpha = 1.0;
@@ -596,7 +603,9 @@ class DicomCanvasFix {
                 height: drawHeight,
                 originalWidth: image.width,
                 originalHeight: image.height,
-                scaleFactor: Math.min(drawWidth / image.width, drawHeight / image.height)
+                scaleFactor: scale,
+                displayWidth: canvasDisplayWidth,
+                displayHeight: canvasDisplayHeight
             };
             
             console.log('Image displayed successfully with safe basic rendering');
@@ -666,6 +675,28 @@ class DicomCanvasFix {
                 }
             }
         }
+    }
+
+    // Method to reset zoom to fit the image properly
+    resetZoomToFit() {
+        if (!this.currentImage || !this.canvas) return;
+        
+        // Clear any existing zoom/pan transformations
+        if (typeof window.zoom !== 'undefined') {
+            window.zoom = 1.0;
+        }
+        if (typeof window.panX !== 'undefined') {
+            window.panX = 0;
+            window.panY = 0;
+        }
+        
+        // Redisplay current image with proper fit
+        const cachedImage = this.imageCache.get(this.currentImage.id) || this.currentImage;
+        if (cachedImage) {
+            this.displayImage(cachedImage, this.currentImage);
+        }
+        
+        console.log('Zoom reset to fit image properly');
     }
 }
 
