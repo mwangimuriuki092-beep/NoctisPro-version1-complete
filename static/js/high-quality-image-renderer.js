@@ -133,30 +133,30 @@ class HighQualityImageRenderer {
             case 'DX':
             case 'CR':
             case 'MG':
-                // Digital Radiography, Computed Radiography, Mammography - Natural brightness
-                this.ctx.filter = 'contrast(1.05) brightness(1.0) saturate(0.9)';
+                // Digital Radiography, Computed Radiography, Mammography - Match reference image
+                this.ctx.filter = 'contrast(1.15) brightness(0.92) saturate(0.85)';
                 break;
             case 'CT':
-                // Computed Tomography - Medical-grade natural brightness
-                this.ctx.filter = 'contrast(1.02) brightness(1.0)';
+                // Computed Tomography - Match reference characteristics
+                this.ctx.filter = 'contrast(1.12) brightness(0.94)';
                 break;
             case 'MR':
             case 'MRI':
-                // Magnetic Resonance - Natural medical imaging
-                this.ctx.filter = 'contrast(1.03) brightness(1.0) saturate(1.0)';
+                // Magnetic Resonance - Match reference imaging
+                this.ctx.filter = 'contrast(1.10) brightness(0.93) saturate(0.95)';
                 break;
             case 'US':
-                // Ultrasound - Natural brightness
-                this.ctx.filter = 'contrast(1.05) brightness(1.0)';
+                // Ultrasound - Match reference brightness
+                this.ctx.filter = 'contrast(1.08) brightness(0.95)';
                 break;
             case 'XA':
             case 'RF':
-                // X-Ray Angiography, Radiofluoroscopy - Natural medical brightness
-                this.ctx.filter = 'contrast(1.08) brightness(1.0)';
+                // X-Ray Angiography, Radiofluoroscopy - Match reference medical display
+                this.ctx.filter = 'contrast(1.16) brightness(0.91)';
                 break;
             default:
-                // Default medical imaging - Natural brightness
-                this.ctx.filter = 'contrast(1.02) brightness(1.0)';
+                // Default medical imaging - Match reference image
+                this.ctx.filter = 'contrast(1.12) brightness(0.93)';
         }
     }
 
