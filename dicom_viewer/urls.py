@@ -51,12 +51,14 @@ urlpatterns = [
     path('api/hanging/', views.api_hanging_protocols, name='api_hanging_protocols'),
     # DICOM SR export
     path('api/study/<int:study_id>/export-sr/', views.api_export_dicom_sr, name='api_export_dicom_sr'),
+    # Enhanced DICOM export
+    path('api/export/image/<int:image_id>/', views.api_export_image, name='api_export_image'),
     # Volume endpoint for GPU VR
     path('api/series/<int:series_id>/volume/', views.api_series_volume_uint8, name='api_series_volume_uint8'),
     
     # DICOM file upload and processing (consolidated with worklist upload)
     # path('upload/', views.upload_dicom, name='upload_dicom'),  # Moved to worklist
-    # path('load-directory/', views.load_from_directory, name='load_from_directory'),  # Consolidated with worklist upload
+    path('load-directory/', views.load_from_directory, name='load_from_directory'),  # Re-enabled for local loading
     path('api/mounts/', views.api_list_mounted_media, name='api_list_mounted_media'),
     path('api/upload/progress/<str:upload_id>/', views.api_upload_progress, name='api_upload_progress'),
     path('api/process/study/<int:study_id>/', views.api_process_study, name='api_process_study'),
