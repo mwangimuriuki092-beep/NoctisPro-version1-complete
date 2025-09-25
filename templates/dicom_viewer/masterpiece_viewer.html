@@ -17,8 +17,6 @@
     <script src="{% static 'js/dicom-viewer-fixes.js' %}"></script>
     <script src="{% static 'js/dicom-viewer-canvas-fix.js' %}"></script>
     <script src="{% static 'js/dicom-loading-fix.js' %}"></script>
-    <script src="{% static 'js/dicom-transform-controls.js' %}"></script>
-    <script src="{% static 'js/dicom-viewer-keyboard-shortcuts.js' %}"></script>
     <style>
         :root {
             --primary-bg: #0a0a0a;
@@ -1406,9 +1404,9 @@
         function setupEventListeners() {
             // Tool button clicks
             document.querySelectorAll('.tool-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
+                btn.addEventListener('click', function(event) {
                     const tool = this.dataset.tool;
-                    handleToolClick(tool);
+                    handleToolClick(tool, event);
                 });
             });
 
@@ -1423,7 +1421,7 @@
             document.addEventListener('keydown', handleKeyDown);
         }
 
-        function handleToolClick(tool) {
+        function handleToolClick(tool, event) {
             // Remove active class from all buttons
             document.querySelectorAll('.tool-btn').forEach(btn => {
                 btn.classList.remove('active');
@@ -1465,10 +1463,18 @@
                 case 'export':
                     exportCurrentImage();
                     break;
+                case 'ai-analysis':
+                    triggerAIAnalysis();
+                    break;
                 default:
                     activeTool = tool;
                     // Add active class to clicked button
-                    event.target.closest('.tool-btn').classList.add('active');
+                    if (event && event.target) {
+                        const btn = event.target.closest('.tool-btn');
+                        if (btn) {
+                            btn.classList.add('active');
+                        }
+                    }
                     break;
             }
         }
@@ -1705,8 +1711,10 @@
                 ctx.putImageData(imgData, 0, 0);
                 ctx.restore();
             } else {
-                // YOUR ORIGINAL SIMPLE METHOD (default)
-                ctx.putImageData(imgData, 0, 0);
+                // Center the image in the canvas
+                const x = (canvas.width - imgData.width) / 2;
+                const y = (canvas.height - imgData.height) / 2;
+                ctx.putImageData(imgData, x, y);
             }
             
             // Always draw measurements and annotations after rendering the image
@@ -2705,6 +2713,28 @@
             showToast('Print dialog opened', 'success');
         }
 
+        function triggerAIAnalysis() {
+            if (!currentStudy || !currentSeries) {
+                showToast('No study or series selected for AI analysis', 'warning');
+                return;
+            }
+            
+            showToast('Starting AI analysis...', 'info');
+            
+            // Trigger AI analysis
+            if (window.aiAnalysisModule) {
+                window.aiAnalysisModule.analyzeCurrentImage();
+            } else {
+                // Fallback to manual trigger
+                const aiBtn = document.getElementById('aiAnalysisToolBtn');
+                if (aiBtn && aiBtn.onclick) {
+                    aiBtn.onclick();
+                } else {
+                    showToast('AI analysis not available', 'error');
+                }
+            }
+        }
+
         function exportCurrentImage() {
             if (!canvas) return;
             
@@ -2899,8 +2929,6 @@
         </div>
     </div>
     
-    <!-- Professional Keyboard Shortcuts - Safe Enhancement -->
-    <script src="{% load static %}{% static 'js/dicom-viewer-keyboard-shortcuts.js' %}"></script>
     
     <!-- AI Analysis Integration - Safe Addition -->
     <script>
