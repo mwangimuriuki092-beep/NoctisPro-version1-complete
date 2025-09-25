@@ -296,6 +296,10 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
         }
 
         /* MPR Four Window Layout */
@@ -1391,7 +1395,22 @@
 
         function initializeViewer() {
             canvas = document.getElementById('dicomCanvas');
+            if (!canvas) {
+                console.error('Canvas element not found');
+                return;
+            }
+            
             ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Canvas context not available');
+                return;
+            }
+            
+            // Disable image smoothing for crisp medical images
+            ctx.imageSmoothingEnabled = false;
+            ctx.mozImageSmoothingEnabled = false;
+            ctx.webkitImageSmoothingEnabled = false;
+            ctx.msImageSmoothingEnabled = false;
             
             // Set canvas size
             resizeCanvas();
@@ -1447,14 +1466,35 @@
 
         function resizeCanvas() {
             const container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
+            if (container && canvas) {
+                // Get container dimensions
+                const rect = container.getBoundingClientRect();
+                
+                // Set canvas size to match container
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+                
+                // Re-apply canvas settings after resize
+                ctx.imageSmoothingEnabled = false;
+                ctx.mozImageSmoothingEnabled = false;
+                ctx.webkitImageSmoothingEnabled = false;
+                ctx.msImageSmoothingEnabled = false;
+            }
             
             // Resize MPR canvases
             Object.values(mprCanvases).forEach(c => {
                 if (c && c.parentElement) {
-                    c.width = c.parentElement.clientWidth;
-                    c.height = c.parentElement.clientHeight;
+                    const containerEl = c.parentElement;
+                    const rect = containerEl.getBoundingClientRect();
+                    
+                    c.width = rect.width;
+                    c.height = rect.height;
+                    
+                    const canvasCtx = c.getContext('2d');
+                    canvasCtx.imageSmoothingEnabled = false;
+                    canvasCtx.mozImageSmoothingEnabled = false;
+                    canvasCtx.webkitImageSmoothingEnabled = false;
+                    canvasCtx.msImageSmoothingEnabled = false;
                 }
             });
             
@@ -1710,39 +1750,61 @@
         }
 
         async function loadCurrentImage() {
-            if (!imageData[currentImageIndex]) return;
+            if (!imageData[currentImageIndex]) {
+                console.warn('No image data available at index:', currentImageIndex);
+                return;
+            }
             
             try {
                 const imageId = imageData[currentImageIndex].id;
-                const response = await fetch(`/dicom-viewer/api/image/${imageId}/data/`);
-                const data = await response.json();
+                console.log('Loading image ID:', imageId);
                 
-                // Update window/level from DICOM data - SAME AS YOUR ORIGINAL
+                const response = await fetch(`/dicom-viewer/api/image/${imageId}/data/`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Image data received:', {
+                    hasPixelData: !!data.pixel_data,
+                    columns: data.columns,
+                    rows: data.rows,
+                    pixelDataLength: data.pixel_data ? data.pixel_data.length : 0
+                });
+                
+                if (!data.pixel_data) {
+                    showToast('No pixel data available for this image', 'warning');
+                    return;
+                }
+                
+                // Update window/level from DICOM data
                 windowWidth = data.window_width || windowWidth;
                 windowLevel = data.window_center || windowLevel;
                 
                 updateSliders();
                 renderDicomImage(data);
                 
+                showToast(`Image ${currentImageIndex + 1} loaded`, 'success');
+                
             } catch (error) {
                 console.error('Error loading image:', error);
-                showToast('Failed to load image', 'error');
+                showToast(`Failed to load image: ${error.message}`, 'error');
             }
         }
 
         function renderDicomImage(imageData) {
-            if (!imageData.pixel_data) return;
+            if (!imageData.pixel_data || !ctx) return;
             
-            // Create ImageData from pixel array - SAME AS YOUR ORIGINAL
+            // Create ImageData from pixel array
             const pixels = new Uint8ClampedArray(imageData.pixel_data.length * 4);
             
             for (let i = 0; i < imageData.pixel_data.length; i++) {
                 let value = imageData.pixel_data[i];
                 
-                // Apply window/level - SAME AS YOUR ORIGINAL
+                // Apply window/level
                 value = applyWindowing(value, windowWidth, windowLevel);
                 
-                // Apply inversion if needed - SAME AS YOUR ORIGINAL
+                // Apply inversion if needed
                 if (inverted) value = 255 - value;
                 
                 pixels[i * 4] = value;     // R
@@ -1753,28 +1815,60 @@
             
             const imgData = new ImageData(pixels, imageData.columns, imageData.rows);
             
-            // Clear and draw - YOUR ORIGINAL METHOD WITH OPTIONAL ENHANCEMENTS
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Use canvas dimensions directly
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
             
-            // If any transformations are active, use enhanced rendering
-            if (zoom !== 1.0 || panX !== 0 || panY !== 0 || rotation !== 0 || flipH || flipV) {
-                // Enhanced rendering with transformations (for new tools)
+            // Clear canvas
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            // Calculate scaling to fit image in canvas while maintaining aspect ratio
+            const imageAspect = imgData.width / imgData.height;
+            const canvasAspect = canvasWidth / canvasHeight;
+            
+            let scale = 1;
+            if (imageAspect > canvasAspect) {
+                // Image is wider than canvas
+                scale = canvasWidth / imgData.width;
+            } else {
+                // Image is taller than canvas
+                scale = canvasHeight / imgData.height;
+            }
+            
+            // Apply zoom
+            scale *= zoom;
+            
+            const drawWidth = imgData.width * scale;
+            const drawHeight = imgData.height * scale;
+            
+            // Center the image with pan offset
+            const drawX = (canvasWidth - drawWidth) / 2 + panX;
+            const drawY = (canvasHeight - drawHeight) / 2 + panY;
+            
+            // Apply transformations if needed
+            if (rotation !== 0 || flipH || flipV) {
                 ctx.save();
-                ctx.translate(canvas.width / 2, canvas.height / 2);
-                ctx.scale(zoom, zoom);
-                ctx.translate(panX, panY);
+                ctx.translate(canvasWidth / 2, canvasHeight / 2);
                 
                 if (rotation !== 0) ctx.rotate(rotation * Math.PI / 180);
                 if (flipH || flipV) ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
                 
-                ctx.translate(-imgData.width / 2, -imgData.height / 2);
-                ctx.putImageData(imgData, 0, 0);
+                // Put image data directly to canvas at transformed position
+                ctx.translate(-drawWidth / 2, -drawHeight / 2);
+                
+                // Scale the context to draw the image at the right size
+                ctx.scale(scale, scale);
+                ctx.putImageData(imgData, -imgData.width / 2, -imgData.height / 2);
+                
                 ctx.restore();
             } else {
-                // Center the image in the canvas
-                const x = (canvas.width - imgData.width) / 2;
-                const y = (canvas.height - imgData.height) / 2;
-                ctx.putImageData(imgData, x, y);
+                // Simple case - no transformations
+                // Scale context and put image data directly
+                ctx.save();
+                ctx.translate(drawX, drawY);
+                ctx.scale(scale, scale);
+                ctx.putImageData(imgData, 0, 0);
+                ctx.restore();
             }
             
             // Always draw measurements and annotations after rendering the image
