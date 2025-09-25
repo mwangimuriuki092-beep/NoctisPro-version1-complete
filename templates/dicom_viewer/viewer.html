@@ -229,8 +229,8 @@
             image-rendering: high-quality;
             cursor: crosshair;
             transition: transform 0.1s ease;
-            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
-            -webkit-filter: contrast(1.15) brightness(1.08);
+            filter: contrast(1.05) brightness(1.35);
+            -webkit-filter: contrast(1.05) brightness(1.35);
         }
 
         .image-container {
@@ -267,9 +267,9 @@
             cursor: crosshair;
             user-select: none;
             transition: none;
-            /* Medical-grade image enhancement */
-            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
-            -webkit-filter: contrast(1.15) brightness(1.08);
+            /* Medical-grade image enhancement - BRIGHTER */
+            filter: contrast(1.05) brightness(1.35);
+            -webkit-filter: contrast(1.05) brightness(1.35);
             /* Transform origin for zoom/pan */
             transform-origin: center center;
         }
@@ -1151,7 +1151,7 @@
                         <span>Zoom</span>
                         <span id="zoomValue">100%</span>
                     </div>
-                    <input type="range" class="slider" id="zoomSlider" min="25" max="500" value="100" oninput="updateZoom(this.value)">
+                    <input type="range" class="slider" id="zoomSlider" min="25" max="300" value="100" oninput="updateZoom(this.value)">
                 </div>
             </div>
 
@@ -1657,7 +1657,7 @@
         }
 
         function setZoom(factor) {
-            zoomFactor = Math.max(0.1, Math.min(5.0, factor));
+            zoomFactor = Math.max(0.25, Math.min(3.0, factor)); // REDUCED max zoom from 5.0 to 3.0
             const zoomPercent = Math.round(zoomFactor * 100);
             
             document.getElementById('zoomSlider').value = zoomPercent;

@@ -356,11 +356,11 @@ function fixCanvasEventHandlers() {
         e.preventDefault();
         
         if (e.ctrlKey) {
-            // Zoom
-            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            // Zoom - REDUCED sensitivity and range
+            const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05; // More gentle zoom steps
             if (typeof window.zoom !== 'undefined') {
                 window.zoom *= zoomFactor;
-                window.zoom = Math.max(0.1, Math.min(10, window.zoom));
+                window.zoom = Math.max(0.25, Math.min(3.0, window.zoom)); // Reduced range
             }
             if (typeof redrawCurrentImage === 'function') {
                 redrawCurrentImage();
@@ -452,9 +452,9 @@ function updatePanning(x, y) {
 }
 
 function handleZoomClick(x, y, isShiftKey) {
-    const zoomFactor = isShiftKey ? 0.8 : 1.25;
+    const zoomFactor = isShiftKey ? 0.85 : 1.15; // More gentle zoom steps
     zoom *= zoomFactor;
-    zoom = Math.max(0.1, Math.min(10, zoom));
+    zoom = Math.max(0.25, Math.min(3.0, zoom)); // Reduced range
     
     // Zoom towards cursor position
     const canvas = document.getElementById('dicomCanvas');
