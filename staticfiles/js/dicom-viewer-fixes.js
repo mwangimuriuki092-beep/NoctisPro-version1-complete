@@ -203,9 +203,17 @@ function fixCanvasEventHandlers() {
         } else {
             // Scroll through images
             if (e.deltaY > 0) {
-                nextImage();
+                if (typeof navigateImage === 'function') {
+                    navigateImage(1);
+                } else if (typeof window.navigateImage === 'function') {
+                    window.navigateImage(1);
+                }
             } else {
-                previousImage();
+                if (typeof navigateImage === 'function') {
+                    navigateImage(-1);
+                } else if (typeof window.navigateImage === 'function') {
+                    window.navigateImage(-1);
+                }
             }
         }
     });
