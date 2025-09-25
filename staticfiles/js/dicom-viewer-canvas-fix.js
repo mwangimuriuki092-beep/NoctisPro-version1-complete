@@ -73,31 +73,30 @@ class DicomCanvasFix {
     setupHighResolutionCanvas() {
         if (!this.canvas) return;
         
-        // Get device pixel ratio for high-DPI displays but limit it for medical imaging
-        const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap DPR at 2 to prevent over-scaling
+        // Simplified canvas setup - avoid complex DPR scaling that causes zoom issues
         const rect = this.canvas.getBoundingClientRect();
         
-        // Detect modality for resolution optimization
+        // Detect modality for reference
         const modality = this.detectModality();
         
-        // Simplified resolution multipliers - FIXED for normal display
-        let resolutionMultiplier = 1.0; // Standard scaling for all modalities
+        // Use 1:1 pixel ratio for medical imaging to avoid scaling artifacts
+        const dpr = 1.0; // Fixed 1:1 ratio for consistent medical image display
         
-        // Set canvas internal dimensions
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
+        // Set canvas dimensions to match display size exactly
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
         
-        // Scale canvas back down using CSS
+        // Ensure CSS dimensions match internal dimensions
         this.canvas.style.width = rect.width + 'px';
         this.canvas.style.height = rect.height + 'px';
         
-        // Scale the drawing context to match - IMPORTANT: Only scale by DPR, not resolution multiplier
-        this.ctx.scale(dpr, dpr);
+        // No context scaling needed with 1:1 ratio
+        // this.ctx.scale(dpr, dpr); // Removed to prevent scaling issues
         
         // Set canvas modality attribute for future reference
         this.canvas.dataset.modality = modality;
         
-        console.log(`High-resolution canvas setup for ${modality}: ${this.canvas.width}x${this.canvas.height} (DPR: ${dpr}, Display: ${rect.width}x${rect.height})`);
+        console.log(`Optimized canvas setup for ${modality}: ${this.canvas.width}x${this.canvas.height} (1:1 ratio, Display: ${rect.width}x${rect.height})`);
     }
 
     setupEventListeners() {
@@ -455,9 +454,9 @@ class DicomCanvasFix {
         
         let drawWidth, drawHeight, drawX, drawY;
         
-        // Fit image to canvas with proper aspect ratio - NORMAL SIZE FIT
-        const maxWidth = canvasDisplayWidth * 0.9; // 90% of display width
-        const maxHeight = canvasDisplayHeight * 0.9; // 90% of display height
+        // Fit image to canvas with proper aspect ratio - OPTIMIZED SIZE FIT
+        const maxWidth = canvasDisplayWidth * 0.98; // 98% of display width for better utilization
+        const maxHeight = canvasDisplayHeight * 0.98; // 98% of display height for better utilization
         
         // Calculate scale to fit image properly
         const scaleX = maxWidth / image.width;
@@ -505,50 +504,50 @@ class DicomCanvasFix {
             this.ctx.imageSmoothingEnabled = true;
             this.ctx.imageSmoothingQuality = 'high';
 
-            if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-                // X-ray modalities: Increased brightness for better visibility
+            if (['DX', 'CR', 'DR', 'XA', 'RF', 'MG'].includes(modality)) {
+                // X-ray modalities: SIGNIFICANTLY increased brightness and contrast for better visibility
                 this.ctx.imageSmoothingEnabled = false; // Critical for X-ray detail
-                this.ctx.filter = 'contrast(1.25) brightness(1.65) saturate(0.85)';
-                console.log(`Applied optimized X-ray settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.8) brightness(2.2) saturate(0.75) gamma(0.8)';
+                console.log(`Applied high-contrast X-ray settings for ${modality}`);
                 
             } else if (['CT'].includes(modality)) {
-                // CT: Increased brightness for better tissue visibility
+                // CT: Enhanced brightness and contrast for better tissue visibility
                 this.ctx.imageSmoothingEnabled = false; // Preserve CT detail
-                this.ctx.filter = 'contrast(1.20) brightness(1.60) saturate(0.90)';
-                console.log(`Applied optimized CT settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.6) brightness(2.0) saturate(0.80) gamma(0.85)';
+                console.log(`Applied enhanced CT settings for ${modality}`);
                 
             } else if (['MR', 'MRI'].includes(modality)) {
-                // MRI: Increased brightness for better contrast differentiation
+                // MRI: Enhanced brightness for better contrast differentiation
                 this.ctx.imageSmoothingEnabled = true;
                 this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.18) brightness(1.58) saturate(0.95)';
-                console.log(`Applied optimized MRI settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.5) brightness(1.9) saturate(0.85) gamma(0.9)';
+                console.log(`Applied enhanced MRI settings for ${modality}`);
                 
             } else if (['US'].includes(modality)) {
-                // Ultrasound: Increased brightness for better visualization
+                // Ultrasound: Enhanced brightness for better visualization
                 this.ctx.imageSmoothingEnabled = true;
                 this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.15) brightness(1.62) saturate(0.88)';
-                console.log(`Applied optimized Ultrasound settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.4) brightness(1.8) saturate(0.80) gamma(0.9)';
+                console.log(`Applied enhanced Ultrasound settings for ${modality}`);
                 
             } else if (['NM', 'PT'].includes(modality)) {
-                // Nuclear Medicine/PET: Increased brightness with good contrast
+                // Nuclear Medicine/PET: Enhanced brightness with excellent contrast
                 this.ctx.imageSmoothingEnabled = true;
                 this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.28) brightness(1.55) saturate(1.05)';
-                console.log(`Applied optimized Nuclear Medicine settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.7) brightness(1.9) saturate(1.1) gamma(0.85)';
+                console.log(`Applied enhanced Nuclear Medicine settings for ${modality}`);
                 
             } else {
-                // Default/Unknown: Increased brightness for general medical imaging
+                // Default/Unknown: Enhanced brightness for general medical imaging
                 this.ctx.imageSmoothingEnabled = false;
-                this.ctx.filter = 'contrast(1.20) brightness(1.60) saturate(0.90)';
-                console.log(`Applied optimized default settings for ${modality}`);
+                this.ctx.filter = 'contrast(1.6) brightness(2.0) saturate(0.80) gamma(0.85)';
+                console.log(`Applied enhanced default settings for ${modality}`);
             }
         } catch (error) {
-            console.warn('Failed to apply modality rendering settings, using defaults:', error);
-            // Safe fallback
+            console.warn('Failed to apply modality rendering settings, using enhanced fallback:', error);
+            // Enhanced fallback for better visibility
             this.ctx.globalAlpha = 1.0;
-            this.ctx.filter = 'none';
+            this.ctx.filter = 'contrast(1.6) brightness(2.0)';
             this.ctx.imageSmoothingEnabled = false;
         }
     }
@@ -570,9 +569,9 @@ class DicomCanvasFix {
             
             let drawWidth, drawHeight, drawX, drawY;
             
-            // Fit image to 85% of display canvas to ensure it's not too large
-            const maxWidth = canvasDisplayWidth * 0.85;
-            const maxHeight = canvasDisplayHeight * 0.85;
+        // Fit image to 95% of display canvas for better utilization
+        const maxWidth = canvasDisplayWidth * 0.95;
+        const maxHeight = canvasDisplayHeight * 0.95;
             
             const scaleX = maxWidth / image.width;
             const scaleY = maxHeight / image.height;
@@ -584,10 +583,10 @@ class DicomCanvasFix {
             drawX = (canvasDisplayWidth - drawWidth) / 2;
             drawY = (canvasDisplayHeight - drawHeight) / 2;
             
-            // Safe rendering settings - Increased brightness for better visibility
+            // Enhanced rendering settings - Significantly increased brightness for better visibility
             this.ctx.globalAlpha = 1.0;
             this.ctx.imageSmoothingEnabled = false;
-            this.ctx.filter = 'contrast(1.20) brightness(1.60)';
+            this.ctx.filter = 'contrast(1.6) brightness(2.0) gamma(0.85)';
             
             // Draw image
             this.ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
