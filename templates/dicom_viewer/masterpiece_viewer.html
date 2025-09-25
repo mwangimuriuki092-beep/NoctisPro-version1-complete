@@ -1467,38 +1467,34 @@
         function resizeCanvas() {
             const container = canvas.parentElement;
             if (container && canvas) {
-                // Set canvas internal dimensions to match container
-                canvas.width = container.clientWidth;
-                canvas.height = container.clientHeight;
+                // Get container dimensions
+                const rect = container.getBoundingClientRect();
                 
-                // Ensure proper pixel ratio for crisp rendering
-                const dpr = window.devicePixelRatio || 1;
-                const rect = canvas.getBoundingClientRect();
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
+                // Set canvas size to match container
+                canvas.width = rect.width;
+                canvas.height = rect.height;
                 
-                // Scale the context to match device pixel ratio
-                ctx.scale(dpr, dpr);
-                
-                // Set canvas CSS size to match container
-                canvas.style.width = rect.width + 'px';
-                canvas.style.height = rect.height + 'px';
+                // Re-apply canvas settings after resize
+                ctx.imageSmoothingEnabled = false;
+                ctx.mozImageSmoothingEnabled = false;
+                ctx.webkitImageSmoothingEnabled = false;
+                ctx.msImageSmoothingEnabled = false;
             }
             
             // Resize MPR canvases
             Object.values(mprCanvases).forEach(c => {
                 if (c && c.parentElement) {
                     const containerEl = c.parentElement;
-                    const dpr = window.devicePixelRatio || 1;
                     const rect = containerEl.getBoundingClientRect();
                     
-                    c.width = rect.width * dpr;
-                    c.height = rect.height * dpr;
-                    c.style.width = rect.width + 'px';
-                    c.style.height = rect.height + 'px';
+                    c.width = rect.width;
+                    c.height = rect.height;
                     
-                    const ctx = c.getContext('2d');
-                    ctx.scale(dpr, dpr);
+                    const canvasCtx = c.getContext('2d');
+                    canvasCtx.imageSmoothingEnabled = false;
+                    canvasCtx.mozImageSmoothingEnabled = false;
+                    canvasCtx.webkitImageSmoothingEnabled = false;
+                    canvasCtx.msImageSmoothingEnabled = false;
                 }
             });
             
@@ -1819,10 +1815,9 @@
             
             const imgData = new ImageData(pixels, imageData.columns, imageData.rows);
             
-            // Account for device pixel ratio
-            const dpr = window.devicePixelRatio || 1;
-            const canvasWidth = canvas.width / dpr;
-            const canvasHeight = canvas.height / dpr;
+            // Use canvas dimensions directly
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
             
             // Clear canvas
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -1831,21 +1826,24 @@
             const imageAspect = imgData.width / imgData.height;
             const canvasAspect = canvasWidth / canvasHeight;
             
-            let drawWidth, drawHeight, drawX, drawY;
-            
+            let scale = 1;
             if (imageAspect > canvasAspect) {
                 // Image is wider than canvas
-                drawWidth = canvasWidth * zoom;
-                drawHeight = (canvasWidth / imageAspect) * zoom;
+                scale = canvasWidth / imgData.width;
             } else {
                 // Image is taller than canvas
-                drawWidth = (canvasHeight * imageAspect) * zoom;
-                drawHeight = canvasHeight * zoom;
+                scale = canvasHeight / imgData.height;
             }
             
+            // Apply zoom
+            scale *= zoom;
+            
+            const drawWidth = imgData.width * scale;
+            const drawHeight = imgData.height * scale;
+            
             // Center the image with pan offset
-            drawX = (canvasWidth - drawWidth) / 2 + panX;
-            drawY = (canvasHeight - drawHeight) / 2 + panY;
+            const drawX = (canvasWidth - drawWidth) / 2 + panX;
+            const drawY = (canvasHeight - drawHeight) / 2 + panY;
             
             // Apply transformations if needed
             if (rotation !== 0 || flipH || flipV) {
@@ -1855,27 +1853,22 @@
                 if (rotation !== 0) ctx.rotate(rotation * Math.PI / 180);
                 if (flipH || flipV) ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
                 
-                // Create temporary canvas for the image
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = imgData.width;
-                tempCanvas.height = imgData.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(imgData, 0, 0);
+                // Put image data directly to canvas at transformed position
+                ctx.translate(-drawWidth / 2, -drawHeight / 2);
                 
-                ctx.drawImage(tempCanvas, 
-                    -drawWidth / 2, -drawHeight / 2, 
-                    drawWidth, drawHeight);
+                // Scale the context to draw the image at the right size
+                ctx.scale(scale, scale);
+                ctx.putImageData(imgData, -imgData.width / 2, -imgData.height / 2);
+                
                 ctx.restore();
             } else {
-                // Create temporary canvas for the image
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = imgData.width;
-                tempCanvas.height = imgData.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(imgData, 0, 0);
-                
-                // Draw scaled image
-                ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight);
+                // Simple case - no transformations
+                // Scale context and put image data directly
+                ctx.save();
+                ctx.translate(drawX, drawY);
+                ctx.scale(scale, scale);
+                ctx.putImageData(imgData, 0, 0);
+                ctx.restore();
             }
             
             // Always draw measurements and annotations after rendering the image
