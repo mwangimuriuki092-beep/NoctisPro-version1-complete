@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Canvas Fixes Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-canvas {
+            border: 2px solid #333;
+            background: #000;
+            width: 100%;
+            max-width: 512px;
+            height: 400px;
+            margin: 10px 0;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+        .controls {
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>DICOM Canvas Rendering Test</h1>
+        
+        <div class="info">
+            <h3>Canvas Fixes Applied:</h3>
+            <ul>
+                <li>✅ Added proper device pixel ratio handling</li>
+                <li>✅ Improved image scaling and aspect ratio preservation</li>
+                <li>✅ Enhanced canvas initialization with image smoothing disabled</li>
+                <li>✅ Better error handling for image loading</li>
+                <li>✅ Crisp pixel rendering for medical images</li>
+            </ul>
+        </div>
+        
+        <canvas id="testCanvas" class="test-canvas"></canvas>
+        
+        <div class="controls">
+            <button onclick="testCanvasRendering()">Test Canvas Rendering</button>
+            <button onclick="testPixelData()">Test Pixel Data Display</button>
+            <button onclick="testScaling()">Test Image Scaling</button>
+            <button onclick="clearCanvas()">Clear Canvas</button>
+        </div>
+        
+        <div id="results" class="info" style="display: none;">
+            <h3>Test Results:</h3>
+            <div id="testOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        let canvas, ctx;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            canvas = document.getElementById('testCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // Apply the same canvas fixes as in the DICOM viewer
+            initializeCanvas();
+        });
+        
+        function initializeCanvas() {
+            if (!canvas || !ctx) return;
+            
+            // Disable image smoothing for crisp medical images
+            ctx.imageSmoothingEnabled = false;
+            ctx.mozImageSmoothingEnabled = false;
+            ctx.webkitImageSmoothingEnabled = false;
+            ctx.msImageSmoothingEnabled = false;
+            
+            // Set canvas size with device pixel ratio
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            log('Canvas initialized successfully');
+        }
+        
+        function resizeCanvas() {
+            if (!canvas) return;
+            
+            const container = canvas.parentElement;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            ctx.scale(dpr, dpr);
+            
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            
+            log(`Canvas resized to ${rect.width}x${rect.height} (DPR: ${dpr})`);
+        }
+        
+        function testCanvasRendering() {
+            clearCanvas();
+            
+            // Create test pattern similar to DICOM data
+            const width = 256;
+            const height = 256;
+            const pixels = new Uint8ClampedArray(width * height * 4);
+            
+            // Create a test pattern
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const index = (y * width + x) * 4;
+                    const value = Math.floor((x + y) / 2) % 256;
+                    
+                    pixels[index] = value;     // R
+                    pixels[index + 1] = value; // G
+                    pixels[index + 2] = value; // B
+                    pixels[index + 3] = 255;   // A
+                }
+            }
+            
+            const imageData = new ImageData(pixels, width, height);
+            
+            // Render like DICOM viewer does
+            const dpr = window.devicePixelRatio || 1;
+            const canvasWidth = canvas.width / dpr;
+            const canvasHeight = canvas.height / dpr;
+            
+            // Create temporary canvas
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            // Calculate scaling
+            const scale = Math.min(canvasWidth / width, canvasHeight / height);
+            const drawWidth = width * scale;
+            const drawHeight = height * scale;
+            const drawX = (canvasWidth - drawWidth) / 2;
+            const drawY = (canvasHeight - drawHeight) / 2;
+            
+            // Draw scaled image
+            ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight);
+            
+            log('Test pattern rendered successfully');
+        }
+        
+        function testPixelData() {
+            clearCanvas();
+            
+            // Simulate DICOM pixel data processing
+            const testPixelData = [];
+            for (let i = 0; i < 512 * 512; i++) {
+                testPixelData.push(Math.floor(Math.random() * 255));
+            }
+            
+            // Apply windowing (similar to DICOM viewer)
+            const windowWidth = 256;
+            const windowLevel = 128;
+            
+            const pixels = new Uint8ClampedArray(testPixelData.length * 4);
+            
+            for (let i = 0; i < testPixelData.length; i++) {
+                let value = testPixelData[i];
+                
+                // Apply windowing
+                const minVal = windowLevel - windowWidth / 2;
+                const maxVal = windowLevel + windowWidth / 2;
+                
+                if (value <= minVal) value = 0;
+                else if (value >= maxVal) value = 255;
+                else value = Math.round(((value - minVal) / windowWidth) * 255);
+                
+                pixels[i * 4] = value;
+                pixels[i * 4 + 1] = value;
+                pixels[i * 4 + 2] = value;
+                pixels[i * 4 + 3] = 255;
+            }
+            
+            const imageData = new ImageData(pixels, 512, 512);
+            
+            // Render similar to DICOM viewer
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 512;
+            tempCanvas.height = 512;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            const dpr = window.devicePixelRatio || 1;
+            const canvasWidth = canvas.width / dpr;
+            const canvasHeight = canvas.height / dpr;
+            
+            const scale = Math.min(canvasWidth / 512, canvasHeight / 512);
+            const drawWidth = 512 * scale;
+            const drawHeight = 512 * scale;
+            const drawX = (canvasWidth - drawWidth) / 2;
+            const drawY = (canvasHeight - drawHeight) / 2;
+            
+            ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight);
+            
+            log('Pixel data test completed - simulated DICOM windowing');
+        }
+        
+        function testScaling() {
+            clearCanvas();
+            
+            // Test different zoom levels
+            const testImage = new ImageData(128, 128);
+            const pixels = testImage.data;
+            
+            // Create checkerboard pattern
+            for (let y = 0; y < 128; y++) {
+                for (let x = 0; x < 128; x++) {
+                    const index = (y * 128 + x) * 4;
+                    const value = ((Math.floor(x / 8) + Math.floor(y / 8)) % 2) * 255;
+                    
+                    pixels[index] = value;
+                    pixels[index + 1] = value;
+                    pixels[index + 2] = value;
+                    pixels[index + 3] = 255;
+                }
+            }
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 128;
+            tempCanvas.height = 128;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.putImageData(testImage, 0, 0);
+            
+            const dpr = window.devicePixelRatio || 1;
+            const canvasWidth = canvas.width / dpr;
+            const canvasHeight = canvas.height / dpr;
+            
+            // Test 2x zoom
+            const zoom = 2.0;
+            const scale = Math.min(canvasWidth / 128, canvasHeight / 128) * zoom;
+            const drawWidth = 128 * scale;
+            const drawHeight = 128 * scale;
+            const drawX = (canvasWidth - drawWidth) / 2;
+            const drawY = (canvasHeight - drawHeight) / 2;
+            
+            ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight);
+            
+            log('Scaling test completed - 2x zoom checkerboard pattern');
+        }
+        
+        function clearCanvas() {
+            if (ctx) {
+                const dpr = window.devicePixelRatio || 1;
+                ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+            }
+        }
+        
+        function log(message) {
+            const results = document.getElementById('results');
+            const output = document.getElementById('testOutput');
+            
+            results.style.display = 'block';
+            output.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+        }
+    </script>
+</body>
+</html>
