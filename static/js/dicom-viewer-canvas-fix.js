@@ -332,54 +332,68 @@ class DicomCanvasFix {
             return;
         }
 
+        if (image instanceof HTMLImageElement) {
+            // Store current image
+            this.currentImage = image;
+            
+            // If transform controls exist, use them for rendering
+            if (window.dicomTransformControls) {
+                window.dicomTransformControls.setImage(image);
+                return;
+            }
+            
+            // Fallback to basic display
+            this.basicDisplayImage(image);
+        }
+    }
+
+    basicDisplayImage(image) {
         // Clear canvas with black background
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        if (image instanceof HTMLImageElement) {
-            // Apply proper scaling to make image visible (not overly zoomed)
-            const canvasAspect = this.canvas.width / this.canvas.height;
-            const imageAspect = image.width / image.height;
-            
-            let drawWidth, drawHeight, drawX, drawY;
-            
-            // Scale image to fit nicely in canvas (70% of canvas size to avoid over-zooming)
-            const scaleFactor = 0.7;
-            
-            if (imageAspect > canvasAspect) {
-                // Image is wider than canvas
-                drawWidth = this.canvas.width * scaleFactor;
-                drawHeight = drawWidth / imageAspect;
-            } else {
-                // Image is taller than canvas
-                drawHeight = this.canvas.height * scaleFactor;
-                drawWidth = drawHeight * imageAspect;
-            }
-            
-            // Center the image
-            drawX = (this.canvas.width - drawWidth) / 2;
-            drawY = (this.canvas.height - drawHeight) / 2;
-            
-            // Enable image smoothing for better quality
-            this.ctx.imageSmoothingEnabled = true;
-            this.ctx.imageSmoothingQuality = 'high';
-            
-            // Draw image with proper contrast
-            this.ctx.globalAlpha = 1.0;
-            this.ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
-            
-            // Store image info for zoom/pan operations
-            this.imageInfo = {
-                x: drawX,
-                y: drawY,
-                width: drawWidth,
-                height: drawHeight,
-                originalWidth: image.width,
-                originalHeight: image.height
-            };
-            
-            console.log('Image displayed successfully with proper scaling');
+        // Apply proper scaling to make image visible (not overly zoomed)
+        const canvasAspect = this.canvas.width / this.canvas.height;
+        const imageAspect = image.width / image.height;
+        
+        let drawWidth, drawHeight, drawX, drawY;
+        
+        // Scale image to fit nicely in canvas (70% of canvas size to avoid over-zooming)
+        const scaleFactor = 0.7;
+        
+        if (imageAspect > canvasAspect) {
+            // Image is wider than canvas
+            drawWidth = this.canvas.width * scaleFactor;
+            drawHeight = drawWidth / imageAspect;
+        } else {
+            // Image is taller than canvas
+            drawHeight = this.canvas.height * scaleFactor;
+            drawWidth = drawHeight * imageAspect;
         }
+        
+        // Center the image
+        drawX = (this.canvas.width - drawWidth) / 2;
+        drawY = (this.canvas.height - drawHeight) / 2;
+        
+        // Enable image smoothing for better quality
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = 'high';
+        
+        // Draw image with proper contrast
+        this.ctx.globalAlpha = 1.0;
+        this.ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+        
+        // Store image info for zoom/pan operations
+        this.imageInfo = {
+            x: drawX,
+            y: drawY,
+            width: drawWidth,
+            height: drawHeight,
+            originalWidth: image.width,
+            originalHeight: image.height
+        };
+        
+        console.log('Image displayed successfully with proper scaling');
     }
 
     displayCachedImage(imageId) {

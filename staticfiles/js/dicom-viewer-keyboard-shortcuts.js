@@ -38,6 +38,12 @@ class DicomKeyboardShortcuts {
             '0': () => this.resetZoom(),
             'f': () => this.toggleFullscreen(),
             
+            // Transform controls
+            'h': () => this.flipHorizontal(),
+            'v': () => this.flipVertical(),
+            'ArrowLeft': () => this.rotateLeft(),
+            'ArrowRight': () => this.rotateRight(),
+            
             // Measurements
             'Delete': () => this.deleteLastMeasurement(),
             'Escape': () => this.cancelCurrentAction(),
@@ -170,20 +176,51 @@ class DicomKeyboardShortcuts {
     
     // Zoom Functions
     zoomIn() {
-        if (typeof setZoom === 'function' && window.zoomFactor) {
+        if (window.dicomTransformControls) {
+            window.dicomTransformControls.zoomIn();
+        } else if (typeof setZoom === 'function' && window.zoomFactor) {
             setZoom(window.zoomFactor * 1.2);
         }
     }
     
     zoomOut() {
-        if (typeof setZoom === 'function' && window.zoomFactor) {
+        if (window.dicomTransformControls) {
+            window.dicomTransformControls.zoomOut();
+        } else if (typeof setZoom === 'function' && window.zoomFactor) {
             setZoom(window.zoomFactor * 0.8);
         }
     }
     
     resetZoom() {
-        if (typeof setZoom === 'function') {
+        if (window.dicomTransformControls) {
+            window.dicomTransformControls.actualSize();
+        } else if (typeof setZoom === 'function') {
             setZoom(1.0);
+        }
+    }
+    
+    // Transform Functions
+    flipHorizontal() {
+        if (window.dicomTransformControls) {
+            window.dicomTransformControls.flipHorizontal();
+        }
+    }
+    
+    flipVertical() {
+        if (window.dicomTransformControls) {
+            window.dicomTransformControls.flipVertical();
+        }
+    }
+    
+    rotateLeft() {
+        if (window.dicomTransformControls) {
+            window.dicomTransformControls.rotateLeft();
+        }
+    }
+    
+    rotateRight() {
+        if (window.dicomTransformControls) {
+            window.dicomTransformControls.rotateRight();
         }
     }
     
@@ -342,6 +379,9 @@ class DicomKeyboardShortcuts {
                             <div><strong>+ / -</strong> - Zoom in/out</div>
                             <div><strong>0</strong> - Reset zoom</div>
                             <div><strong>F / F11</strong> - Fullscreen</div>
+                            <div><strong>H</strong> - Flip horizontal</div>
+                            <div><strong>V</strong> - Flip vertical</div>
+                            <div><strong>← / →</strong> - Rotate left/right</div>
                             <div><strong>Delete</strong> - Delete last measurement</div>
                             <div><strong>Escape</strong> - Cancel action</div>
                             <div><strong>F1</strong> - Show this help</div>
