@@ -369,8 +369,8 @@ def api_study_data(request, study_id):
 
 @login_required
 @csrf_exempt
-def api_image_data(request, image_id):
-    """API endpoint to get specific image data"""
+def api_image_metadata(request, image_id):
+    """API endpoint to get specific image metadata"""
     image = get_object_or_404(DicomImage, id=image_id)
     user = request.user
     
@@ -794,22 +794,28 @@ def api_realtime_studies(request):
         
         # Get studies updated since last check
         try:
+            # Build base queryset with filters first, then slice
             if hasattr(user, 'is_facility_user') and user.is_facility_user() and hasattr(user, 'facility') and user.facility:
-                studies = Study.objects.filter(
+                base_query = Study.objects.filter(
                     facility=user.facility,
                     last_updated__gt=last_update_time
-                ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
+                )
             else:
                 # For admin users or users without facility, show all studies
-                studies = Study.objects.filter(
+                base_query = Study.objects.filter(
                     last_updated__gt=last_update_time
-                ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
+                )
             
-            # Filter out temporary/invalid entries
-            studies = studies.exclude(patient__patient_id__startswith='TEMP_')
-            studies = studies.exclude(accession_number__startswith='TEMP_')
-            studies = studies.exclude(patient__first_name='TEMP')
-            studies = studies.exclude(patient__last_name__startswith='TEMP')
+            # Apply filters to exclude temporary/invalid entries before slicing
+            studies = base_query.exclude(
+                patient__patient_id__startswith='TEMP_'
+            ).exclude(
+                accession_number__startswith='TEMP_'
+            ).exclude(
+                patient__first_name='TEMP'
+            ).exclude(
+                patient__last_name__startswith='TEMP'
+            ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
         except Exception as e:
             logger.error(f"Error fetching studies: {str(e)}")
             # Return empty list if there's an issue
@@ -1581,7 +1587,7 @@ def api_calculate_distance(request):
 
 @login_required
 def api_export_image(request, image_id):
-    """API endpoint to export image in various formats"""
+    """Enhanced API endpoint to export image with detailed DICOM metadata and multiple views"""
     image = get_object_or_404(DicomImage, id=image_id)
     user = request.user
     
@@ -1590,18 +1596,208 @@ def api_export_image(request, image_id):
     if user.is_facility_user() and study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    export_format = request.GET.get('format', 'png')  # png, jpg, tiff, dicom
+    export_format = request.GET.get('format', 'png')  # png, jpg, tiff, dicom, pdf
+    include_metadata = request.GET.get('include_metadata', 'true').lower() == 'true'
+    include_multiple_views = request.GET.get('multiple_views', 'false').lower() == 'true'
+    window_presets = request.GET.get('presets', '').split(',') if request.GET.get('presets') else ['soft']
     
-    # This would export the image in the requested format
-    # For now, we'll return a success message
-    result = {
-        'success': True,
-        'download_url': f'/media/exports/image_{image_id}.{export_format}',
-        'format': export_format,
-        'filename': f'image_{image_id}.{export_format}'
-    }
-    
-    return JsonResponse(result)
+    try:
+        # Load DICOM data
+        dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+        if not os.path.exists(dicom_path):
+            return JsonResponse({'error': 'DICOM file not found'}, status=404)
+        
+        ds = pydicom.dcmread(dicom_path)
+        
+        # Initialize DICOM processor for enhanced imaging
+        from .dicom_utils import DicomProcessor, DicomFileHandler, safe_dicom_str
+        processor = DicomProcessor()
+        file_handler = DicomFileHandler()
+        
+        # Extract comprehensive DICOM metadata
+        metadata = file_handler.extract_dicom_metadata(ds)
+        
+        # Enhanced metadata with clinical details
+        enhanced_metadata = {
+            **metadata,
+            'export_timestamp': timezone.now().isoformat(),
+            'exported_by': user.username,
+            'facility': study.facility.name if study.facility else 'Unknown',
+            'accession_number': study.accession_number,
+            'study_uid': study.study_instance_uid,
+            'series_uid': image.series.series_instance_uid,
+            'image_uid': image.sop_instance_uid,
+            'slice_location': image.slice_location,
+            'instance_number': image.instance_number,
+            'acquisition_date': getattr(ds, 'AcquisitionDate', ''),
+            'acquisition_time': getattr(ds, 'AcquisitionTime', ''),
+            'slice_thickness': getattr(ds, 'SliceThickness', ''),
+            'pixel_spacing': safe_dicom_str(getattr(ds, 'PixelSpacing', '')),
+            'image_position': safe_dicom_str(getattr(ds, 'ImagePositionPatient', '')),
+            'image_orientation': safe_dicom_str(getattr(ds, 'ImageOrientationPatient', '')),
+            'kvp': getattr(ds, 'KVP', ''),
+            'exposure_time': getattr(ds, 'ExposureTime', ''),
+            'x_ray_tube_current': getattr(ds, 'XRayTubeCurrent', ''),
+            'exposure': getattr(ds, 'Exposure', ''),
+            'filter_type': getattr(ds, 'FilterType', ''),
+            'collimator_shape': getattr(ds, 'CollimatorShape', ''),
+            'reconstruction_diameter': getattr(ds, 'ReconstructionDiameter', ''),
+            'gantry_detector_tilt': getattr(ds, 'GantryDetectorTilt', ''),
+            'table_height': getattr(ds, 'TableHeight', ''),
+            'rotation_direction': getattr(ds, 'RotationDirection', ''),
+            'spiral_pitch_factor': getattr(ds, 'SpiralPitchFactor', ''),
+            'data_collection_diameter': getattr(ds, 'DataCollectionDiameter', ''),
+        }
+        
+        # Create exports directory if it doesn't exist
+        export_dir = os.path.join(settings.MEDIA_ROOT, 'exports')
+        os.makedirs(export_dir, exist_ok=True)
+        
+        # Generate base filename with timestamp
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        base_filename = f"export_{image_id}_{timestamp}"
+        
+        exported_files = []
+        
+        if include_multiple_views and hasattr(ds, 'pixel_array'):
+            # Generate multiple window/level views
+            pixel_array = ds.pixel_array
+            
+            # Convert to Hounsfield units if CT
+            if getattr(ds, 'Modality', '') == 'CT':
+                pixel_array = processor.convert_to_hounsfield_units(pixel_array, ds)
+            
+            for preset_name in window_presets:
+                if preset_name in processor.window_presets:
+                    preset = processor.window_presets[preset_name]
+                    
+                    # Apply windowing
+                    windowed_image = processor.apply_windowing(
+                        pixel_array, 
+                        preset['ww'], 
+                        preset['wl'],
+                        enhanced_contrast=True
+                    )
+                    
+                    # Export image with preset name
+                    view_filename = f"{base_filename}_{preset_name}.{export_format}"
+                    view_path = os.path.join(export_dir, view_filename)
+                    
+                    if export_format.lower() in ['png', 'jpg', 'jpeg']:
+                        from PIL import Image
+                        pil_image = Image.fromarray(windowed_image)
+                        pil_image.save(view_path)
+                    elif export_format.lower() == 'tiff':
+                        from PIL import Image
+                        pil_image = Image.fromarray(windowed_image)
+                        pil_image.save(view_path, format='TIFF')
+                    
+                    exported_files.append({
+                        'filename': view_filename,
+                        'preset': preset_name,
+                        'description': preset['description'],
+                        'window_width': preset['ww'],
+                        'window_level': preset['wl'],
+                        'download_url': f'/media/exports/{view_filename}'
+                    })
+        else:
+            # Single view export
+            if hasattr(ds, 'pixel_array'):
+                pixel_array = ds.pixel_array
+                
+                # Auto-optimize window/level
+                modality = getattr(ds, 'Modality', 'CT')
+                window_width, window_level = processor.auto_window_from_data(pixel_array, modality=modality)
+                
+                # Apply windowing
+                windowed_image = processor.apply_windowing(
+                    pixel_array, 
+                    window_width, 
+                    window_level,
+                    enhanced_contrast=True
+                )
+                
+                # Export single image
+                single_filename = f"{base_filename}.{export_format}"
+                single_path = os.path.join(export_dir, single_filename)
+                
+                if export_format.lower() in ['png', 'jpg', 'jpeg']:
+                    from PIL import Image
+                    pil_image = Image.fromarray(windowed_image)
+                    pil_image.save(single_path)
+                elif export_format.lower() == 'tiff':
+                    from PIL import Image
+                    pil_image = Image.fromarray(windowed_image)
+                    pil_image.save(single_path, format='TIFF')
+                elif export_format.lower() == 'dicom':
+                    # Copy original DICOM file
+                    import shutil
+                    single_filename = f"{base_filename}.dcm"
+                    single_path = os.path.join(export_dir, single_filename)
+                    shutil.copy2(dicom_path, single_path)
+                
+                exported_files.append({
+                    'filename': single_filename,
+                    'preset': 'auto',
+                    'description': 'Auto-optimized window/level',
+                    'window_width': window_width,
+                    'window_level': window_level,
+                    'download_url': f'/media/exports/{single_filename}'
+                })
+        
+        # Export metadata if requested
+        metadata_file = None
+        if include_metadata:
+            metadata_filename = f"{base_filename}_metadata.json"
+            metadata_path = os.path.join(export_dir, metadata_filename)
+            
+            with open(metadata_path, 'w') as f:
+                json.dump(enhanced_metadata, f, indent=2, default=str)
+            
+            metadata_file = {
+                'filename': metadata_filename,
+                'download_url': f'/media/exports/{metadata_filename}'
+            }
+        
+        # Log export activity for audit
+        try:
+            from .medical_audit import MedicalAuditLogger
+            audit_logger = MedicalAuditLogger()
+            audit_logger.log_data_export(
+                user=user,
+                export_type=f'DICOM_IMAGE_{export_format.upper()}',
+                data_description=f'Image {image_id} with {len(exported_files)} views',
+                destination='LOCAL_FILE',
+                success=True
+            )
+        except Exception as e:
+            logger.warning(f"Failed to log export audit: {e}")
+        
+        result = {
+            'success': True,
+            'export_format': export_format,
+            'exported_files': exported_files,
+            'metadata_file': metadata_file,
+            'total_files': len(exported_files) + (1 if metadata_file else 0),
+            'enhanced_metadata': enhanced_metadata if include_metadata else None,
+            'export_summary': {
+                'image_id': image_id,
+                'patient_name': enhanced_metadata.get('patient_name', ''),
+                'study_date': enhanced_metadata.get('study_date', ''),
+                'modality': enhanced_metadata.get('modality', ''),
+                'body_part': enhanced_metadata.get('body_part_examined', ''),
+                'series_description': enhanced_metadata.get('series_description', ''),
+                'institution': enhanced_metadata.get('institution_name', ''),
+                'exported_by': user.username,
+                'export_timestamp': enhanced_metadata['export_timestamp']
+            }
+        }
+        
+        return JsonResponse(result)
+        
+    except Exception as e:
+        logger.error(f"Error exporting image {image_id}: {str(e)}")
+        return JsonResponse({'error': f'Export failed: {str(e)}'}, status=500)
 
 @login_required
 @csrf_exempt
@@ -3203,7 +3399,10 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
                     st = 1.0
                 ps_attr = getattr(ds, 'PixelSpacing', [1.0, 1.0])
                 try:
-                    first_ps = (float(ps_attr[0]), float(ps_attr[1]))
+                    if ps_attr is not None and len(ps_attr) >= 2:
+                        first_ps = (float(ps_attr[0]), float(ps_attr[1]))
+                    else:
+                        first_ps = (1.0, 1.0)
                 except Exception:
                     first_ps = (1.0, 1.0)
 
@@ -3665,101 +3864,296 @@ from django.views.decorators.http import require_POST
 @require_POST
 def print_dicom_image(request):
     """
-    Print DICOM image(s) with high quality settings optimized for glossy paper.
-    Supports single images, multiple views, and CT series printing.
+    Enhanced DICOM printing with detailed metadata and multiple views.
+    Supports single images, multiple window/level views, CT series, and comprehensive metadata printing.
     """
     try:
-        # Check for multiple images (CT series or multiple views)
-        image_data_list = []
-        
-        # Single image mode
-        image_data = request.POST.get('image_data')
-        if image_data:
-            image_data_list.append(image_data)
-        
-        # Multiple images mode (CT series or multiple views)
-        image_count = int(request.POST.get('image_count', 0))
-        if image_count > 0:
-            for i in range(image_count):
-                img_data = request.POST.get(f'image_data_{i}')
-                if img_data:
-                    image_data_list.append(img_data)
-        
-        # CT series mode - get all images in a series
+        # Get image/series information
+        image_id = request.POST.get('image_id')
         series_id = request.POST.get('series_id')
-        if series_id and not image_data_list:
-            try:
-                from worklist.models import Series, DicomImage
-                series = Series.objects.get(id=series_id)
-                dicom_images = DicomImage.objects.filter(series=series).order_by('instance_number')
-                
-                # Convert DICOM images to printable format
-                for dicom_img in dicom_images[:20]:  # Limit to 20 images for practical printing
-                    try:
-                        # This would need actual DICOM to image conversion
-                        # For now, we'll use a placeholder
-                        image_data_list.append(f"dicom_series_{dicom_img.id}")
-                    except Exception:
-                        continue
-                        
-            except Exception as e:
-                logger.error(f"Error loading CT series for printing: {e}")
+        image_data = request.POST.get('image_data')
         
-        if not image_data_list:
-            return JsonResponse({'success': False, 'error': 'No image data provided'})
+        # Enhanced printing options
+        include_metadata = request.POST.get('include_metadata', 'true').lower() == 'true'
+        include_multiple_views = request.POST.get('multiple_views', 'true').lower() == 'true'
+        window_presets = request.POST.get('presets', 'soft,bone,lung,brain').split(',')
+        print_layout = request.POST.get('layout', 'professional')  # professional, diagnostic, comparison
         
-        # Process multiple images for printing
-        processed_images = []
-        for img_data in image_data_list:
-            try:
-                # Parse image data (base64 encoded)
-                if img_data.startswith('data:image'):
-                    img_data = img_data.split(',')[1]
-                elif img_data.startswith('dicom_series_'):
-                    # Handle DICOM series images - would need actual conversion
-                    # For now, skip these
-                    continue
-                
-                image_bytes = base64.b64decode(img_data)
-                processed_images.append(image_bytes)
-            except Exception as e:
-                logger.warning(f"Error processing image data: {e}")
-                continue
-        
-        if not processed_images:
-            return JsonResponse({'success': False, 'error': 'No valid image data found'})
-        
-        # Get printing options
+        # Standard printing options
         paper_size = request.POST.get('paper_size', 'A4')
         paper_type = request.POST.get('paper_type', 'glossy')
         print_quality = request.POST.get('print_quality', 'high')
         copies = int(request.POST.get('copies', 1))
         printer_name = request.POST.get('printer_name', '')
-        layout_type = request.POST.get('layout_type', 'single')
         print_medium = request.POST.get('print_medium', 'paper')  # paper or film
         
-        # Get patient and study information
-        patient_name = request.POST.get('patient_name', 'Unknown Patient')
-        study_date = request.POST.get('study_date', '')
-        modality = request.POST.get('modality', '')
-        series_description = request.POST.get('series_description', '')
-        institution_name = request.POST.get('institution_name', request.user.facility.name if hasattr(request.user, 'facility') and request.user.facility else 'Medical Facility')
+        processed_images = []
+        enhanced_metadata = {}
         
-        # Create temporary files
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as img_temp:
-            img_temp.write(image_bytes)
-            img_temp_path = img_temp.name
+        # Initialize DICOM processor
+        from .dicom_utils import DicomProcessor, DicomFileHandler, safe_dicom_str
+        processor = DicomProcessor()
+        file_handler = DicomFileHandler()
         
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as pdf_temp:
-            pdf_temp_path = pdf_temp.name
+        if image_id:
+            # Single image with multiple views
+            try:
+                image = DicomImage.objects.get(id=image_id)
+                dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+                
+                if os.path.exists(dicom_path):
+                    ds = pydicom.dcmread(dicom_path)
+                    
+                    # Extract comprehensive metadata
+                    enhanced_metadata = file_handler.extract_dicom_metadata(ds)
+                    enhanced_metadata.update({
+                        'facility': image.series.study.facility.name if image.series.study.facility else 'Unknown',
+                        'accession_number': image.series.study.accession_number,
+                        'study_uid': image.series.study.study_instance_uid,
+                        'series_uid': image.series.series_instance_uid,
+                        'image_uid': image.sop_instance_uid,
+                        'slice_location': image.slice_location,
+                        'instance_number': image.instance_number,
+                        'print_timestamp': timezone.now().isoformat(),
+                        'printed_by': request.user.username,
+                    })
+                    
+                    if hasattr(ds, 'pixel_array'):
+                        pixel_array = ds.pixel_array
+                        
+                        # Convert to Hounsfield units if CT
+                        if getattr(ds, 'Modality', '') == 'CT':
+                            pixel_array = processor.convert_to_hounsfield_units(pixel_array, ds)
+                        
+                        if include_multiple_views:
+                            # Generate multiple window/level views
+                            for preset_name in window_presets:
+                                if preset_name.strip() and preset_name.strip() in processor.window_presets:
+                                    preset = processor.window_presets[preset_name.strip()]
+                                    
+                                    # Apply windowing with enhanced contrast
+                                    windowed_image = processor.apply_windowing(
+                                        pixel_array, 
+                                        preset['ww'], 
+                                        preset['wl'],
+                                        enhanced_contrast=True
+                                    )
+                                    
+                                    # Convert to PIL Image
+                                    from PIL import Image
+                                    pil_image = Image.fromarray(windowed_image)
+                                    
+                                    # Convert to bytes for processing
+                                    import io
+                                    img_buffer = io.BytesIO()
+                                    pil_image.save(img_buffer, format='PNG')
+                                    img_bytes = img_buffer.getvalue()
+                                    
+                                    processed_images.append({
+                                        'data': img_bytes,
+                                        'preset': preset_name.strip(),
+                                        'description': preset['description'],
+                                        'window_width': preset['ww'],
+                                        'window_level': preset['wl']
+                                    })
+                        else:
+                            # Single optimized view
+                            modality = getattr(ds, 'Modality', 'CT')
+                            window_width, window_level = processor.auto_window_from_data(pixel_array, modality=modality)
+                            
+                            windowed_image = processor.apply_windowing(
+                                pixel_array, 
+                                window_width, 
+                                window_level,
+                                enhanced_contrast=True
+                            )
+                            
+                            from PIL import Image
+                            pil_image = Image.fromarray(windowed_image)
+                            
+                            import io
+                            img_buffer = io.BytesIO()
+                            pil_image.save(img_buffer, format='PNG')
+                            img_bytes = img_buffer.getvalue()
+                            
+                            processed_images.append({
+                                'data': img_bytes,
+                                'preset': 'auto',
+                                'description': 'Auto-optimized window/level',
+                                'window_width': window_width,
+                                'window_level': window_level
+                            })
+                            
+            except DicomImage.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Image not found'})
+            except Exception as e:
+                logger.error(f"Error processing image {image_id}: {e}")
+                return JsonResponse({'success': False, 'error': f'Error processing image: {str(e)}'})
+        
+        elif series_id:
+            # CT series with multiple views
+            try:
+                series = Series.objects.get(id=series_id)
+                dicom_images = DicomImage.objects.filter(series=series).order_by('instance_number')[:20]
+                
+                # Get metadata from first image
+                if dicom_images.exists():
+                    first_image = dicom_images.first()
+                    first_dicom_path = os.path.join(settings.MEDIA_ROOT, str(first_image.file_path))
+                    
+                    if os.path.exists(first_dicom_path):
+                        ds = pydicom.dcmread(first_dicom_path)
+                        enhanced_metadata = file_handler.extract_dicom_metadata(ds)
+                        enhanced_metadata.update({
+                            'facility': series.study.facility.name if series.study.facility else 'Unknown',
+                            'accession_number': series.study.accession_number,
+                            'study_uid': series.study.study_instance_uid,
+                            'series_uid': series.series_instance_uid,
+                            'total_images': dicom_images.count(),
+                            'print_timestamp': timezone.now().isoformat(),
+                            'printed_by': request.user.username,
+                        })
+                
+                # Process each image in series
+                for dicom_img in dicom_images:
+                    try:
+                        dicom_path = os.path.join(settings.MEDIA_ROOT, str(dicom_img.file_path))
+                        if os.path.exists(dicom_path):
+                            ds = pydicom.dcmread(dicom_path)
+                            
+                            if hasattr(ds, 'pixel_array'):
+                                pixel_array = ds.pixel_array
+                                
+                                # Convert to Hounsfield units if CT
+                                if getattr(ds, 'Modality', '') == 'CT':
+                                    pixel_array = processor.convert_to_hounsfield_units(pixel_array, ds)
+                                
+                                # Use auto-optimized windowing for series
+                                modality = getattr(ds, 'Modality', 'CT')
+                                window_width, window_level = processor.auto_window_from_data(pixel_array, modality=modality)
+                                
+                                windowed_image = processor.apply_windowing(
+                                    pixel_array, 
+                                    window_width, 
+                                    window_level,
+                                    enhanced_contrast=True
+                                )
+                                
+                                from PIL import Image
+                                pil_image = Image.fromarray(windowed_image)
+                                
+                                import io
+                                img_buffer = io.BytesIO()
+                                pil_image.save(img_buffer, format='PNG')
+                                img_bytes = img_buffer.getvalue()
+                                
+                                processed_images.append({
+                                    'data': img_bytes,
+                                    'preset': 'auto',
+                                    'description': f'Slice {dicom_img.instance_number}',
+                                    'window_width': window_width,
+                                    'window_level': window_level,
+                                    'slice_location': dicom_img.slice_location,
+                                    'instance_number': dicom_img.instance_number
+                                })
+                                
+                    except Exception as e:
+                        logger.warning(f"Error processing series image {dicom_img.id}: {e}")
+                        continue
+                        
+            except Series.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Series not found'})
+            except Exception as e:
+                logger.error(f"Error processing series {series_id}: {e}")
+                return JsonResponse({'success': False, 'error': f'Error processing series: {str(e)}'})
+        
+        elif image_data:
+            # Legacy base64 image data
+            try:
+                if image_data.startswith('data:image'):
+                    image_data = image_data.split(',')[1]
+                
+                image_bytes = base64.b64decode(image_data)
+                processed_images.append({
+                    'data': image_bytes,
+                    'preset': 'custom',
+                    'description': 'Custom image data'
+                })
+                
+                # Basic metadata for legacy mode
+                enhanced_metadata = {
+                    'patient_name': request.POST.get('patient_name', 'Unknown Patient'),
+                    'study_date': request.POST.get('study_date', ''),
+                    'modality': request.POST.get('modality', ''),
+                    'series_description': request.POST.get('series_description', ''),
+                    'print_timestamp': timezone.now().isoformat(),
+                    'printed_by': request.user.username,
+                }
+                
+            except Exception as e:
+                logger.error(f"Error processing base64 image data: {e}")
+                return JsonResponse({'success': False, 'error': 'Invalid image data'})
+        
+        if not processed_images:
+            return JsonResponse({'success': False, 'error': 'No valid image data found'})
+        
+        # Get patient and study information from metadata
+        patient_name = enhanced_metadata.get('patient_name', 'Unknown Patient')
+        study_date = enhanced_metadata.get('study_date', '')
+        modality = enhanced_metadata.get('modality', '')
+        series_description = enhanced_metadata.get('series_description', '')
+        institution_name = enhanced_metadata.get('institution_name', '')
+        institution_name = enhanced_metadata.get('institution_name', 
+            request.POST.get('institution_name', 
+                request.user.facility.name if hasattr(request.user, 'facility') and request.user.facility else 'Medical Facility'))
+        
+        # Create temporary files for processed images
+        temp_image_paths = []
         
         try:
-            # Create PDF with medical image and metadata using selected layout
-            create_medical_print_pdf_enhanced(
-                img_temp_path, pdf_temp_path, paper_size, layout_type, 
-                print_medium, modality, patient_name, study_date, 
-                series_description, institution_name
-            )
+            for i, img_data in enumerate(processed_images):
+                with tempfile.NamedTemporaryFile(suffix=f'_view_{i}.png', delete=False) as img_temp:
+                    img_temp.write(img_data['data'])
+                    temp_image_paths.append({
+                        'path': img_temp.name,
+                        'preset': img_data.get('preset', 'auto'),
+                        'description': img_data.get('description', ''),
+                        'window_width': img_data.get('window_width', ''),
+                        'window_level': img_data.get('window_level', ''),
+                        'slice_location': img_data.get('slice_location', ''),
+                        'instance_number': img_data.get('instance_number', '')
+                    })
+            
+            # Create PDF with enhanced layout
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as pdf_temp:
+                pdf_temp_path = pdf_temp.name
+            
+            # Choose appropriate layout based on number of images and layout preference
+            if print_layout == 'professional' and len(processed_images) > 1:
+                success = create_enhanced_professional_print_layout(
+                    temp_image_paths, pdf_temp_path, paper_size, print_medium,
+                    enhanced_metadata, include_metadata
+                )
+            elif print_layout == 'diagnostic' and len(processed_images) > 1:
+                success = create_enhanced_diagnostic_print_layout(
+                    temp_image_paths, pdf_temp_path, paper_size, print_medium,
+                    enhanced_metadata, include_metadata
+                )
+            elif print_layout == 'comparison' and len(processed_images) > 1:
+                success = create_enhanced_comparison_print_layout(
+                    temp_image_paths, pdf_temp_path, paper_size, print_medium,
+                    enhanced_metadata, include_metadata
+                )
+            else:
+                # Single image layout
+                success = create_enhanced_single_print_layout(
+                    temp_image_paths[0] if temp_image_paths else None,
+                    pdf_temp_path, paper_size, print_medium,
+                    enhanced_metadata, include_metadata
+                )
+            
+            if not success:
+                return JsonResponse({'success': False, 'error': 'Failed to create print layout'})
             
             # Print the PDF
             print_result = send_to_printer(
@@ -3768,11 +4162,29 @@ def print_dicom_image(request):
             )
             
             if print_result['success']:
-                # Log successful print
-                logger.info(f"Successfully printed DICOM image for patient {patient_name}")
+                # Log successful print with audit
+                try:
+                    from .medical_audit import MedicalAuditLogger
+                    audit_logger = MedicalAuditLogger()
+                    audit_logger.log_print_activity(
+                        user=request.user,
+                        print_type=f'DICOM_{print_layout.upper()}',
+                        data_description=f'{len(processed_images)} images - {patient_name}',
+                        printer_name=printer_name,
+                        copies=copies,
+                        success=True
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to log print audit: {e}")
+                
+                logger.info(f"Successfully printed {len(processed_images)} DICOM images for patient {patient_name}")
                 return JsonResponse({
                     'success': True, 
-                    'message': f'Image sent to printer successfully. Job ID: {print_result.get("job_id", "N/A")}'
+                    'message': f'{len(processed_images)} images sent to printer successfully. Job ID: {print_result.get("job_id", "N/A")}',
+                    'images_printed': len(processed_images),
+                    'layout_used': print_layout,
+                    'metadata_included': include_metadata,
+                    'presets_used': [img.get('preset', 'auto') for img in processed_images]
                 })
             else:
                 return JsonResponse({
@@ -3781,16 +4193,393 @@ def print_dicom_image(request):
                 })
                 
         finally:
-            # Clean up temporary files
+            # Clean up all temporary files
+            for temp_img in temp_image_paths:
+                try:
+                    os.unlink(temp_img['path'])
+                except:
+                    pass
+            
             try:
-                os.unlink(img_temp_path)
-                os.unlink(pdf_temp_path)
+                if 'pdf_temp_path' in locals():
+                    os.unlink(pdf_temp_path)
             except:
                 pass
                 
     except Exception as e:
         logger.error(f"Error in print_dicom_image: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+def create_enhanced_professional_print_layout(image_paths, output_path, paper_size, print_medium, metadata, include_metadata):
+    """Create professional medical print layout with multiple views and detailed metadata"""
+    try:
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.units import inch
+        from reportlab.lib.colors import black, blue, gray
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import Paragraph
+        from PIL import Image
+        
+        # Set page size
+        page_size = A4 if paper_size == 'A4' else letter
+        c = canvas.Canvas(output_path, pagesize=page_size)
+        width, height = page_size
+        
+        # Header with metadata
+        if include_metadata:
+            # Title
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(50, height - 50, f"Medical Imaging Report - {metadata.get('modality', 'DICOM')}")
+            
+            # Patient information
+            c.setFont("Helvetica", 10)
+            y_pos = height - 80
+            
+            # Left column
+            patient_info = [
+                f"Patient: {metadata.get('patient_name', 'N/A')}",
+                f"ID: {metadata.get('patient_id', 'N/A')}",
+                f"DOB: {metadata.get('patient_birth_date', 'N/A')}",
+                f"Sex: {metadata.get('patient_sex', 'N/A')}",
+                f"Study Date: {metadata.get('study_date', 'N/A')}",
+            ]
+            
+            for info in patient_info:
+                c.drawString(50, y_pos, info)
+                y_pos -= 15
+            
+            # Right column
+            y_pos = height - 80
+            technical_info = [
+                f"Accession: {metadata.get('accession_number', 'N/A')}",
+                f"Series: {metadata.get('series_description', 'N/A')}",
+                f"Institution: {metadata.get('institution_name', 'N/A')}",
+                f"Modality: {metadata.get('modality', 'N/A')}",
+                f"Body Part: {metadata.get('body_part_examined', 'N/A')}",
+            ]
+            
+            for info in technical_info:
+                c.drawString(width/2, y_pos, info)
+                y_pos -= 15
+            
+            # Separator line
+            c.line(50, height - 180, width - 50, height - 180)
+            start_y = height - 200
+        else:
+            start_y = height - 50
+        
+        # Calculate image layout
+        num_images = len(image_paths)
+        if num_images == 1:
+            # Single large image
+            img_width = width - 100
+            img_height = start_y - 150
+            
+            img_path = image_paths[0]['path']
+            c.drawImage(img_path, 50, 100, img_width, img_height, preserveAspectRatio=True)
+            
+            # Image details
+            if include_metadata:
+                c.setFont("Helvetica", 8)
+                details = f"Preset: {image_paths[0]['preset']} | W/L: {image_paths[0]['window_width']}/{image_paths[0]['window_level']}"
+                c.drawString(50, 80, details)
+                c.drawString(50, 65, image_paths[0]['description'])
+        
+        elif num_images <= 4:
+            # 2x2 grid
+            cols = 2
+            rows = 2
+            img_width = (width - 150) / cols
+            img_height = (start_y - 150) / rows
+            
+            for i, img_info in enumerate(image_paths[:4]):
+                row = i // cols
+                col = i % cols
+                
+                x = 50 + col * (img_width + 25)
+                y = start_y - 50 - (row + 1) * (img_height + 40)
+                
+                c.drawImage(img_info['path'], x, y, img_width, img_height, preserveAspectRatio=True)
+                
+                # Image label
+                c.setFont("Helvetica-Bold", 8)
+                c.drawString(x, y - 10, f"{img_info['preset'].upper()}")
+                c.setFont("Helvetica", 7)
+                c.drawString(x, y - 22, f"W/L: {img_info['window_width']}/{img_info['window_level']}")
+        
+        else:
+            # Multiple images in grid
+            cols = 3
+            rows = min(3, (num_images + cols - 1) // cols)
+            img_width = (width - 200) / cols
+            img_height = (start_y - 150) / rows
+            
+            for i, img_info in enumerate(image_paths[:9]):  # Max 9 images
+                row = i // cols
+                col = i % cols
+                
+                x = 50 + col * (img_width + 25)
+                y = start_y - 50 - (row + 1) * (img_height + 30)
+                
+                c.drawImage(img_info['path'], x, y, img_width, img_height, preserveAspectRatio=True)
+                
+                # Image label
+                c.setFont("Helvetica-Bold", 7)
+                c.drawString(x, y - 8, f"{img_info['preset'].upper()}")
+                c.setFont("Helvetica", 6)
+                if img_info.get('slice_location'):
+                    c.drawString(x, y - 18, f"Slice: {img_info['slice_location']}")
+        
+        # Footer
+        c.setFont("Helvetica", 8)
+        footer_text = f"Printed: {metadata.get('print_timestamp', '')} | By: {metadata.get('printed_by', 'N/A')}"
+        c.drawString(50, 30, footer_text)
+        
+        c.save()
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error creating professional print layout: {e}")
+        return False
+
+
+def create_enhanced_diagnostic_print_layout(image_paths, output_path, paper_size, print_medium, metadata, include_metadata):
+    """Create diagnostic-focused print layout optimized for clinical review"""
+    try:
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.units import inch
+        
+        page_size = A4 if paper_size == 'A4' else letter
+        c = canvas.Canvas(output_path, pagesize=page_size)
+        width, height = page_size
+        
+        # Diagnostic header
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, height - 40, "DIAGNOSTIC IMAGING REVIEW")
+        
+        # Essential patient info only
+        if include_metadata:
+            c.setFont("Helvetica", 10)
+            essential_info = f"{metadata.get('patient_name', 'N/A')} | {metadata.get('patient_id', 'N/A')} | {metadata.get('study_date', 'N/A')} | {metadata.get('modality', 'N/A')}"
+            c.drawString(50, height - 60, essential_info)
+            
+            c.line(50, height - 80, width - 50, height - 80)
+            start_y = height - 100
+        else:
+            start_y = height - 60
+        
+        # Large images for diagnostic review
+        num_images = len(image_paths)
+        if num_images == 1:
+            # Full page image
+            img_width = width - 100
+            img_height = start_y - 100
+            
+            c.drawImage(image_paths[0]['path'], 50, 70, img_width, img_height, preserveAspectRatio=True)
+            
+            # Technical details
+            c.setFont("Helvetica", 9)
+            tech_details = f"Window/Level: {image_paths[0]['window_width']}/{image_paths[0]['window_level']} | {image_paths[0]['description']}"
+            c.drawString(50, 50, tech_details)
+        
+        else:
+            # Side-by-side comparison
+            cols = min(2, num_images)
+            img_width = (width - 150) / cols
+            img_height = start_y - 100
+            
+            for i, img_info in enumerate(image_paths[:2]):  # Max 2 for diagnostic
+                x = 50 + i * (img_width + 50)
+                
+                c.drawImage(img_info['path'], x, 100, img_width, img_height, preserveAspectRatio=True)
+                
+                # Labels
+                c.setFont("Helvetica-Bold", 10)
+                c.drawString(x, 80, f"{img_info['preset'].upper()} VIEW")
+                c.setFont("Helvetica", 8)
+                c.drawString(x, 65, f"W/L: {img_info['window_width']}/{img_info['window_level']}")
+        
+        # Footer
+        c.setFont("Helvetica", 8)
+        c.drawString(50, 30, f"Diagnostic Review | Printed: {metadata.get('print_timestamp', '')}")
+        
+        c.save()
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error creating diagnostic print layout: {e}")
+        return False
+
+
+def create_enhanced_comparison_print_layout(image_paths, output_path, paper_size, print_medium, metadata, include_metadata):
+    """Create comparison print layout for multiple window/level views"""
+    try:
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.pdfgen import canvas
+        
+        page_size = A4 if paper_size == 'A4' else letter
+        c = canvas.Canvas(output_path, pagesize=page_size)
+        width, height = page_size
+        
+        # Comparison header
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, height - 40, "MULTI-VIEW COMPARISON")
+        
+        if include_metadata:
+            c.setFont("Helvetica", 9)
+            c.drawString(50, height - 60, f"Patient: {metadata.get('patient_name', 'N/A')} | Study: {metadata.get('study_date', 'N/A')}")
+            c.drawString(50, height - 75, f"Series: {metadata.get('series_description', 'N/A')} | {metadata.get('modality', 'N/A')}")
+            
+            c.line(50, height - 95, width - 50, height - 95)
+            start_y = height - 115
+        else:
+            start_y = height - 60
+        
+        # Grid layout for comparison
+        num_images = len(image_paths)
+        cols = min(3, num_images)
+        rows = (num_images + cols - 1) // cols
+        
+        img_width = (width - 100 - (cols - 1) * 20) / cols
+        img_height = (start_y - 100 - (rows - 1) * 60) / rows
+        
+        for i, img_info in enumerate(image_paths):
+            row = i // cols
+            col = i % cols
+            
+            x = 50 + col * (img_width + 20)
+            y = start_y - 50 - (row + 1) * (img_height + 60)
+            
+            c.drawImage(img_info['path'], x, y, img_width, img_height, preserveAspectRatio=True)
+            
+            # Detailed labels for comparison
+            c.setFont("Helvetica-Bold", 9)
+            c.drawString(x, y - 15, f"{img_info['preset'].upper()}")
+            c.setFont("Helvetica", 7)
+            c.drawString(x, y - 25, img_info['description'])
+            c.drawString(x, y - 35, f"W: {img_info['window_width']} L: {img_info['window_level']}")
+            
+            if img_info.get('slice_location'):
+                c.drawString(x, y - 45, f"Slice: {img_info['slice_location']}")
+        
+        # Footer
+        c.setFont("Helvetica", 8)
+        c.drawString(50, 30, f"Multi-view Comparison | Views: {num_images} | {metadata.get('print_timestamp', '')}")
+        
+        c.save()
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error creating comparison print layout: {e}")
+        return False
+
+
+def create_enhanced_single_print_layout(image_info, output_path, paper_size, print_medium, metadata, include_metadata):
+    """Create single image print layout with comprehensive metadata"""
+    try:
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.pdfgen import canvas
+        
+        page_size = A4 if paper_size == 'A4' else letter
+        c = canvas.Canvas(output_path, pagesize=page_size)
+        width, height = page_size
+        
+        if not image_info:
+            return False
+        
+        # Header
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, height - 50, "MEDICAL IMAGE PRINT")
+        
+        if include_metadata:
+            # Comprehensive metadata display
+            c.setFont("Helvetica", 10)
+            y_pos = height - 80
+            
+            # Patient demographics
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(50, y_pos, "PATIENT INFORMATION")
+            y_pos -= 20
+            
+            c.setFont("Helvetica", 9)
+            patient_fields = [
+                ("Name:", metadata.get('patient_name', 'N/A')),
+                ("ID:", metadata.get('patient_id', 'N/A')),
+                ("DOB:", metadata.get('patient_birth_date', 'N/A')),
+                ("Sex:", metadata.get('patient_sex', 'N/A')),
+            ]
+            
+            for label, value in patient_fields:
+                c.drawString(50, y_pos, f"{label} {value}")
+                y_pos -= 12
+            
+            # Study information
+            y_pos -= 10
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(50, y_pos, "STUDY INFORMATION")
+            y_pos -= 20
+            
+            c.setFont("Helvetica", 9)
+            study_fields = [
+                ("Study Date:", metadata.get('study_date', 'N/A')),
+                ("Modality:", metadata.get('modality', 'N/A')),
+                ("Body Part:", metadata.get('body_part_examined', 'N/A')),
+                ("Series:", metadata.get('series_description', 'N/A')),
+                ("Institution:", metadata.get('institution_name', 'N/A')),
+                ("Accession:", metadata.get('accession_number', 'N/A')),
+            ]
+            
+            for label, value in study_fields:
+                c.drawString(50, y_pos, f"{label} {value}")
+                y_pos -= 12
+            
+            # Technical parameters
+            y_pos -= 10
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(50, y_pos, "TECHNICAL PARAMETERS")
+            y_pos -= 20
+            
+            c.setFont("Helvetica", 9)
+            tech_fields = [
+                ("Window Width:", image_info.get('window_width', 'N/A')),
+                ("Window Level:", image_info.get('window_level', 'N/A')),
+                ("Preset:", image_info.get('preset', 'N/A')),
+                ("Pixel Spacing:", metadata.get('pixel_spacing', 'N/A')),
+                ("Slice Thickness:", metadata.get('slice_thickness', 'N/A')),
+                ("Matrix Size:", f"{metadata.get('rows', 'N/A')} x {metadata.get('columns', 'N/A')}"),
+            ]
+            
+            for label, value in tech_fields:
+                c.drawString(50, y_pos, f"{label} {value}")
+                y_pos -= 12
+            
+            # Image
+            img_start_y = y_pos - 30
+            img_height = img_start_y - 100
+            img_width = width - 100
+            
+            c.drawImage(image_info['path'], 50, 70, img_width, img_height, preserveAspectRatio=True)
+        else:
+            # Large image without metadata
+            img_width = width - 100
+            img_height = height - 150
+            
+            c.drawImage(image_info['path'], 50, 70, img_width, img_height, preserveAspectRatio=True)
+        
+        # Footer
+        c.setFont("Helvetica", 8)
+        footer = f"Printed: {metadata.get('print_timestamp', '')} | By: {metadata.get('printed_by', 'N/A')} | {image_info.get('description', '')}"
+        c.drawString(50, 30, footer)
+        
+        c.save()
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error creating single print layout: {e}")
+        return False
 
 def create_medical_print_pdf_enhanced(image_paths, output_path, paper_size, layout_type, print_medium, modality, patient_name, study_date, series_description, institution_name):
     """
@@ -5125,7 +5914,11 @@ def api_image_data(request, image_id):
             # Read DICOM data
             ds = pydicom.dcmread(dicom_path)
             
-            # Extract basic image information
+            # Extract basic image information with safe attribute handling
+            pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+            image_position = getattr(ds, 'ImagePositionPatient', [0, 0, 0])
+            image_orientation = getattr(ds, 'ImageOrientationPatient', [1, 0, 0, 0, 1, 0])
+            
             data = {
                 'id': image.id,
                 'instance_number': image.instance_number,
@@ -5133,10 +5926,10 @@ def api_image_data(request, image_id):
                 'rows': getattr(ds, 'Rows', 512),
                 'window_center': getattr(ds, 'WindowCenter', 128),
                 'window_width': getattr(ds, 'WindowWidth', 256),
-                'pixel_spacing': list(getattr(ds, 'PixelSpacing', [1.0, 1.0])),
+                'pixel_spacing': list(pixel_spacing) if pixel_spacing is not None else [1.0, 1.0],
                 'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
-                'image_position': list(getattr(ds, 'ImagePositionPatient', [0, 0, 0])),
-                'image_orientation': list(getattr(ds, 'ImageOrientationPatient', [1, 0, 0, 0, 1, 0])),
+                'image_position': list(image_position) if image_position is not None else [0, 0, 0],
+                'image_orientation': list(image_orientation) if image_orientation is not None else [1, 0, 0, 0, 1, 0],
             }
             
             # Extract pixel data if available

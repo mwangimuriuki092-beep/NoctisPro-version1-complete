@@ -3252,5 +3252,193 @@
             // Don't break the DICOM viewer if this fails
         }
     </script>
+
+    <!-- Hidden file input for local DICOM loading -->
+    <input type="file" id="fileInput" style="display: none;" multiple accept=".dcm,.dicom,*">
+
+    <!-- Load Local Files Functionality -->
+    <script>
+        // Load local DICOM files functionality
+        window.loadFromLocalFiles = function() {
+            try {
+                const fileInput = document.getElementById('fileInput');
+                if (!fileInput) {
+                    console.error('File input element not found');
+                    showToast('File input not available', 'error');
+                    return;
+                }
+                
+                // Reset file input first
+                fileInput.value = '';
+                
+                // Configure for DICOM files and directories
+                fileInput.setAttribute('webkitdirectory', '');
+                fileInput.setAttribute('directory', '');
+                fileInput.setAttribute('accept', '.dcm,.dicom,*');
+                fileInput.multiple = true;
+                
+                // Set up file change handler
+                fileInput.onchange = function(event) {
+                    const files = event.target.files;
+                    if (files && files.length > 0) {
+                        processLocalDicomFiles(files);
+                    }
+                };
+                
+                // Trigger file picker
+                fileInput.click();
+                showToast('📁 Select DICOM directory or files', 'info');
+                
+            } catch (error) {
+                console.error('Error opening file picker:', error);
+                showToast('Failed to open file picker', 'error');
+            }
+        };
+
+        // Process selected local DICOM files
+        async function processLocalDicomFiles(files) {
+            try {
+                showLoading('Processing local DICOM files...');
+                
+                const dicomFiles = [];
+                const maxFiles = 1000; // Limit for performance
+                
+                // Filter and validate DICOM files
+                for (let i = 0; i < Math.min(files.length, maxFiles); i++) {
+                    const file = files[i];
+                    
+                    // Check file extension or try to validate as DICOM
+                    const fileName = file.name.toLowerCase();
+                    const isDicomFile = fileName.endsWith('.dcm') || 
+                                       fileName.endsWith('.dicom') || 
+                                       fileName.endsWith('.dic') ||
+                                       fileName.includes('dicom') ||
+                                       file.size > 1024; // Basic size check
+                    
+                    if (isDicomFile) {
+                        dicomFiles.push(file);
+                    }
+                }
+                
+                if (dicomFiles.length === 0) {
+                    hideLoading();
+                    showToast('No DICOM files found in selection', 'warning');
+                    return;
+                }
+                
+                // Try to process files locally first (if browser supports it)
+                try {
+                    const processedImages = await processFilesLocally(dicomFiles);
+                    if (processedImages && processedImages.length > 0) {
+                        hideLoading();
+                        showToast(`Successfully loaded ${processedImages.length} local DICOM images`, 'success');
+                        
+                        // Load the first study/series if available
+                        if (processedImages[0] && processedImages[0].studyId) {
+                            loadStudy(processedImages[0].studyId);
+                        }
+                        return;
+                    }
+                } catch (localError) {
+                    console.warn('Local processing failed, uploading to server:', localError);
+                }
+                
+                // Fallback: Upload to server for processing
+                await uploadFilesToServer(dicomFiles);
+                
+            } catch (error) {
+                console.error('Error processing local DICOM files:', error);
+                hideLoading();
+                showToast('Failed to process DICOM files', 'error');
+            }
+        }
+
+        // Process files locally (if supported)
+        async function processFilesLocally(files) {
+            // This would require DICOM parsing library
+            // For now, return null to trigger server upload
+            return null;
+        }
+
+        // Upload files to server for processing
+        async function uploadFilesToServer(files) {
+            try {
+                const formData = new FormData();
+                
+                // Add files to form data
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('dicom_files', files[i]);
+                }
+                
+                // Add CSRF token
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                                 document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                if (csrfToken) {
+                    formData.append('csrfmiddlewaretoken', csrfToken);
+                }
+                
+                showLoading(`Uploading ${files.length} DICOM files...`);
+                
+                // Upload to worklist upload endpoint
+                const response = await fetch('/worklist/upload/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+                
+                const result = await response.json();
+                hideLoading();
+                
+                if (result.success) {
+                    showToast(`Successfully uploaded and processed ${files.length} DICOM files`, 'success');
+                    
+                    // Refresh studies list
+                    if (typeof loadStudies === 'function') {
+                        loadStudies();
+                    }
+                    
+                    // Load the first study if available
+                    if (result.studies && result.studies.length > 0) {
+                        const firstStudy = result.studies[0];
+                        if (firstStudy.id) {
+                            setTimeout(() => loadStudy(firstStudy.id), 1000);
+                        }
+                    }
+                } else {
+                    showToast(`Upload failed: ${result.error || 'Unknown error'}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error uploading files:', error);
+                hideLoading();
+                showToast('Failed to upload DICOM files', 'error');
+            }
+        }
+
+        // Helper functions
+        function showLoading(message) {
+            if (typeof window.showLoading === 'function') {
+                window.showLoading(message);
+            } else {
+                console.log('Loading:', message);
+            }
+        }
+
+        function hideLoading() {
+            if (typeof window.hideLoading === 'function') {
+                window.hideLoading();
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            if (typeof window.showToast === 'function') {
+                window.showToast(message, type);
+            } else {
+                console.log(`${type.toUpperCase()}: ${message}`);
+            }
+        }
+    </script>
 </body>
 </html>
