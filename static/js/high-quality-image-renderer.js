@@ -133,30 +133,30 @@ class HighQualityImageRenderer {
             case 'DX':
             case 'CR':
             case 'MG':
-                // Digital Radiography, Computed Radiography, Mammography - BRIGHTER
-                this.ctx.filter = 'contrast(1.25) brightness(1.4) saturate(0.9)';
+                // Digital Radiography, Computed Radiography, Mammography - Natural brightness
+                this.ctx.filter = 'contrast(1.05) brightness(1.0) saturate(0.9)';
                 break;
             case 'CT':
-                // Computed Tomography - ENHANCED BRIGHTNESS
-                this.ctx.filter = 'contrast(1.2) brightness(1.3)';
+                // Computed Tomography - Medical-grade natural brightness
+                this.ctx.filter = 'contrast(1.02) brightness(1.0)';
                 break;
             case 'MR':
             case 'MRI':
-                // Magnetic Resonance - BRIGHTER
-                this.ctx.filter = 'contrast(1.22) brightness(1.25) saturate(1.1)';
+                // Magnetic Resonance - Natural medical imaging
+                this.ctx.filter = 'contrast(1.03) brightness(1.0) saturate(1.0)';
                 break;
             case 'US':
-                // Ultrasound - ENHANCED
-                this.ctx.filter = 'contrast(1.3) brightness(1.35)';
+                // Ultrasound - Natural brightness
+                this.ctx.filter = 'contrast(1.05) brightness(1.0)';
                 break;
             case 'XA':
             case 'RF':
-                // X-Ray Angiography, Radiofluoroscopy - BRIGHTER
-                this.ctx.filter = 'contrast(1.35) brightness(1.4)';
+                // X-Ray Angiography, Radiofluoroscopy - Natural medical brightness
+                this.ctx.filter = 'contrast(1.08) brightness(1.0)';
                 break;
             default:
-                // Default medical imaging enhancement - MUCH BRIGHTER
-                this.ctx.filter = 'contrast(1.25) brightness(1.3)';
+                // Default medical imaging - Natural brightness
+                this.ctx.filter = 'contrast(1.02) brightness(1.0)';
         }
     }
 

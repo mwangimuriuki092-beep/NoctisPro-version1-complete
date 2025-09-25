@@ -505,42 +505,42 @@ class DicomCanvasFix {
             this.ctx.imageSmoothingQuality = 'high';
 
             if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-                // X-ray modalities: Preserve sharp edges, BRIGHTER display
+                // X-ray modalities: Natural medical imaging brightness
                 this.ctx.imageSmoothingEnabled = false; // Critical for X-ray detail
-                this.ctx.filter = 'contrast(1.1) brightness(1.3) saturate(0.9)';
+                this.ctx.filter = 'contrast(1.05) brightness(1.0) saturate(0.9)';
                 console.log(`Applied X-ray rendering settings for ${modality}`);
                 
             } else if (['CT'].includes(modality)) {
-                // CT: Balanced smoothing with BRIGHTER contrast enhancement
+                // CT: Natural contrast with medical-grade brightness
                 this.ctx.imageSmoothingEnabled = false; // Preserve CT detail
-                this.ctx.filter = 'contrast(1.05) brightness(1.4) saturate(0.95)';
+                this.ctx.filter = 'contrast(1.02) brightness(1.0) saturate(0.95)';
                 console.log(`Applied CT rendering settings for ${modality}`);
                 
             } else if (['MR', 'MRI'].includes(modality)) {
-                // MRI: Slight smoothing acceptable, BRIGHTER display
+                // MRI: Natural medical imaging display
                 this.ctx.imageSmoothingEnabled = true;
                 this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.08) brightness(1.35) saturate(1.0)';
+                this.ctx.filter = 'contrast(1.03) brightness(1.0) saturate(1.0)';
                 console.log(`Applied MRI rendering settings for ${modality}`);
                 
             } else if (['US'].includes(modality)) {
-                // Ultrasound: Smoothing helps with noise, BRIGHTER
+                // Ultrasound: Natural brightness for medical accuracy
                 this.ctx.imageSmoothingEnabled = true;
                 this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.05) brightness(1.25) saturate(0.9)';
+                this.ctx.filter = 'contrast(1.02) brightness(1.0) saturate(0.9)';
                 console.log(`Applied Ultrasound rendering settings for ${modality}`);
                 
             } else if (['NM', 'PT'].includes(modality)) {
-                // Nuclear Medicine/PET: Smoothing for better visualization, BRIGHTER
+                // Nuclear Medicine/PET: Slight enhancement while maintaining medical accuracy
                 this.ctx.imageSmoothingEnabled = true;
                 this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.15) brightness(1.3) saturate(1.1)';
+                this.ctx.filter = 'contrast(1.08) brightness(1.0) saturate(1.1)';
                 console.log(`Applied Nuclear Medicine rendering settings for ${modality}`);
                 
             } else {
-                // Default/Unknown: Conservative settings that work for all, BRIGHTER
+                // Default/Unknown: Medical-grade natural brightness
                 this.ctx.imageSmoothingEnabled = false;
-                this.ctx.filter = 'contrast(1.05) brightness(1.3) saturate(0.95)';
+                this.ctx.filter = 'contrast(1.02) brightness(1.0) saturate(0.95)';
                 console.log(`Applied default rendering settings for ${modality}`);
             }
         } catch (error) {
@@ -577,10 +577,10 @@ class DicomCanvasFix {
             drawX = (this.canvas.width - drawWidth) / 2;
             drawY = (this.canvas.height - drawHeight) / 2;
             
-            // Safe rendering settings - BRIGHTER for better visibility
+            // Safe rendering settings - Natural medical imaging brightness
             this.ctx.globalAlpha = 1.0;
             this.ctx.imageSmoothingEnabled = false;
-            this.ctx.filter = 'contrast(1.05) brightness(1.3)';
+            this.ctx.filter = 'contrast(1.02) brightness(1.0)';
             
             // Draw image
             this.ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
