@@ -121,14 +121,26 @@ class DicomLoadingFix {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json',
                 'X-CSRFToken': this.getCSRFToken(),
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
                 ...options.headers
             },
             credentials: 'same-origin',
+            cache: 'no-store',
             ...options
         };
 
         try {
-            const response = await fetch(url, defaultOptions);
+            // Add timeout to prevent hanging requests
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+            
+            const response = await fetch(url, {
+                ...defaultOptions,
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
             
             if (!response.ok) {
                 const errorText = await response.text();
@@ -141,11 +153,25 @@ class DicomLoadingFix {
             if (retryCount < this.maxRetries && this.isRetryableError(error)) {
                 console.warn(`Fetch failed, retrying ${retryCount + 1}/${this.maxRetries}:`, error.message);
                 
-                const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+                // Progressive backoff with jitter to avoid thundering herd
+                const baseDelay = 1000 * Math.pow(2, retryCount);
+                const jitter = Math.random() * 500;
+                const delay = Math.min(baseDelay + jitter, 8000);
+                
                 await this.delay(delay);
                 
                 return await this.fetchWithRetry(url, options, retryCount + 1);
             } else {
+                // Enhanced error reporting for MPR issues
+                if (url.includes('mpr') || url.includes('reconstruction')) {
+                    console.error('MPR/Reconstruction fetch failed:', {
+                        url,
+                        error: error.message,
+                        retryCount,
+                        stack: error.stack
+                    });
+                    this.showErrorMessage(`MPR generation failed: ${error.message}`);
+                }
                 throw error;
             }
         }
@@ -155,10 +181,16 @@ class DicomLoadingFix {
         // Retry on network errors, timeouts, and 5xx server errors
         return error.message.includes('NetworkError') ||
                error.message.includes('timeout') ||
+               error.message.includes('Failed to fetch') ||
+               error.message.includes('aborted') ||
                error.message.includes('500') ||
                error.message.includes('502') ||
                error.message.includes('503') ||
-               error.message.includes('504');
+               error.message.includes('504') ||
+               error.message.includes('ECONNRESET') ||
+               error.message.includes('ENOTFOUND') ||
+               error.name === 'AbortError' ||
+               error.name === 'TypeError';
     }
 
     setupErrorRecovery() {

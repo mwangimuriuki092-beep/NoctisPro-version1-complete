@@ -5415,6 +5415,10 @@ def mpr_slice_api(request, series_id, plane, slice_index):
         # Get the MPR slice using existing optimized function
         slice_index = int(slice_index)
         
+        # Validate plane parameter
+        if plane not in ['axial', 'sagittal', 'coronal']:
+            return JsonResponse({'error': 'Invalid plane parameter'}, status=400)
+        
         # Use existing MPR cache system
         cached_slice = _mpr_cache_get(series_id, plane, slice_index, 400, 40, False)
         if cached_slice:
@@ -5422,19 +5426,76 @@ def mpr_slice_api(request, series_id, plane, slice_index):
             import base64
             from django.http import HttpResponse
             
-            image_data = base64.b64decode(cached_slice.split(',')[1])
-            return HttpResponse(image_data, content_type='image/png')
+            try:
+                image_data = base64.b64decode(cached_slice.split(',')[1])
+                return HttpResponse(image_data, content_type='image/png')
+            except Exception as decode_error:
+                logger.warning(f"Failed to decode cached MPR slice: {decode_error}")
         
         # Generate new slice if not cached
-        # This would use the existing MPR generation system
-        # For now, return a placeholder
-        from django.http import Http404
-        raise Http404("MPR slice not available")
+        try:
+            volume, spacing = _get_mpr_volume_and_spacing(series)
+            
+            # Validate slice index bounds
+            if plane == 'axial':
+                max_slice = volume.shape[0] - 1
+            elif plane == 'sagittal':
+                max_slice = volume.shape[2] - 1
+            elif plane == 'coronal':
+                max_slice = volume.shape[1] - 1
+            
+            if slice_index < 0 or slice_index > max_slice:
+                slice_index = max_slice // 2  # Default to middle slice
+            
+            # Generate the MPR slice
+            img_b64 = _get_encoded_mpr_slice(series_id, volume, plane, slice_index, 400, 40, False)
+            
+            if img_b64:
+                import base64
+                from django.http import HttpResponse
+                image_data = base64.b64decode(img_b64.split(',')[1])
+                return HttpResponse(image_data, content_type='image/png')
+            else:
+                raise ValueError("Failed to generate MPR slice")
+                
+        except Exception as generation_error:
+            logger.error(f"MPR slice generation error: {generation_error}")
+            # Return error image instead of 404
+            return generate_error_image_response(f"MPR slice generation failed: {str(generation_error)}")
         
     except Exception as e:
-        logger.error(f"MPR slice error: {e}")
-        from django.http import Http404
-        raise Http404("MPR slice not found")
+        logger.error(f"MPR slice API error: {e}")
+        return generate_error_image_response(f"MPR slice not available: {str(e)}")
+
+
+def generate_error_image_response(error_message):
+    """Generate an error image response instead of throwing 404"""
+    from PIL import Image, ImageDraw, ImageFont
+    from django.http import HttpResponse
+    import io
+    
+    # Create error image
+    img = Image.new('RGB', (512, 512), color='black')
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        # Try to use a font, fall back to default if not available
+        font = ImageFont.load_default()
+    except:
+        font = None
+    
+    # Draw error message
+    draw.text((256, 200), "MPR Generation Error", fill='red', anchor='mm', font=font)
+    draw.text((256, 250), error_message[:50] + "..." if len(error_message) > 50 else error_message, 
+              fill='white', anchor='mm', font=font)
+    draw.text((256, 300), "Check console for details", fill='gray', anchor='mm', font=font)
+    
+    # Save to bytes
+    img_io = io.BytesIO()
+    img.save(img_io, 'PNG')
+    img_io.seek(0)
+    
+    return HttpResponse(img_io.getvalue(), content_type='image/png')
 
 
 @login_required
