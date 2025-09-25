@@ -794,22 +794,28 @@ def api_realtime_studies(request):
         
         # Get studies updated since last check
         try:
+            # Build base queryset with filters first, then slice
             if hasattr(user, 'is_facility_user') and user.is_facility_user() and hasattr(user, 'facility') and user.facility:
-                studies = Study.objects.filter(
+                base_query = Study.objects.filter(
                     facility=user.facility,
                     last_updated__gt=last_update_time
-                ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
+                )
             else:
                 # For admin users or users without facility, show all studies
-                studies = Study.objects.filter(
+                base_query = Study.objects.filter(
                     last_updated__gt=last_update_time
-                ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
+                )
             
-            # Filter out temporary/invalid entries
-            studies = studies.exclude(patient__patient_id__startswith='TEMP_')
-            studies = studies.exclude(accession_number__startswith='TEMP_')
-            studies = studies.exclude(patient__first_name='TEMP')
-            studies = studies.exclude(patient__last_name__startswith='TEMP')
+            # Apply filters to exclude temporary/invalid entries before slicing
+            studies = base_query.exclude(
+                patient__patient_id__startswith='TEMP_'
+            ).exclude(
+                accession_number__startswith='TEMP_'
+            ).exclude(
+                patient__first_name='TEMP'
+            ).exclude(
+                patient__last_name__startswith='TEMP'
+            ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
         except Exception as e:
             logger.error(f"Error fetching studies: {str(e)}")
             # Return empty list if there's an issue
@@ -3203,7 +3209,10 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
                     st = 1.0
                 ps_attr = getattr(ds, 'PixelSpacing', [1.0, 1.0])
                 try:
-                    first_ps = (float(ps_attr[0]), float(ps_attr[1]))
+                    if ps_attr is not None and len(ps_attr) >= 2:
+                        first_ps = (float(ps_attr[0]), float(ps_attr[1]))
+                    else:
+                        first_ps = (1.0, 1.0)
                 except Exception:
                     first_ps = (1.0, 1.0)
 
@@ -5125,7 +5134,11 @@ def api_image_data(request, image_id):
             # Read DICOM data
             ds = pydicom.dcmread(dicom_path)
             
-            # Extract basic image information
+            # Extract basic image information with safe attribute handling
+            pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+            image_position = getattr(ds, 'ImagePositionPatient', [0, 0, 0])
+            image_orientation = getattr(ds, 'ImageOrientationPatient', [1, 0, 0, 0, 1, 0])
+            
             data = {
                 'id': image.id,
                 'instance_number': image.instance_number,
@@ -5133,10 +5146,10 @@ def api_image_data(request, image_id):
                 'rows': getattr(ds, 'Rows', 512),
                 'window_center': getattr(ds, 'WindowCenter', 128),
                 'window_width': getattr(ds, 'WindowWidth', 256),
-                'pixel_spacing': list(getattr(ds, 'PixelSpacing', [1.0, 1.0])),
+                'pixel_spacing': list(pixel_spacing) if pixel_spacing is not None else [1.0, 1.0],
                 'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
-                'image_position': list(getattr(ds, 'ImagePositionPatient', [0, 0, 0])),
-                'image_orientation': list(getattr(ds, 'ImageOrientationPatient', [1, 0, 0, 0, 1, 0])),
+                'image_position': list(image_position) if image_position is not None else [0, 0, 0],
+                'image_orientation': list(image_orientation) if image_orientation is not None else [1, 0, 0, 0, 1, 0],
             }
             
             # Extract pixel data if available

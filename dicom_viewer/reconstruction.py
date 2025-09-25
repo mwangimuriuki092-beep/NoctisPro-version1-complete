@@ -38,6 +38,8 @@ class BaseProcessor:
             volume[i] = pixel_array
             if i == 0:
                 pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                if pixel_spacing is None:
+                    pixel_spacing = [1.0, 1.0]
                 slice_thickness = getattr(ds, 'SliceThickness', 1.0)
                 spacing = [float(slice_thickness), float(pixel_spacing[0]), float(pixel_spacing[1])]
         return volume, spacing
