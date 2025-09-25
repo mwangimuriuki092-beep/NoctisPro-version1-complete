@@ -224,30 +224,24 @@ function fixCanvasEventHandlers() {
         if (e.ctrlKey) {
             // Zoom
             const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-            zoom *= zoomFactor;
-            zoom = Math.max(0.1, Math.min(10, zoom));
-            redrawCurrentImage();
+            if (typeof window.zoom !== 'undefined') {
+                window.zoom *= zoomFactor;
+                window.zoom = Math.max(0.1, Math.min(10, window.zoom));
+            }
+            if (typeof redrawCurrentImage === 'function') {
+                redrawCurrentImage();
+            } else if (typeof updateImageDisplay === 'function') {
+                updateImageDisplay();
+            }
         } else {
-            // Scroll through images
+            // Scroll through images - use the functions we defined
             if (e.deltaY > 0) {
-                if (typeof nextImage === 'function') {
-                    nextImage();
-                } else if (typeof window.nextImage === 'function') {
+                if (typeof window.nextImage === 'function') {
                     window.nextImage();
-                } else if (typeof changeSlice === 'function') {
-                    changeSlice(1);
-                } else if (window.keyboardShortcuts && typeof window.keyboardShortcuts.nextImage === 'function') {
-                    window.keyboardShortcuts.nextImage();
                 }
             } else {
-                if (typeof previousImage === 'function') {
-                    previousImage();
-                } else if (typeof window.previousImage === 'function') {
+                if (typeof window.previousImage === 'function') {
                     window.previousImage();
-                } else if (typeof changeSlice === 'function') {
-                    changeSlice(-1);
-                } else if (window.keyboardShortcuts && typeof window.keyboardShortcuts.previousImage === 'function') {
-                    window.keyboardShortcuts.previousImage();
                 }
             }
         }
@@ -439,6 +433,13 @@ window.startWindowLevel = 0;
 window.startWindowWidth = 0;
 window.startPanX = 0;
 window.startPanY = 0;
+window.zoom = 1.0;
+window.panX = 0;
+window.panY = 0;
+window.windowWidth = 256;
+window.windowLevel = 127;
+window.currentImageIndex = 0;
+window.images = [];
 
 // Ensure these functions exist globally
 window.setActiveTool = window.setActiveTool || function(tool) {
@@ -480,6 +481,50 @@ window.setActiveTool = window.setActiveTool || function(tool) {
     
     // Show tool-specific instructions
     showToolInstructions(tool);
+};
+
+// Additional utility functions that might be missing
+window.updateImageDisplay = window.updateImageDisplay || function() {
+    if (typeof redrawCurrentImage === 'function') {
+        redrawCurrentImage();
+    } else if (window.dicomCanvasFix && typeof window.dicomCanvasFix.displayImage === 'function') {
+        // Use canvas fix to redraw
+        const currentImage = window.dicomCanvasFix.currentImage;
+        if (currentImage) {
+            window.dicomCanvasFix.displayImage(currentImage);
+        }
+    }
+};
+
+window.redrawCurrentImage = window.redrawCurrentImage || function() {
+    if (typeof updateImageDisplay === 'function') {
+        updateImageDisplay();
+    }
+};
+
+window.changeSlice = window.changeSlice || function(direction) {
+    if (window.images && window.images.length > 0) {
+        window.currentImageIndex = Math.max(0, Math.min(window.images.length - 1, window.currentImageIndex + direction));
+        updateImageDisplay();
+    }
+};
+
+window.showToast = window.showToast || function(message, type = 'info') {
+    if (window.dicomLoadingFix && typeof window.dicomLoadingFix.showToast === 'function') {
+        window.dicomLoadingFix.showToast(message, type);
+    } else {
+        console.log(`[${type.toUpperCase()}] ${message}`);
+    }
+};
+
+window.showLoading = window.showLoading || function(show, message = 'Loading...') {
+    if (window.dicomLoadingFix) {
+        if (show) {
+            window.dicomLoadingFix.showLoadingIndicator(message);
+        } else {
+            window.dicomLoadingFix.hideLoadingIndicator();
+        }
+    }
 };
 
 // Default tool

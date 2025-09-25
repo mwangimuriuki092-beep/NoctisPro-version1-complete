@@ -86,7 +86,9 @@ class DicomKeyboardShortcuts {
     
     // Image Navigation
     previousImage() {
-        if (typeof changeSlice === 'function') {
+        if (typeof window.previousImage === 'function') {
+            window.previousImage();
+        } else if (typeof changeSlice === 'function') {
             changeSlice(-1);
         } else if (window.currentImageIndex !== undefined) {
             if (window.currentImageIndex > 0) {
@@ -97,7 +99,9 @@ class DicomKeyboardShortcuts {
     }
     
     nextImage() {
-        if (typeof changeSlice === 'function') {
+        if (typeof window.nextImage === 'function') {
+            window.nextImage();
+        } else if (typeof changeSlice === 'function') {
             changeSlice(1);
         } else if (window.currentImageIndex !== undefined && window.images) {
             if (window.currentImageIndex < window.images.length - 1) {
