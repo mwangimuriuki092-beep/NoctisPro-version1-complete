@@ -47,15 +47,21 @@ class HighQualityImageRenderer {
         const displayWidth = rect.width;
         const displayHeight = rect.height;
         
-        // Set canvas size for high-DPI displays
-        this.canvas.width = displayWidth * this.dpr;
-        this.canvas.height = displayHeight * this.dpr;
+        // Set canvas size for high-DPI displays with better scaling
+        const scaledWidth = displayWidth * this.dpr;
+        const scaledHeight = displayHeight * this.dpr;
+        
+        // Only resize if dimensions changed to prevent flickering
+        if (this.canvas.width !== scaledWidth || this.canvas.height !== scaledHeight) {
+            this.canvas.width = scaledWidth;
+            this.canvas.height = scaledHeight;
+        }
         
         // Scale canvas back down using CSS
         this.canvas.style.width = displayWidth + 'px';
         this.canvas.style.height = displayHeight + 'px';
         
-        // Scale drawing context
+        // Scale drawing context for high-DPI
         this.ctx.scale(this.dpr, this.dpr);
         
         // Apply modality-specific rendering settings
@@ -83,12 +89,23 @@ class HighQualityImageRenderer {
         this.ctx.fillStyle = '#000000';
         this.ctx.fillRect(0, 0, displayWidth, displayHeight);
         
-        // Apply transforms if available
+        // Apply transforms if available - IMPROVED ZOOM/PAN HANDLING
         if (typeof zoomFactor !== 'undefined' && typeof panX !== 'undefined' && typeof panY !== 'undefined') {
             this.ctx.save();
-            this.ctx.translate(displayWidth / 2, displayHeight / 2);
-            this.ctx.scale(zoomFactor, zoomFactor);
-            this.ctx.translate(-displayWidth / 2 + panX / zoomFactor, -displayHeight / 2 + panY / zoomFactor);
+            
+            // Clamp zoom factor to reasonable medical imaging range
+            const clampedZoom = Math.max(0.1, Math.min(2.0, zoomFactor));
+            
+            // Apply transforms with better centering
+            this.ctx.translate(displayWidth / 2 + panX, displayHeight / 2 + panY);
+            this.ctx.scale(clampedZoom, clampedZoom);
+            this.ctx.translate(-displayWidth / 2, -displayHeight / 2);
+            
+            // Adjust draw coordinates for zoom
+            drawX = (drawX - displayWidth / 2) / clampedZoom + displayWidth / 2;
+            drawY = (drawY - displayHeight / 2) / clampedZoom + displayHeight / 2;
+            drawWidth = drawWidth / clampedZoom;
+            drawHeight = drawHeight / clampedZoom;
         }
         
         // Render image with high quality
@@ -115,30 +132,30 @@ class HighQualityImageRenderer {
             case 'DX':
             case 'CR':
             case 'MG':
-                // Digital Radiography, Computed Radiography, Mammography
-                this.ctx.filter = 'contrast(1.2) brightness(1.1) saturate(0.9)';
+                // Digital Radiography, Computed Radiography, Mammography - BRIGHTER
+                this.ctx.filter = 'contrast(1.25) brightness(1.4) saturate(0.9)';
                 break;
             case 'CT':
-                // Computed Tomography
-                this.ctx.filter = 'contrast(1.15) brightness(1.08)';
+                // Computed Tomography - ENHANCED BRIGHTNESS
+                this.ctx.filter = 'contrast(1.2) brightness(1.3)';
                 break;
             case 'MR':
             case 'MRI':
-                // Magnetic Resonance
-                this.ctx.filter = 'contrast(1.18) brightness(1.05) saturate(1.1)';
+                // Magnetic Resonance - BRIGHTER
+                this.ctx.filter = 'contrast(1.22) brightness(1.25) saturate(1.1)';
                 break;
             case 'US':
-                // Ultrasound
-                this.ctx.filter = 'contrast(1.25) brightness(1.12)';
+                // Ultrasound - ENHANCED
+                this.ctx.filter = 'contrast(1.3) brightness(1.35)';
                 break;
             case 'XA':
             case 'RF':
-                // X-Ray Angiography, Radiofluoroscopy
-                this.ctx.filter = 'contrast(1.3) brightness(1.15)';
+                // X-Ray Angiography, Radiofluoroscopy - BRIGHTER
+                this.ctx.filter = 'contrast(1.35) brightness(1.4)';
                 break;
             default:
-                // Default medical imaging enhancement
-                this.ctx.filter = 'contrast(1.15) brightness(1.08)';
+                // Default medical imaging enhancement - MUCH BRIGHTER
+                this.ctx.filter = 'contrast(1.25) brightness(1.3)';
         }
     }
 

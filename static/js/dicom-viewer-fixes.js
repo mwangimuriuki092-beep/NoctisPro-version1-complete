@@ -351,35 +351,38 @@ function fixCanvasEventHandlers() {
         handleCanvasMouseUp(e);
     });
     
-    // Mouse wheel for scrolling through images
-    canvas.addEventListener('wheel', function(e) {
-        e.preventDefault();
-        
-        if (e.ctrlKey) {
-            // Zoom - REDUCED sensitivity and range
-            const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05; // More gentle zoom steps
-            if (typeof window.zoom !== 'undefined') {
-                window.zoom *= zoomFactor;
-                window.zoom = Math.max(0.25, Math.min(3.0, window.zoom)); // Reduced range
-            }
-            if (typeof redrawCurrentImage === 'function') {
-                redrawCurrentImage();
-            } else if (typeof updateImageDisplay === 'function') {
-                updateImageDisplay();
-            }
-        } else {
-            // Scroll through images - use the functions we defined
-            if (e.deltaY > 0) {
-                if (typeof window.nextImage === 'function') {
-                    window.nextImage();
+        // Mouse wheel for scrolling through images
+        canvas.addEventListener('wheel', function(e) {
+            e.preventDefault();
+            
+            if (e.ctrlKey) {
+                // Zoom - MUCH MORE GENTLE for medical imaging
+                const zoomDelta = e.deltaY > 0 ? 0.98 : 1.02; // Very gentle zoom steps
+                if (typeof window.zoom !== 'undefined') {
+                    window.zoom *= zoomDelta;
+                    window.zoom = Math.max(0.1, Math.min(2.0, window.zoom)); // Reduced max zoom to 2.0x
+                } else if (typeof window.zoomFactor !== 'undefined') {
+                    window.zoomFactor *= zoomDelta;
+                    window.zoomFactor = Math.max(0.1, Math.min(2.0, window.zoomFactor));
+                }
+                if (typeof redrawCurrentImage === 'function') {
+                    redrawCurrentImage();
+                } else if (typeof updateImageDisplay === 'function') {
+                    updateImageDisplay();
                 }
             } else {
-                if (typeof window.previousImage === 'function') {
-                    window.previousImage();
+                // Scroll through images - use the functions we defined
+                if (e.deltaY > 0) {
+                    if (typeof window.nextImage === 'function') {
+                        window.nextImage();
+                    }
+                } else {
+                    if (typeof window.previousImage === 'function') {
+                        window.previousImage();
+                    }
                 }
             }
-        }
-    });
+        });
 }
 
 function handleCanvasMouseDown(e, x, y) {
@@ -452,19 +455,31 @@ function updatePanning(x, y) {
 }
 
 function handleZoomClick(x, y, isShiftKey) {
-    const zoomFactor = isShiftKey ? 0.85 : 1.15; // More gentle zoom steps
-    zoom *= zoomFactor;
-    zoom = Math.max(0.25, Math.min(3.0, zoom)); // Reduced range
+    const zoomDelta = isShiftKey ? 0.9 : 1.1; // Gentle zoom steps for click
     
-    // Zoom towards cursor position
+    if (typeof window.zoom !== 'undefined') {
+        window.zoom *= zoomDelta;
+        window.zoom = Math.max(0.1, Math.min(2.0, window.zoom)); // Reduced max to 2.0x
+    } else if (typeof window.zoomFactor !== 'undefined') {
+        window.zoomFactor *= zoomDelta;
+        window.zoomFactor = Math.max(0.1, Math.min(2.0, window.zoomFactor));
+    }
+    
+    // Zoom towards cursor position - reduced sensitivity
     const canvas = document.getElementById('dicomCanvas');
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     
-    panX += (centerX - x) * 0.1;
-    panY += (centerY - y) * 0.1;
+    if (typeof window.panX !== 'undefined') {
+        window.panX += (centerX - x) * 0.05; // Reduced from 0.1 to 0.05
+        window.panY += (centerY - y) * 0.05;
+    }
     
-    redrawCurrentImage();
+    if (typeof redrawCurrentImage === 'function') {
+        redrawCurrentImage();
+    } else if (typeof updateImageDisplay === 'function') {
+        updateImageDisplay();
+    }
 }
 
 function updateCursorPosition(x, y) {

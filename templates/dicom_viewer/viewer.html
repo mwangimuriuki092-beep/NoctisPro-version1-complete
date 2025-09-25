@@ -229,8 +229,8 @@
             image-rendering: high-quality;
             cursor: crosshair;
             transition: transform 0.1s ease;
-            filter: contrast(1.05) brightness(1.35);
-            -webkit-filter: contrast(1.05) brightness(1.35);
+            filter: contrast(1.15) brightness(1.5);
+            -webkit-filter: contrast(1.15) brightness(1.5);
         }
 
         .image-container {
@@ -268,8 +268,8 @@
             user-select: none;
             transition: none;
             /* Medical-grade image enhancement - BRIGHTER */
-            filter: contrast(1.05) brightness(1.35);
-            -webkit-filter: contrast(1.05) brightness(1.35);
+            filter: contrast(1.15) brightness(1.5);
+            -webkit-filter: contrast(1.15) brightness(1.5);
             /* Transform origin for zoom/pan */
             transform-origin: center center;
         }
@@ -1151,7 +1151,7 @@
                         <span>Zoom</span>
                         <span id="zoomValue">100%</span>
                     </div>
-                    <input type="range" class="slider" id="zoomSlider" min="25" max="300" value="100" oninput="updateZoom(this.value)">
+                    <input type="range" class="slider" id="zoomSlider" min="10" max="200" value="100" oninput="updateZoom(this.value)">
                 </div>
             </div>
 
@@ -1657,7 +1657,7 @@
         }
 
         function setZoom(factor) {
-            zoomFactor = Math.max(0.25, Math.min(3.0, factor)); // REDUCED max zoom from 5.0 to 3.0
+            zoomFactor = Math.max(0.1, Math.min(2.0, factor)); // FURTHER REDUCED max zoom to 2.0 for medical imaging
             const zoomPercent = Math.round(zoomFactor * 100);
             
             document.getElementById('zoomSlider').value = zoomPercent;
@@ -1682,7 +1682,12 @@
         function applyTransform() {
             const dicomImage = document.getElementById('dicomImage');
             if (dicomImage) {
-                dicomImage.style.transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
+                // Clamp zoom factor to prevent excessive zooming
+                const clampedZoom = Math.max(0.1, Math.min(2.0, zoomFactor));
+                
+                // Apply transform with improved centering
+                dicomImage.style.transform = `translate(${panX}px, ${panY}px) scale(${clampedZoom})`;
+                dicomImage.style.transformOrigin = 'center center';
             }
         }
 
@@ -2460,11 +2465,16 @@
                 drawY = 0;
             }
             
-            // Apply current zoom and pan transformations
+            // Apply current zoom and pan transformations - IMPROVED
             ctx.save();
-            ctx.translate(displayWidth / 2, displayHeight / 2);
-            ctx.scale(zoomFactor, zoomFactor);
-            ctx.translate(-displayWidth / 2 + panX / zoomFactor, -displayHeight / 2 + panY / zoomFactor);
+            
+            // Clamp zoom factor to prevent excessive zooming
+            const clampedZoom = Math.max(0.1, Math.min(2.0, zoomFactor));
+            
+            // Apply transforms with better centering for medical imaging
+            ctx.translate(displayWidth / 2 + panX, displayHeight / 2 + panY);
+            ctx.scale(clampedZoom, clampedZoom);
+            ctx.translate(-displayWidth / 2, -displayHeight / 2);
             
             // Clear canvas with black background
             ctx.fillStyle = '#000000';
@@ -2688,6 +2698,7 @@
             
             document.getElementById('zoomSlider').value = 100;
             document.getElementById('zoomValue').textContent = '100%';
+            document.getElementById('zoomInfo').textContent = 'Zoom: 100%';
             
             applyTransform();
             updateZoomInfo();
