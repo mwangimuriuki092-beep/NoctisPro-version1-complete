@@ -834,4 +834,30 @@ window.resetZoom = function() {
     console.log('Zoom reset to proper fit level (0.8x)');
 };
 
+// Add modality-specific zoom adjustment function
+window.adjustZoomForModality = function(modality) {
+    if (!modality) return;
+    
+    const modalityUpper = modality.toUpperCase();
+    let targetZoom = 0.8; // Default
+    
+    if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modalityUpper)) {
+        targetZoom = 0.6; // X-ray images need less zoom
+        console.log('Applied X-ray specific zoom adjustment: 60%');
+    } else if (['CT', 'MR', 'MRI'].includes(modalityUpper)) {
+        targetZoom = 0.8; // CT/MR can use normal zoom
+        console.log('Applied CT/MR specific zoom adjustment: 80%');
+    }
+    
+    // Apply the zoom
+    if (typeof setZoom === 'function') {
+        setZoom(targetZoom);
+    } else if (typeof window.zoomFactor !== 'undefined') {
+        window.zoomFactor = targetZoom;
+        if (typeof updateImageDisplay === 'function') {
+            updateImageDisplay();
+        }
+    }
+};
+
 console.log('DICOM Viewer fixes loaded successfully');

@@ -1789,6 +1789,19 @@
                         if (canvas && dicomImage.complete && dicomImage.naturalWidth > 0) {
                             try {
                                 renderImageToCanvas(dicomImage, canvas, currentSeries?.modality);
+                                
+                                // Apply modality-specific zoom adjustment
+                                const modality = currentSeries?.modality?.toUpperCase();
+                                if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
+                                    // X-ray images need less zoom for better fit
+                                    setZoom(0.6);
+                                    console.log('Applied X-ray specific zoom: 60%');
+                                } else if (modality && ['CT', 'MR', 'MRI'].includes(modality)) {
+                                    // CT/MR images can use normal zoom
+                                    setZoom(0.8);
+                                    console.log('Applied CT/MR specific zoom: 80%');
+                                }
+                                
                                 // Hide the img element and show canvas
                                 dicomImage.style.display = 'none';
                                 canvas.style.display = 'block';
@@ -2413,10 +2426,10 @@
             const displayWidth = rect.width;
             const displayHeight = rect.height;
             
-            // Modality-specific resolution enhancement
-            let resolutionMultiplier = 1.5; // Default for CT/MR
+            // Modality-specific resolution enhancement - FIXED for X-ray zoom issue
+            let resolutionMultiplier = 1.2; // Default for CT/MR - reduced from 1.5
             if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
-                resolutionMultiplier = 2.0; // Higher resolution for X-ray images
+                resolutionMultiplier = 1.0; // Lower resolution multiplier for X-ray to reduce zoom
             }
             
             // Set actual canvas size to device pixel ratio with enhanced resolution

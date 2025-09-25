@@ -80,10 +80,10 @@ class DicomCanvasFix {
         // Detect modality for resolution optimization
         const modality = this.detectModality();
         
-        // Modality-specific resolution multipliers - FIXED for proper scaling
+        // Modality-specific resolution multipliers - OPTIMIZED for X-ray vs CT
         let resolutionMultiplier = 1.0; // Default - standard scaling
         if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-            resolutionMultiplier = 1.0; // X-ray images - standard resolution, no extra scaling
+            resolutionMultiplier = 0.8; // X-ray images - reduced scaling to prevent over-zoom
         } else if (['CT'].includes(modality)) {
             resolutionMultiplier = 1.0; // CT - standard resolution
         } else if (['MR', 'MRI'].includes(modality)) {
@@ -450,12 +450,12 @@ class DicomCanvasFix {
         
         let drawWidth, drawHeight, drawX, drawY;
         
-        // Modality-specific scale factors - OPTIMIZED for proper fit and visibility
-        let scaleFactor = 0.75; // Default - better fit with comfortable margins
+        // Modality-specific scale factors - FIXED for X-ray vs CT difference
+        let scaleFactor = 0.75; // Default - good fit for most modalities
         if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-            scaleFactor = 0.70; // X-ray images - further reduced for proper fit
+            scaleFactor = 0.50; // X-ray images - much smaller scale for 2D images
         } else if (['CT', 'MR', 'MRI'].includes(modality)) {
-            scaleFactor = 0.75; // CT/MR - optimized for medical viewing
+            scaleFactor = 0.75; // CT/MR - keep current good scaling
         }
         
         if (imageAspect > canvasAspect) {
@@ -564,7 +564,7 @@ class DicomCanvasFix {
             const imageAspect = image.width / image.height;
             
             let drawWidth, drawHeight, drawX, drawY;
-            const scaleFactor = 0.70; // Further reduced for optimal fit
+            const scaleFactor = 0.60; // Reduced for better fit in basic display mode
             
             if (imageAspect > canvasAspect) {
                 drawWidth = this.canvas.width * scaleFactor;
