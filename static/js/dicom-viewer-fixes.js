@@ -380,11 +380,37 @@ function applyPreset(preset) {
     };
     
     if (presets[preset]) {
-        windowWidth = presets[preset].windowWidth;
-        windowLevel = presets[preset].windowLevel;
+        // Update global window/level variables
+        if (typeof window.windowWidth !== 'undefined') {
+            window.windowWidth = presets[preset].windowWidth;
+            window.windowLevel = presets[preset].windowLevel;
+        } else {
+            windowWidth = presets[preset].windowWidth;
+            windowLevel = presets[preset].windowLevel;
+        }
+        
+        // Update UI sliders if they exist
+        const wwSlider = document.getElementById('windowWidth');
+        const wlSlider = document.getElementById('windowLevel');
+        const wwValue = document.getElementById('wwValue');
+        const wlValue = document.getElementById('wlValue');
+        
+        if (wwSlider) wwSlider.value = presets[preset].windowWidth;
+        if (wlSlider) wlSlider.value = presets[preset].windowLevel;
+        if (wwValue) wwValue.textContent = presets[preset].windowWidth;
+        if (wlValue) wlValue.textContent = presets[preset].windowLevel;
+        
+        // Update display functions
         updateWindowLevelDisplay();
-        redrawCurrentImage();
-        showToast(`Applied ${preset} preset`, 'success');
+        
+        // Refresh image with new settings
+        if (typeof updateImageDisplay === 'function') {
+            updateImageDisplay();
+        } else if (typeof redrawCurrentImage === 'function') {
+            redrawCurrentImage();
+        }
+        
+        showToast(`Applied ${preset} preset (W:${presets[preset].windowWidth} L:${presets[preset].windowLevel})`, 'success');
     }
 }
 
