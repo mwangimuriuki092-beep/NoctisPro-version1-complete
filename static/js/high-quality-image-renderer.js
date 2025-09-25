@@ -67,45 +67,46 @@ class HighQualityImageRenderer {
         // Apply modality-specific rendering settings
         this.applyModalitySettings(modality, mergedOptions);
         
-        // Calculate aspect-preserving dimensions
+        // Calculate aspect-preserving dimensions with proper scaling
         const imgAspect = imageElement.naturalWidth / imageElement.naturalHeight;
         const canvasAspect = displayWidth / displayHeight;
         
         let drawWidth, drawHeight, drawX, drawY;
+        const fitScale = 0.80; // Scale factor to ensure image fits with margins
         
         if (imgAspect > canvasAspect) {
-            drawWidth = displayWidth;
-            drawHeight = displayWidth / imgAspect;
-            drawX = 0;
+            drawWidth = displayWidth * fitScale;
+            drawHeight = drawWidth / imgAspect;
+            drawX = (displayWidth - drawWidth) / 2;
             drawY = (displayHeight - drawHeight) / 2;
         } else {
-            drawWidth = displayHeight * imgAspect;
-            drawHeight = displayHeight;
+            drawHeight = displayHeight * fitScale;
+            drawWidth = drawHeight * imgAspect;
             drawX = (displayWidth - drawWidth) / 2;
-            drawY = 0;
+            drawY = (displayHeight - drawHeight) / 2;
         }
         
         // Clear canvas
         this.ctx.fillStyle = '#000000';
         this.ctx.fillRect(0, 0, displayWidth, displayHeight);
         
-        // Apply transforms if available - IMPROVED ZOOM/PAN HANDLING
+        // Apply transforms if available - FIXED ZOOM/PAN HANDLING
         if (typeof zoomFactor !== 'undefined' && typeof panX !== 'undefined' && typeof panY !== 'undefined') {
             this.ctx.save();
             
-            // Clamp zoom factor to reasonable medical imaging range
-            const clampedZoom = Math.max(0.1, Math.min(2.0, zoomFactor));
+            // Clamp zoom factor to more conservative range to prevent excessive zoom
+            const clampedZoom = Math.max(0.2, Math.min(1.5, zoomFactor));
             
             // Apply transforms with better centering
             this.ctx.translate(displayWidth / 2 + panX, displayHeight / 2 + panY);
             this.ctx.scale(clampedZoom, clampedZoom);
             this.ctx.translate(-displayWidth / 2, -displayHeight / 2);
             
-            // Adjust draw coordinates for zoom
-            drawX = (drawX - displayWidth / 2) / clampedZoom + displayWidth / 2;
-            drawY = (drawY - displayHeight / 2) / clampedZoom + displayHeight / 2;
-            drawWidth = drawWidth / clampedZoom;
-            drawHeight = drawHeight / clampedZoom;
+            // Adjust draw coordinates for zoom - keep original positioning
+            drawX = drawX;
+            drawY = drawY;
+            drawWidth = drawWidth;
+            drawHeight = drawHeight;
         }
         
         // Render image with high quality

@@ -80,14 +80,14 @@ class DicomCanvasFix {
         // Detect modality for resolution optimization
         const modality = this.detectModality();
         
-        // Modality-specific resolution multipliers - REDUCED for better display
-        let resolutionMultiplier = 1.0; // Default - no excessive scaling
+        // Modality-specific resolution multipliers - FIXED for proper scaling
+        let resolutionMultiplier = 1.0; // Default - standard scaling
         if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-            resolutionMultiplier = 1.2; // X-ray images - moderate resolution
+            resolutionMultiplier = 1.0; // X-ray images - standard resolution, no extra scaling
         } else if (['CT'].includes(modality)) {
-            resolutionMultiplier = 1.1; // CT - slight resolution boost
+            resolutionMultiplier = 1.0; // CT - standard resolution
         } else if (['MR', 'MRI'].includes(modality)) {
-            resolutionMultiplier = 1.1; // MRI - slight resolution boost
+            resolutionMultiplier = 1.0; // MRI - standard resolution
         } else if (['US'].includes(modality)) {
             resolutionMultiplier = 1.0; // Ultrasound - standard resolution
         }
@@ -450,12 +450,12 @@ class DicomCanvasFix {
         
         let drawWidth, drawHeight, drawX, drawY;
         
-        // Modality-specific scale factors - OPTIMIZED for better fit
-        let scaleFactor = 0.95; // Default - fit better in viewport
+        // Modality-specific scale factors - FIXED for proper fit
+        let scaleFactor = 0.85; // Default - better fit with margins
         if (['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality)) {
-            scaleFactor = 0.98; // X-ray images - almost full screen
+            scaleFactor = 0.80; // X-ray images - reduced from 0.98 to fit properly
         } else if (['CT', 'MR', 'MRI'].includes(modality)) {
-            scaleFactor = 0.95; // CT/MR - good balance
+            scaleFactor = 0.85; // CT/MR - reduced for better fit
         }
         
         if (imageAspect > canvasAspect) {
@@ -564,7 +564,7 @@ class DicomCanvasFix {
             const imageAspect = image.width / image.height;
             
             let drawWidth, drawHeight, drawX, drawY;
-            const scaleFactor = 0.9; // Safe default
+            const scaleFactor = 0.80; // Reduced from 0.9 for better fit
             
             if (imageAspect > canvasAspect) {
                 drawWidth = this.canvas.width * scaleFactor;
