@@ -77,3 +77,71 @@ gevent
 reportlab
 # pycups - commented out due to installation issues on some systems
 # python-escpos - commented out due to dependency on pycups
+
+# World-class performance optimization
+fastapi
+uvicorn
+aiofiles
+asyncpg
+redis-py-cluster
+msgpack
+orjson
+lz4
+zstandard
+
+# Advanced medical imaging
+vtk
+itk
+pyvista
+nibabel
+dicom2nifti
+
+# GPU acceleration and compute
+cupy-cuda12x
+numba
+jax
+jaxlib
+
+# Advanced AI and ML
+tensorflow
+keras
+onnxruntime-gpu
+tensorrt
+triton-inference-server
+
+# Performance monitoring
+prometheus-client
+grafana-api
+influxdb-client
+jaeger-client
+
+# Advanced networking and protocols
+grpc
+protobuf
+websockets
+httpx
+aiohttp
+
+# Medical standards compliance
+pynetdicom3
+dicomweb-client
+hl7apy
+fhir-parser
+
+# Advanced image processing
+pillow-simd
+opencv-contrib-python
+scikit-image-extra
+mahotas
+imageio-ffmpeg
+
+# Memory optimization
+pympler
+memory-profiler
+tracemalloc-tools
+
+# Async and concurrency
+asyncio-mqtt
+aioredis
+aiodns
+uvloop
