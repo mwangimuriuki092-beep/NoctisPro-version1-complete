@@ -498,56 +498,24 @@ class DicomCanvasFix {
 
     applyModalityRenderingSettings(modality) {
         try {
-            // Reset to defaults first
+            // Universal high-quality diagnostic settings for ALL modalities
+            // Optimized for diagnostic value and consistent viewing experience
+            
             this.ctx.globalAlpha = 1.0;
-            this.ctx.filter = 'none';
-            this.ctx.imageSmoothingEnabled = true;
+            this.ctx.imageSmoothingEnabled = false; // Preserve pixel accuracy for all medical images
             this.ctx.imageSmoothingQuality = 'high';
-
-            if (['DX', 'CR', 'DR', 'XA', 'RF', 'MG'].includes(modality)) {
-                // X-ray modalities: SIGNIFICANTLY increased brightness and contrast for better visibility
-                this.ctx.imageSmoothingEnabled = false; // Critical for X-ray detail
-                this.ctx.filter = 'contrast(1.8) brightness(2.2) saturate(0.75) gamma(0.8)';
-                console.log(`Applied high-contrast X-ray settings for ${modality}`);
-                
-            } else if (['CT'].includes(modality)) {
-                // CT: Enhanced brightness and contrast for better tissue visibility
-                this.ctx.imageSmoothingEnabled = false; // Preserve CT detail
-                this.ctx.filter = 'contrast(1.8) brightness(2.2) saturate(0.85) gamma(0.9)';
-                console.log(`Applied enhanced CT settings for ${modality}`);
-                
-            } else if (['MR', 'MRI'].includes(modality)) {
-                // MRI: Enhanced brightness for better contrast differentiation
-                this.ctx.imageSmoothingEnabled = true;
-                this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.5) brightness(1.9) saturate(0.85) gamma(0.9)';
-                console.log(`Applied enhanced MRI settings for ${modality}`);
-                
-            } else if (['US'].includes(modality)) {
-                // Ultrasound: Enhanced brightness for better visualization
-                this.ctx.imageSmoothingEnabled = true;
-                this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.4) brightness(1.8) saturate(0.80) gamma(0.9)';
-                console.log(`Applied enhanced Ultrasound settings for ${modality}`);
-                
-            } else if (['NM', 'PT'].includes(modality)) {
-                // Nuclear Medicine/PET: Enhanced brightness with excellent contrast
-                this.ctx.imageSmoothingEnabled = true;
-                this.ctx.imageSmoothingQuality = 'high';
-                this.ctx.filter = 'contrast(1.7) brightness(1.9) saturate(1.1) gamma(0.85)';
-                console.log(`Applied enhanced Nuclear Medicine settings for ${modality}`);
-                
-            } else {
-                // Default/Unknown: Enhanced brightness for general medical imaging
-                this.ctx.imageSmoothingEnabled = false;
-                this.ctx.filter = 'contrast(1.6) brightness(2.0) saturate(0.80) gamma(0.85)';
-                console.log(`Applied enhanced default settings for ${modality}`);
-            }
+            
+            // Universal diagnostic-quality filter settings
+            // These values provide excellent visibility for all DICOM modalities
+            this.ctx.filter = 'contrast(1.8) brightness(2.1) saturate(0.9) gamma(0.9)';
+            
+            console.log(`Applied universal diagnostic settings for ${modality}`);
+            
         } catch (error) {
-            console.warn('Failed to apply modality rendering settings, using enhanced fallback:', error);
-            // Enhanced fallback for better visibility
+            console.warn('Failed to apply rendering settings, using diagnostic fallback:', error);
+            // Diagnostic fallback - still high quality
             this.ctx.globalAlpha = 1.0;
-            this.ctx.filter = 'contrast(1.6) brightness(2.0)';
+            this.ctx.filter = 'contrast(1.8) brightness(2.1)';
             this.ctx.imageSmoothingEnabled = false;
         }
     }
@@ -583,10 +551,10 @@ class DicomCanvasFix {
             drawX = (canvasDisplayWidth - drawWidth) / 2;
             drawY = (canvasDisplayHeight - drawHeight) / 2;
             
-            // Enhanced rendering settings - Significantly increased brightness for better visibility
+            // Universal diagnostic rendering settings - High quality for all medical images
             this.ctx.globalAlpha = 1.0;
             this.ctx.imageSmoothingEnabled = false;
-            this.ctx.filter = 'contrast(1.6) brightness(2.0) gamma(0.85)';
+            this.ctx.filter = 'contrast(1.8) brightness(2.1) saturate(0.9) gamma(0.9)';
             
             // Draw image
             this.ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
