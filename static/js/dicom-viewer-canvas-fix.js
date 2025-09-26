@@ -498,24 +498,49 @@ class DicomCanvasFix {
 
     applyModalityRenderingSettings(modality) {
         try {
-            // Universal high-quality diagnostic settings for ALL modalities
-            // Optimized for diagnostic value and consistent viewing experience
-            
+            // Reset to defaults first
             this.ctx.globalAlpha = 1.0;
-            this.ctx.imageSmoothingEnabled = false; // Preserve pixel accuracy for all medical images
+            this.ctx.filter = 'none';
+            this.ctx.imageSmoothingEnabled = false; // Always preserve pixel accuracy
             this.ctx.imageSmoothingQuality = 'high';
-            
-            // Universal diagnostic-quality filter settings
-            // These values provide excellent visibility for all DICOM modalities
-            this.ctx.filter = 'contrast(1.8) brightness(2.1) saturate(0.9) gamma(0.9)';
-            
-            console.log(`Applied universal diagnostic settings for ${modality}`);
-            
+
+            // Refined universal settings - high quality for all modalities
+            const universalFilter = 'contrast(1.9) brightness(2.2) saturate(0.9) gamma(0.9)';
+
+            if (['DX', 'CR', 'DR', 'XA', 'RF', 'MG'].includes(modality)) {
+                // X-ray modalities
+                this.ctx.filter = universalFilter;
+                console.log(`Applied refined X-ray settings for ${modality}`);
+                
+            } else if (['CT'].includes(modality)) {
+                // CT scans
+                this.ctx.filter = universalFilter;
+                console.log(`Applied refined CT settings for ${modality}`);
+                
+            } else if (['MR', 'MRI'].includes(modality)) {
+                // MRI
+                this.ctx.filter = universalFilter;
+                console.log(`Applied refined MRI settings for ${modality}`);
+                
+            } else if (['US'].includes(modality)) {
+                // Ultrasound
+                this.ctx.filter = universalFilter;
+                console.log(`Applied refined Ultrasound settings for ${modality}`);
+                
+            } else if (['NM', 'PT'].includes(modality)) {
+                // Nuclear Medicine/PET
+                this.ctx.filter = universalFilter;
+                console.log(`Applied refined Nuclear Medicine settings for ${modality}`);
+                
+            } else {
+                // Default/Unknown
+                this.ctx.filter = universalFilter;
+                console.log(`Applied refined default settings for ${modality}`);
+            }
         } catch (error) {
-            console.warn('Failed to apply rendering settings, using diagnostic fallback:', error);
-            // Diagnostic fallback - still high quality
+            console.warn('Failed to apply modality rendering settings, using fallback:', error);
             this.ctx.globalAlpha = 1.0;
-            this.ctx.filter = 'contrast(1.8) brightness(2.1)';
+            this.ctx.filter = 'contrast(1.9) brightness(2.2)';
             this.ctx.imageSmoothingEnabled = false;
         }
     }
