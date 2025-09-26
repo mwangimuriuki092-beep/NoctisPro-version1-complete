@@ -129,6 +129,21 @@ class DicomComponentConnector {
             case 'ai':
                 this.runAIAnalysis();
                 break;
+            case 'print':
+                this.showPrint();
+                break;
+            case 'export':
+                this.showExport();
+                break;
+            case 'presets':
+                this.showPresets();
+                break;
+            case 'preferences':
+                this.showPreferences();
+                break;
+            case 'hounsfield':
+                this.enableHounsfieldMeasurement();
+                break;
             default:
                 console.log(`Tool not implemented: ${tool}`);
         }
@@ -460,23 +475,66 @@ class DicomComponentConnector {
     }
     
     startMeasurement(x, y) {
-        console.log(`📏 Starting measurement at (${x}, ${y})`);
-        // Implement measurement start
+        if (window.advancedMeasurements) {
+            window.advancedMeasurements.setMeasurementType('distance');
+        }
+        console.log(`📏 Distance measurement mode activated`);
     }
     
     startAngleMeasurement(x, y) {
-        console.log(`📐 Starting angle measurement at (${x}, ${y})`);
-        // Implement angle measurement start
+        if (window.advancedMeasurements) {
+            window.advancedMeasurements.setMeasurementType('angle');
+        }
+        console.log(`📐 Angle measurement mode activated`);
     }
     
     startAreaMeasurement(x, y) {
-        console.log(`📊 Starting area measurement at (${x}, ${y})`);
-        // Implement area measurement start
+        if (window.advancedMeasurements) {
+            window.advancedMeasurements.setMeasurementType('area');
+        }
+        console.log(`📊 Area measurement mode activated`);
     }
     
     addAnnotation(x, y) {
-        console.log(`📝 Adding annotation at (${x}, ${y})`);
-        // Implement annotation
+        if (window.advancedMeasurements) {
+            window.advancedMeasurements.setMeasurementType('annotation');
+        }
+        console.log(`📝 Annotation mode activated`);
+    }
+    
+    enableHounsfieldMeasurement() {
+        if (window.advancedMeasurements) {
+            window.advancedMeasurements.setMeasurementType('hounsfield');
+        }
+        console.log(`🏥 Hounsfield Unit measurement activated`);
+    }
+    
+    showPrint() {
+        if (window.showPrintDialog) {
+            window.showPrintDialog();
+        }
+        console.log('🖨️ Print dialog opened');
+    }
+    
+    showExport() {
+        if (window.showExportDialog) {
+            window.showExportDialog();
+        }
+        console.log('📤 Export dialog opened');
+    }
+    
+    showPresets() {
+        if (window.showWindowLevelPresets) {
+            window.showWindowLevelPresets();
+        }
+        console.log('🎚️ Window/Level presets opened');
+    }
+    
+    showPreferences() {
+        if (window.showPreferencesDialog) {
+            window.showPreferencesDialog();
+        }
+        console.log('👤 User preferences opened');
     }
     
     connectStudyLoading() {
