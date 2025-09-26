@@ -275,13 +275,14 @@ class WorkingDicomCanvas {
         
         let width, height;
         
+        // Calculate scale to fit image properly within canvas (not zoomed in)
         if (imageAspect > canvasAspect) {
-            // Image is wider than canvas
-            width = this.canvas.width * this.viewport.scale;
+            // Image is wider than canvas - fit to width
+            width = this.canvas.width * 0.95 * this.viewport.scale; // 95% of canvas width
             height = width / imageAspect;
         } else {
-            // Image is taller than canvas
-            height = this.canvas.height * this.viewport.scale;
+            // Image is taller than canvas - fit to height  
+            height = this.canvas.height * 0.95 * this.viewport.scale; // 95% of canvas height
             width = height * imageAspect;
         }
         
@@ -292,11 +293,32 @@ class WorkingDicomCanvas {
     }
     
     applyImageFilters() {
-        // Apply brightness and contrast based on window/level
-        const brightness = (this.viewport.windowCenter - 127) / 127;
-        const contrast = this.viewport.windowWidth / 256;
+        // Improved brightness and contrast for medical imaging
+        // Make images much brighter and higher contrast by default
         
-        let filter = `contrast(${contrast}) brightness(${1 + brightness})`;
+        // Base brightness boost for medical images (they're often too dark)
+        let baseBrightness = 1.8; // 80% brighter by default
+        let baseContrast = 1.6;   // 60% more contrast by default
+        
+        // Additional adjustments based on window/level if available
+        if (this.currentImageData && this.currentImageData.window_center && this.currentImageData.window_width) {
+            // Use DICOM window/level values for proper medical display
+            const windowCenter = this.viewport.windowCenter;
+            const windowWidth = this.viewport.windowWidth;
+            
+            // Convert window/level to brightness/contrast adjustments
+            const brightnessAdjust = (windowCenter - 128) / 128 * 0.5;
+            const contrastAdjust = Math.max(0.5, Math.min(3.0, windowWidth / 200));
+            
+            baseBrightness += brightnessAdjust;
+            baseContrast = contrastAdjust;
+        }
+        
+        // Ensure values are within reasonable bounds
+        baseBrightness = Math.max(0.5, Math.min(3.0, baseBrightness));
+        baseContrast = Math.max(0.5, Math.min(3.0, baseContrast));
+        
+        let filter = `contrast(${baseContrast}) brightness(${baseBrightness}) saturate(0.9)`;
         
         if (this.viewport.invert) {
             filter += ' invert(1)';
