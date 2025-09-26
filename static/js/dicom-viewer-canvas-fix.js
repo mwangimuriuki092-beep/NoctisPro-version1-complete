@@ -73,30 +73,24 @@ class DicomCanvasFix {
     setupHighResolutionCanvas() {
         if (!this.canvas) return;
         
-        // Simplified canvas setup - avoid complex DPR scaling that causes zoom issues
         const rect = this.canvas.getBoundingClientRect();
-        
-        // Detect modality for reference
         const modality = this.detectModality();
         
-        // Use 1:1 pixel ratio for medical imaging to avoid scaling artifacts
-        const dpr = 1.0; // Fixed 1:1 ratio for consistent medical image display
+        // Set canvas dimensions for optimal performance
+        this.canvas.width = Math.floor(rect.width);
+        this.canvas.height = Math.floor(rect.height);
         
-        // Set canvas dimensions to match display size exactly
-        this.canvas.width = rect.width;
-        this.canvas.height = rect.height;
-        
-        // Ensure CSS dimensions match internal dimensions
+        // Match CSS dimensions exactly
         this.canvas.style.width = rect.width + 'px';
         this.canvas.style.height = rect.height + 'px';
         
-        // No context scaling needed with 1:1 ratio
-        // this.ctx.scale(dpr, dpr); // Removed to prevent scaling issues
+        // Optimize canvas for medical imaging performance
+        this.ctx.imageSmoothingEnabled = false; // Preserve medical image detail
+        this.ctx.imageSmoothingQuality = 'high';
         
-        // Set canvas modality attribute for future reference
         this.canvas.dataset.modality = modality;
         
-        console.log(`Optimized canvas setup for ${modality}: ${this.canvas.width}x${this.canvas.height} (1:1 ratio, Display: ${rect.width}x${rect.height})`);
+        console.log(`Canvas optimized: ${this.canvas.width}x${this.canvas.height}`);
     }
 
     setupEventListeners() {
@@ -366,29 +360,21 @@ class DicomCanvasFix {
         }
 
         if (image instanceof HTMLImageElement) {
-        // Store current image
-        this.currentImage = image;
-        
-        // Reset any existing zoom/pan to ensure proper fit
-        if (typeof window.zoom !== 'undefined') {
-            window.zoom = 1.0;
-        }
-        if (typeof window.panX !== 'undefined') {
-            window.panX = 0;
-            window.panY = 0;
-        }
-        
-        try {
-            // Detect modality from various sources (with fallback)
-            const modality = this.detectModality(metadata);
+            // Store current image
+            this.currentImage = image;
             
-            // Use modality-specific display
+            // Reset viewport for proper initial display
+            if (typeof window.zoom !== 'undefined') {
+                window.zoom = 1.0;
+            }
+            if (typeof window.panX !== 'undefined') {
+                window.panX = 0;
+                window.panY = 0;
+            }
+            
+            // Fast, optimized display
+            const modality = this.detectModality(metadata);
             this.modalitySpecificDisplayImage(image, modality);
-        } catch (error) {
-            console.warn('Modality-specific display failed, using basic display:', error);
-            // Fallback to basic display if modality-specific fails
-            this.basicDisplayImage(image);
-        }
         }
     }
 
