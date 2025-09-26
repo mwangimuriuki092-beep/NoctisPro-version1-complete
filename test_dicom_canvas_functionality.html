@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Canvas Functionality Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+            font-family: monospace;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+        
+        #viewer-container {
+            width: 800px;
+            height: 600px;
+            border: 2px solid #00ff00;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background: #333;
+            color: #fff;
+            border: 1px solid #666;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #555;
+        }
+        
+        .status {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .warning { color: #ffaa00; }
+        
+        .performance-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .stat-item {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🎯 DICOM Canvas Functionality Test</h1>
+        
+        <div class="test-section">
+            <h2>1. Canvas Initialization Test</h2>
+            <div id="init-status" class="status">Testing canvas initialization...</div>
+            <div id="viewer-container"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>2. Image Loading Test</h2>
+            <div class="controls">
+                <button onclick="testImageLoad()">Test Image Load</button>
+                <button onclick="testStudyLoad()">Test Study Load</button>
+                <button onclick="generateTestImage()">Generate Test Image</button>
+            </div>
+            <div id="load-status" class="status">Click buttons to test image loading...</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>3. Canvas Manipulation Test</h2>
+            <div class="controls">
+                <button onclick="testZoom()">Test Zoom</button>
+                <button onclick="testPan()">Test Pan</button>
+                <button onclick="testWindowLevel()">Test Window/Level</button>
+                <button onclick="testInvert()">Test Invert</button>
+                <button onclick="testReset()">Reset View</button>
+            </div>
+            <div id="manipulation-status" class="status">Click buttons to test canvas manipulation...</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>4. Performance Metrics</h2>
+            <div class="controls">
+                <button onclick="updatePerformanceStats()">Update Stats</button>
+                <button onclick="startPerformanceMonitoring()">Start Monitoring</button>
+                <button onclick="stopPerformanceMonitoring()">Stop Monitoring</button>
+            </div>
+            <div class="performance-stats" id="performance-stats">
+                <div class="stat-item">
+                    <strong>Render Time:</strong> <span id="render-time">-</span>
+                </div>
+                <div class="stat-item">
+                    <strong>FPS:</strong> <span id="fps">-</span>
+                </div>
+                <div class="stat-item">
+                    <strong>Load Time:</strong> <span id="load-time">-</span>
+                </div>
+                <div class="stat-item">
+                    <strong>Has Image:</strong> <span id="has-image">-</span>
+                </div>
+                <div class="stat-item">
+                    <strong>Scale:</strong> <span id="scale">-</span>
+                </div>
+                <div class="stat-item">
+                    <strong>Window/Level:</strong> <span id="window-level">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>5. Test Results</h2>
+            <div id="test-results" class="status">
+                <div>Tests will appear here...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let canvas = null;
+        let performanceInterval = null;
+        let testResults = [];
+        
+        // Initialize canvas when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCanvas();
+        });
+        
+        function initializeCanvas() {
+            const initStatus = document.getElementById('init-status');
+            
+            try {
+                // Check if WorkingDicomCanvas is available
+                if (typeof WorkingDicomCanvas !== 'undefined') {
+                    canvas = new WorkingDicomCanvas();
+                    addTestResult('Canvas Initialization', 'success', 'WorkingDicomCanvas initialized successfully');
+                    initStatus.innerHTML = '<span class="success">✅ Canvas initialized successfully</span>';
+                } else {
+                    throw new Error('WorkingDicomCanvas not available');
+                }
+            } catch (error) {
+                addTestResult('Canvas Initialization', 'error', error.message);
+                initStatus.innerHTML = `<span class="error">❌ Canvas initialization failed: ${error.message}</span>`;
+            }
+        }
+        
+        function testImageLoad() {
+            const loadStatus = document.getElementById('load-status');
+            loadStatus.innerHTML = '🔄 Testing image load...';
+            
+            if (!canvas) {
+                loadStatus.innerHTML = '<span class="error">❌ Canvas not initialized</span>';
+                return;
+            }
+            
+            // Test with a sample study ID (you'd need to have actual data)
+            const testStudyId = 1; // Replace with actual study ID
+            
+            canvas.loadStudy(testStudyId)
+                .then(() => {
+                    addTestResult('Image Load', 'success', 'Image loaded successfully');
+                    loadStatus.innerHTML = '<span class="success">✅ Image load test completed</span>';
+                })
+                .catch(error => {
+                    addTestResult('Image Load', 'warning', `Load test failed (expected without data): ${error.message}`);
+                    loadStatus.innerHTML = `<span class="warning">⚠️ Load test failed (expected): ${error.message}</span>`;
+                });
+        }
+        
+        function testStudyLoad() {
+            const loadStatus = document.getElementById('load-status');
+            
+            if (!canvas) {
+                loadStatus.innerHTML = '<span class="error">❌ Canvas not initialized</span>';
+                return;
+            }
+            
+            loadStatus.innerHTML = '🔄 Testing study load with API call...';
+            
+            // Test API endpoint directly
+            fetch('/dicom-viewer/api/studies/', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    addTestResult('Study API', 'success', 'Study API endpoint accessible');
+                    loadStatus.innerHTML = '<span class="success">✅ Study API test completed</span>';
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            })
+            .catch(error => {
+                addTestResult('Study API', 'warning', `API test failed: ${error.message}`);
+                loadStatus.innerHTML = `<span class="warning">⚠️ API test failed: ${error.message}</span>`;
+            });
+        }
+        
+        function generateTestImage() {
+            const loadStatus = document.getElementById('load-status');
+            
+            if (!canvas) {
+                loadStatus.innerHTML = '<span class="error">❌ Canvas not initialized</span>';
+                return;
+            }
+            
+            loadStatus.innerHTML = '🔄 Generating test image...';
+            
+            try {
+                // Create a test image
+                const testCanvas = document.createElement('canvas');
+                testCanvas.width = 512;
+                testCanvas.height = 512;
+                const ctx = testCanvas.getContext('2d');
+                
+                // Draw a test pattern
+                const imageData = ctx.createImageData(512, 512);
+                const data = imageData.data;
+                
+                for (let i = 0; i < data.length; i += 4) {
+                    const x = (i / 4) % 512;
+                    const y = Math.floor((i / 4) / 512);
+                    
+                    // Create a test pattern
+                    const value = Math.sin(x * 0.1) * Math.cos(y * 0.1) * 127 + 128;
+                    
+                    data[i] = value;     // R
+                    data[i + 1] = value; // G
+                    data[i + 2] = value; // B
+                    data[i + 3] = 255;   // A
+                }
+                
+                ctx.putImageData(imageData, 0, 0);
+                
+                // Convert to base64 and display
+                const dataUrl = testCanvas.toDataURL();
+                const testImageData = {
+                    success: true,
+                    image_data: dataUrl,
+                    width: 512,
+                    height: 512,
+                    window_center: 128,
+                    window_width: 256
+                };
+                
+                canvas.displayImageData(testImageData)
+                    .then(() => {
+                        addTestResult('Test Image Generation', 'success', 'Test image generated and displayed');
+                        loadStatus.innerHTML = '<span class="success">✅ Test image generated successfully</span>';
+                    })
+                    .catch(error => {
+                        addTestResult('Test Image Generation', 'error', error.message);
+                        loadStatus.innerHTML = `<span class="error">❌ Test image failed: ${error.message}</span>`;
+                    });
+                    
+            } catch (error) {
+                addTestResult('Test Image Generation', 'error', error.message);
+                loadStatus.innerHTML = `<span class="error">❌ Test image generation failed: ${error.message}</span>`;
+            }
+        }
+        
+        function testZoom() {
+            const manipStatus = document.getElementById('manipulation-status');
+            
+            if (!canvas) {
+                manipStatus.innerHTML = '<span class="error">❌ Canvas not initialized</span>';
+                return;
+            }
+            
+            try {
+                canvas.zoom(1.5);
+                addTestResult('Zoom Test', 'success', 'Zoom function executed');
+                manipStatus.innerHTML = '<span class="success">✅ Zoom test completed</span>';
+            } catch (error) {
+                addTestResult('Zoom Test', 'error', error.message);
+                manipStatus.innerHTML = `<span class="error">❌ Zoom test failed: ${error.message}</span>`;
+            }
+        }
+        
+        function testPan() {
+            const manipStatus = document.getElementById('manipulation-status');
+            
+            if (!canvas) {
+                manipStatus.innerHTML = '<span class="error">❌ Canvas not initialized</span>';
+                return;
+            }
+            
+            try {
+                canvas.pan(50, 50);
+                addTestResult('Pan Test', 'success', 'Pan function executed');
+                manipStatus.innerHTML = '<span class="success">✅ Pan test completed</span>';
+            } catch (error) {
+                addTestResult('Pan Test', 'error', error.message);
+                manipStatus.innerHTML = `<span class="error">❌ Pan test failed: ${error.message}</span>`;
+            }
+        }
+        
+        function testWindowLevel() {
+            const manipStatus = document.getElementById('manipulation-status');
+            
+            if (!canvas) {
+                manipStatus.innerHTML = '<span class="error">❌ Canvas not initialized</span>';
+                return;
+            }
+            
+            try {
+                canvas.setWindowLevel(100, 200);
+                addTestResult('Window/Level Test', 'success', 'Window/Level function executed');
+                manipStatus.innerHTML = '<span class="success">✅ Window/Level test completed</span>';
+            } catch (error) {
+                addTestResult('Window/Level Test', 'error', error.message);
+                manipStatus.innerHTML = `<span class="error">❌ Window/Level test failed: ${error.message}</span>`;
+            }
+        }
+        
+        function testInvert() {
+            const manipStatus = document.getElementById('manipulation-status');
+            
+            if (!canvas) {
+                manipStatus.innerHTML = '<span class="error">❌ Canvas not initialized</span>';
+                return;
+            }
+            
+            try {
+                canvas.invert();
+                addTestResult('Invert Test', 'success', 'Invert function executed');
+                manipStatus.innerHTML = '<span class="success">✅ Invert test completed</span>';
+            } catch (error) {
+                addTestResult('Invert Test', 'error', error.message);
+                manipStatus.innerHTML = `<span class="error">❌ Invert test failed: ${error.message}</span>`;
+            }
+        }
+        
+        function testReset() {
+            const manipStatus = document.getElementById('manipulation-status');
+            
+            if (!canvas) {
+                manipStatus.innerHTML = '<span class="error">❌ Canvas not initialized</span>';
+                return;
+            }
+            
+            try {
+                canvas.resetViewport();
+                addTestResult('Reset Test', 'success', 'Reset function executed');
+                manipStatus.innerHTML = '<span class="success">✅ Reset test completed</span>';
+            } catch (error) {
+                addTestResult('Reset Test', 'error', error.message);
+                manipStatus.innerHTML = `<span class="error">❌ Reset test failed: ${error.message}</span>`;
+            }
+        }
+        
+        function updatePerformanceStats() {
+            if (!canvas) return;
+            
+            try {
+                const stats = canvas.getPerformanceStats();
+                
+                document.getElementById('render-time').textContent = `${stats.renderTime.toFixed(2)}ms`;
+                document.getElementById('fps').textContent = `${stats.fps.toFixed(1)}`;
+                document.getElementById('load-time').textContent = `${stats.loadTime.toFixed(2)}ms`;
+                document.getElementById('has-image').textContent = stats.hasImage ? 'Yes' : 'No';
+                document.getElementById('scale').textContent = `${(stats.viewport.scale * 100).toFixed(0)}%`;
+                document.getElementById('window-level').textContent = `${stats.viewport.windowWidth.toFixed(0)}/${stats.viewport.windowCenter.toFixed(0)}`;
+                
+                addTestResult('Performance Stats', 'success', 'Performance stats updated');
+            } catch (error) {
+                addTestResult('Performance Stats', 'error', error.message);
+            }
+        }
+        
+        function startPerformanceMonitoring() {
+            if (performanceInterval) return;
+            
+            performanceInterval = setInterval(updatePerformanceStats, 1000);
+            addTestResult('Performance Monitoring', 'success', 'Started performance monitoring');
+        }
+        
+        function stopPerformanceMonitoring() {
+            if (performanceInterval) {
+                clearInterval(performanceInterval);
+                performanceInterval = null;
+                addTestResult('Performance Monitoring', 'success', 'Stopped performance monitoring');
+            }
+        }
+        
+        function addTestResult(testName, status, message) {
+            testResults.push({
+                name: testName,
+                status: status,
+                message: message,
+                timestamp: new Date().toLocaleTimeString()
+            });
+            
+            updateTestResults();
+        }
+        
+        function updateTestResults() {
+            const resultsDiv = document.getElementById('test-results');
+            
+            let html = '<h3>Test Results:</h3>';
+            testResults.forEach(result => {
+                const statusClass = result.status === 'success' ? 'success' : 
+                                  result.status === 'error' ? 'error' : 'warning';
+                
+                const icon = result.status === 'success' ? '✅' : 
+                            result.status === 'error' ? '❌' : '⚠️';
+                
+                html += `
+                    <div style="margin: 5px 0; padding: 5px; background: #2a2a2a; border-radius: 3px;">
+                        <span class="${statusClass}">${icon} [${result.timestamp}] ${result.name}: ${result.message}</span>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+    </script>
+    
+    <!-- Include the working canvas script -->
+    <script src="/static/js/working-dicom-canvas.js"></script>
+</body>
+</html>
