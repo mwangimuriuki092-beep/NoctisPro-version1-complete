@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/studies/', views.api_studies_redirect, name='api_studies_redirect'),
     path('api/study/<int:study_id>/data/', views.api_study_data, name='api_study_data'),
     path('api/image/<int:image_id>/data/', views.api_image_data, name='api_image_data'),
+    path('api/image/<int:image_id>/data/professional/', views.api_image_data_professional, name='api_image_data_professional'),
     path('api/image/<int:image_id>/metadata/', views.api_image_metadata, name='api_image_metadata'),
     path('api/image/<int:image_id>/display/', views.api_dicom_image_display, name='api_dicom_image_display'),
     path('api/image/<int:image_id>/hounsfield/', views.api_image_hounsfield, name='api_image_hounsfield'),
@@ -27,6 +28,10 @@ urlpatterns = [
     path('api/series/<int:series_id>/mpr/', views.api_mpr_reconstruction, name='api_mpr_reconstruction'),
     path('api/series/<int:series_id>/mip/', views.api_mip_reconstruction, name='api_mip_reconstruction'),
     path('api/series/<int:series_id>/bone/', views.api_bone_reconstruction, name='api_bone_reconstruction'),
+    path('api/series/<int:series_id>/3d/', views.api_3d_reconstruction, name='api_3d_reconstruction'),
+    
+    # AI Analysis endpoints
+    path('api/ai/analyze/', views.api_ai_analysis, name='api_ai_analysis'),
     path('api/series/<int:series_id>/sr-export/', views.api_series_sr_export, name='api_series_sr_export'),
     path('api/hu/', views.api_hu_value, name='api_hu_value'),
     path('api/hounsfield-units/', views.api_hounsfield_units, name='api_hounsfield_units'),

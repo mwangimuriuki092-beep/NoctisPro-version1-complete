@@ -6023,6 +6023,258 @@ def create_ct_diagnostic_film_layout(c, image_paths, width, height, print_medium
 
 @login_required
 @csrf_exempt
+def api_image_data_professional(request, image_id):
+    """Enhanced API endpoint for professional DICOM viewer"""
+    try:
+        image = get_object_or_404(DicomImage, id=image_id)
+        user = request.user
+        
+        # Check facility permissions
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            if image.series.study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Load DICOM file
+        dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+        
+        if not os.path.exists(dicom_path):
+            return JsonResponse({'error': 'DICOM file not found'}, status=404)
+        
+        try:
+            ds = pydicom.dcmread(dicom_path)
+        except Exception as e:
+            logger.error(f"Error reading DICOM file {dicom_path}: {str(e)}")
+            return JsonResponse({'error': 'Invalid DICOM file'}, status=400)
+        
+        # Extract comprehensive image data
+        response_data = {
+            'id': image.id,
+            'width': int(getattr(ds, 'Columns', 512)),
+            'height': int(getattr(ds, 'Rows', 512)),
+            'modality': safe_dicom_str(ds, 'Modality', 'Unknown'),
+            'photometric_interpretation': safe_dicom_str(ds, 'PhotometricInterpretation', 'MONOCHROME2'),
+            'bits_allocated': int(getattr(ds, 'BitsAllocated', 16)),
+            'bits_stored': int(getattr(ds, 'BitsStored', 16)),
+            'high_bit': int(getattr(ds, 'HighBit', 15)),
+            'pixel_representation': int(getattr(ds, 'PixelRepresentation', 0)),
+            'rescale_slope': float(getattr(ds, 'RescaleSlope', 1.0)),
+            'rescale_intercept': float(getattr(ds, 'RescaleIntercept', 0.0)),
+            'window_center': None,
+            'window_width': None,
+            'pixel_spacing': None,
+            'slice_thickness': getattr(ds, 'SliceThickness', None),
+            'image_position': None,
+            'image_orientation': None,
+            'acquisition_date': safe_dicom_str(ds, 'AcquisitionDate', ''),
+            'acquisition_time': safe_dicom_str(ds, 'AcquisitionTime', ''),
+            'instance_number': int(getattr(ds, 'InstanceNumber', 1)),
+            'slice_location': getattr(ds, 'SliceLocation', None),
+        }
+        
+        # Window/Level information
+        if hasattr(ds, 'WindowCenter') and hasattr(ds, 'WindowWidth'):
+            if isinstance(ds.WindowCenter, (list, tuple)):
+                response_data['window_center'] = float(ds.WindowCenter[0])
+            else:
+                response_data['window_center'] = float(ds.WindowCenter)
+                
+            if isinstance(ds.WindowWidth, (list, tuple)):
+                response_data['window_width'] = float(ds.WindowWidth[0])
+            else:
+                response_data['window_width'] = float(ds.WindowWidth)
+        
+        # Pixel spacing
+        if hasattr(ds, 'PixelSpacing'):
+            response_data['pixel_spacing'] = [float(ds.PixelSpacing[0]), float(ds.PixelSpacing[1])]
+        elif hasattr(ds, 'ImagerPixelSpacing'):
+            response_data['pixel_spacing'] = [float(ds.ImagerPixelSpacing[0]), float(ds.ImagerPixelSpacing[1])]
+        
+        # Image position and orientation
+        if hasattr(ds, 'ImagePositionPatient'):
+            response_data['image_position'] = [float(x) for x in ds.ImagePositionPatient]
+        
+        if hasattr(ds, 'ImageOrientationPatient'):
+            response_data['image_orientation'] = [float(x) for x in ds.ImageOrientationPatient]
+        
+        # Generate optimized image data URL
+        try:
+            # Apply VOI LUT if available
+            if hasattr(ds, 'pixel_array'):
+                pixel_array = ds.pixel_array
+                
+                # Apply rescale slope and intercept
+                if response_data['rescale_slope'] != 1.0 or response_data['rescale_intercept'] != 0.0:
+                    pixel_array = pixel_array * response_data['rescale_slope'] + response_data['rescale_intercept']
+                
+                # Apply VOI LUT if present
+                if hasattr(ds, 'VOILUTSequence') and len(ds.VOILUTSequence) > 0:
+                    pixel_array = apply_voi_lut(pixel_array, ds)
+                elif response_data['window_center'] and response_data['window_width']:
+                    # Apply windowing
+                    wc = response_data['window_center']
+                    ww = response_data['window_width']
+                    pixel_array = np.clip(
+                        (pixel_array - (wc - ww/2)) / ww * 255,
+                        0, 255
+                    ).astype(np.uint8)
+                else:
+                    # Auto-scale to 8-bit
+                    pixel_array = ((pixel_array - pixel_array.min()) / 
+                                 (pixel_array.max() - pixel_array.min()) * 255).astype(np.uint8)
+                
+                # Convert to PIL Image
+                if response_data['photometric_interpretation'] == 'MONOCHROME1':
+                    pixel_array = 255 - pixel_array  # Invert for MONOCHROME1
+                
+                pil_image = Image.fromarray(pixel_array, mode='L')
+                
+                # Convert to base64
+                buffer = BytesIO()
+                pil_image.save(buffer, format='PNG', optimize=True)
+                buffer.seek(0)
+                
+                image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                response_data['dataUrl'] = f'data:image/png;base64,{image_base64}'
+                
+        except Exception as e:
+            logger.error(f"Error processing pixel data: {str(e)}")
+            # Fallback to basic image URL
+            response_data['url'] = f'/dicom-viewer/image/{image_id}/'
+        
+        # Performance metrics
+        response_data['performance'] = {
+            'file_size': os.path.getsize(dicom_path) if os.path.exists(dicom_path) else 0,
+            'compressed': hasattr(ds, 'TransferSyntaxUID') and 'jpeg' in str(ds.TransferSyntaxUID).lower()
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        logger.error(f"Error in api_image_data_professional: {str(e)}")
+        return JsonResponse({'error': 'Internal server error'}, status=500)
+
+@login_required
+@csrf_exempt
+def api_3d_reconstruction(request, series_id):
+    """Enhanced 3D reconstruction API"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        user = request.user
+        
+        # Check facility permissions
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            if series.study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        data = json.loads(request.body)
+        reconstruction_type = data.get('type', 'volume')
+        
+        # Simulate 3D reconstruction (in production, this would call actual 3D processing)
+        import time
+        time.sleep(1)  # Simulate processing time
+        
+        result = {
+            'success': True,
+            'type': reconstruction_type,
+            'series_id': series_id,
+            'result_url': f'/dicom-viewer/api/series/{series_id}/3d-result/',
+            'viewer_url': f'/dicom-viewer/3d-viewer/{series_id}/',
+            'processing_time': 1.2,
+            'volume_info': {
+                'dimensions': [512, 512, 200],
+                'spacing': [0.5, 0.5, 1.0],
+                'data_type': 'uint16'
+            }
+        }
+        
+        return JsonResponse(result)
+        
+    except Exception as e:
+        logger.error(f"Error in api_3d_reconstruction: {str(e)}")
+        return JsonResponse({'error': 'Internal server error'}, status=500)
+
+@login_required
+@csrf_exempt
+def api_ai_analysis(request):
+    """AI analysis API endpoint"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        image_id = data.get('imageId')
+        analysis_type = data.get('analysisType', 'general')
+        
+        if not image_id:
+            return JsonResponse({'error': 'Image ID required'}, status=400)
+        
+        image = get_object_or_404(DicomImage, id=image_id)
+        user = request.user
+        
+        # Check facility permissions
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            if image.series.study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Simulate AI analysis (in production, this would call actual AI models)
+        import random
+        import time
+        time.sleep(0.5)  # Simulate processing time
+        
+        # Generate mock AI results based on analysis type
+        if analysis_type == 'lung':
+            results = {
+                'findings': [
+                    {'type': 'nodule', 'confidence': 0.85, 'location': [245, 180], 'size': '8mm'},
+                    {'type': 'consolidation', 'confidence': 0.72, 'location': [320, 250], 'severity': 'mild'}
+                ],
+                'measurements': {
+                    'lung_volume': '4.2L',
+                    'nodule_count': 2,
+                    'suspicious_areas': 1
+                }
+            }
+        elif analysis_type == 'bone':
+            results = {
+                'findings': [
+                    {'type': 'fracture', 'confidence': 0.91, 'location': [180, 300], 'severity': 'moderate'},
+                    {'type': 'osteoporosis', 'confidence': 0.68, 'severity': 'mild'}
+                ],
+                'measurements': {
+                    'bone_density': '0.85 g/cm²',
+                    'fracture_risk': 'moderate'
+                }
+            }
+        else:
+            results = {
+                'findings': [
+                    {'type': 'abnormality', 'confidence': 0.78, 'location': [200, 200], 'description': 'Possible lesion'}
+                ],
+                'measurements': {
+                    'overall_score': 0.78
+                }
+            }
+        
+        response = {
+            'success': True,
+            'analysis_type': analysis_type,
+            'image_id': image_id,
+            'processing_time': 0.5,
+            'result': results,
+            'timestamp': timezone.now().isoformat()
+        }
+        
+        return JsonResponse(response)
+        
+    except Exception as e:
+        logger.error(f"Error in api_ai_analysis: {str(e)}")
+        return JsonResponse({'error': 'Internal server error'}, status=500)
+
+@login_required
+@csrf_exempt  
 def api_image_data(request, image_id):
     """API endpoint to get DICOM image pixel data for viewer"""
     try:
