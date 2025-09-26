@@ -35,6 +35,7 @@ from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor, safe_dicom_str
 from .reconstruction import MPRProcessor, Bone3DProcessor, MRI3DProcessor
 from .models import WindowLevelPreset, HangingProtocol
+from .performance_optimizer import get_performance_optimizer
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -1075,15 +1076,18 @@ def api_image_hounsfield(request, image_id):
 @login_required
 @csrf_exempt 
 def api_dicom_image_display(request, image_id):
-    """API endpoint to get processed DICOM image with windowing
-    - If pixel data cannot be decoded, still return metadata and sensible window defaults
-    """
+    """Optimized API endpoint to get processed DICOM image with windowing"""
+    start_time = time.time()
+    
     image = get_object_or_404(DicomImage, id=image_id)
     user = request.user
     
     # Check permissions
     if user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    # Get performance optimizer
+    optimizer = get_performance_optimizer()
     
     # Always attempt to return a response (avoid 500 for robustness)
     warnings = {}
