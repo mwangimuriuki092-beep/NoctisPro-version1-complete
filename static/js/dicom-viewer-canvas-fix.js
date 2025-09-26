@@ -490,8 +490,8 @@ class DicomCanvasFix {
             this.ctx.imageSmoothingEnabled = false; // Always preserve pixel accuracy
             this.ctx.imageSmoothingQuality = 'high';
 
-            // Refined universal settings - high quality for all modalities
-            const universalFilter = 'contrast(1.9) brightness(2.2) saturate(0.9) gamma(0.9)';
+            // Optimized universal settings for excellent medical image display
+            const universalFilter = 'contrast(2.0) brightness(2.4) saturate(0.95) gamma(0.95)';
 
             if (['DX', 'CR', 'DR', 'XA', 'RF', 'MG'].includes(modality)) {
                 // X-ray modalities
@@ -562,10 +562,10 @@ class DicomCanvasFix {
             drawX = (canvasDisplayWidth - drawWidth) / 2;
             drawY = (canvasDisplayHeight - drawHeight) / 2;
             
-            // Universal diagnostic rendering settings - High quality for all medical images
+            // Universal diagnostic rendering settings - Excellent visibility for all medical images
             this.ctx.globalAlpha = 1.0;
             this.ctx.imageSmoothingEnabled = false;
-            this.ctx.filter = 'contrast(1.8) brightness(2.1) saturate(0.9) gamma(0.9)';
+            this.ctx.filter = 'contrast(2.0) brightness(2.4) saturate(0.95) gamma(0.95)';
             
             // Draw image
             this.ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
