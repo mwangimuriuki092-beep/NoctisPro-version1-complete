@@ -455,8 +455,8 @@ class DicomCanvasFix {
         let drawWidth, drawHeight, drawX, drawY;
         
         // Fit image to canvas with proper aspect ratio - OPTIMIZED SIZE FIT
-        const maxWidth = canvasDisplayWidth * 0.98; // 98% of display width for better utilization
-        const maxHeight = canvasDisplayHeight * 0.98; // 98% of display height for better utilization
+        const maxWidth = canvasDisplayWidth * 0.95; // 95% of display width for better fit (not zoomed)
+        const maxHeight = canvasDisplayHeight * 0.95; // 95% of display height for better fit (not zoomed)
         
         // Calculate scale to fit image properly
         const scaleX = maxWidth / image.width;
@@ -513,7 +513,7 @@ class DicomCanvasFix {
             } else if (['CT'].includes(modality)) {
                 // CT: Enhanced brightness and contrast for better tissue visibility
                 this.ctx.imageSmoothingEnabled = false; // Preserve CT detail
-                this.ctx.filter = 'contrast(1.6) brightness(2.0) saturate(0.80) gamma(0.85)';
+                this.ctx.filter = 'contrast(1.8) brightness(2.2) saturate(0.85) gamma(0.9)';
                 console.log(`Applied enhanced CT settings for ${modality}`);
                 
             } else if (['MR', 'MRI'].includes(modality)) {
