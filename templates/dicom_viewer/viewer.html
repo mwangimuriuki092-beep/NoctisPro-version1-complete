@@ -2735,9 +2735,16 @@
             
             // Get container dimensions
             const container = canvas.parentElement;
-            const rect = container.getBoundingClientRect();
-            const displayWidth = Math.max(rect.width, 400);
-            const displayHeight = Math.max(rect.height, 400);
+            let displayWidth = 400;
+            let displayHeight = 400;
+            
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                displayWidth = Math.max(rect.width, 400);
+                displayHeight = Math.max(rect.height, 400);
+            } else {
+                console.warn('Canvas container not available, using default dimensions');
+            }
             
             // Set canvas size to container size
             canvas.width = displayWidth;
