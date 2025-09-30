@@ -6110,28 +6110,34 @@ def api_image_data_professional(request, image_id):
         
         # Window/Level information
         if hasattr(ds, 'WindowCenter') and hasattr(ds, 'WindowWidth'):
-            if isinstance(ds.WindowCenter, (list, tuple)):
+            if isinstance(ds.WindowCenter, (list, tuple)) and len(ds.WindowCenter) > 0:
                 response_data['window_center'] = float(ds.WindowCenter[0])
-            else:
+            elif ds.WindowCenter is not None:
                 response_data['window_center'] = float(ds.WindowCenter)
                 
-            if isinstance(ds.WindowWidth, (list, tuple)):
+            if isinstance(ds.WindowWidth, (list, tuple)) and len(ds.WindowWidth) > 0:
                 response_data['window_width'] = float(ds.WindowWidth[0])
-            else:
+            elif ds.WindowWidth is not None:
                 response_data['window_width'] = float(ds.WindowWidth)
         
         # Pixel spacing
-        if hasattr(ds, 'PixelSpacing'):
+        if hasattr(ds, 'PixelSpacing') and ds.PixelSpacing is not None and len(ds.PixelSpacing) >= 2:
             response_data['pixel_spacing'] = [float(ds.PixelSpacing[0]), float(ds.PixelSpacing[1])]
-        elif hasattr(ds, 'ImagerPixelSpacing'):
+        elif hasattr(ds, 'ImagerPixelSpacing') and ds.ImagerPixelSpacing is not None and len(ds.ImagerPixelSpacing) >= 2:
             response_data['pixel_spacing'] = [float(ds.ImagerPixelSpacing[0]), float(ds.ImagerPixelSpacing[1])]
         
         # Image position and orientation
-        if hasattr(ds, 'ImagePositionPatient'):
-            response_data['image_position'] = [float(x) for x in ds.ImagePositionPatient]
+        if hasattr(ds, 'ImagePositionPatient') and ds.ImagePositionPatient is not None:
+            try:
+                response_data['image_position'] = [float(x) for x in ds.ImagePositionPatient]
+            except (TypeError, ValueError):
+                response_data['image_position'] = None
         
-        if hasattr(ds, 'ImageOrientationPatient'):
-            response_data['image_orientation'] = [float(x) for x in ds.ImageOrientationPatient]
+        if hasattr(ds, 'ImageOrientationPatient') and ds.ImageOrientationPatient is not None:
+            try:
+                response_data['image_orientation'] = [float(x) for x in ds.ImageOrientationPatient]
+            except (TypeError, ValueError):
+                response_data['image_orientation'] = None
         
         # Generate optimized image data URL
         try:
@@ -6144,7 +6150,7 @@ def api_image_data_professional(request, image_id):
                     pixel_array = pixel_array * response_data['rescale_slope'] + response_data['rescale_intercept']
                 
                 # Apply VOI LUT if present
-                if hasattr(ds, 'VOILUTSequence') and len(ds.VOILUTSequence) > 0:
+                if hasattr(ds, 'VOILUTSequence') and ds.VOILUTSequence is not None and len(ds.VOILUTSequence) > 0:
                     pixel_array = apply_voi_lut(pixel_array, ds)
                 elif response_data['window_center'] and response_data['window_width']:
                     # Apply windowing
@@ -6187,7 +6193,9 @@ def api_image_data_professional(request, image_id):
         return JsonResponse(response_data)
         
     except Exception as e:
+        import traceback
         logger.error(f"Error in api_image_data_professional: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         return JsonResponse({'error': 'Internal server error'}, status=500)
 
 @login_required
