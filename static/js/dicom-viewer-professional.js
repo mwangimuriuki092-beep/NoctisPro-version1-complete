@@ -862,10 +862,13 @@ class ProfessionalDicomViewer {
     }
     
     setupResponsiveDesign() {
-        // Handle window resize
+        // Handle window resize with safety checks
         window.addEventListener('resize', () => {
-            if (this.currentImage && this.renderer) {
-                this.renderer.handleResize();
+            if (this.currentImage && this.renderer && this.renderer.canvas) {
+                // Add a small delay to ensure DOM is stable
+                setTimeout(() => {
+                    this.renderer.handleResize();
+                }, 10);
             }
         });
     }
@@ -928,6 +931,16 @@ class DicomRenderer {
         
         if (!this.canvas) {
             throw new Error('DICOM canvas not found after waiting');
+        }
+        
+        // Wait for container to be properly laid out
+        const container = this.canvas.parentElement;
+        if (container) {
+            let containerAttempts = 0;
+            while (containerAttempts < 20 && (container.clientWidth === 0 || container.clientHeight === 0)) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                containerAttempts++;
+            }
         }
         
         // Ensure canvas has proper dimensions
@@ -1415,6 +1428,16 @@ class DicomRenderer {
         // Check if container exists and has dimensions
         if (!container) {
             console.warn('Canvas container not available for resize');
+            return;
+        }
+        
+        // Ensure container is mounted in DOM and has computed dimensions
+        if (container.clientWidth === 0 || container.clientHeight === 0) {
+            console.warn('Container dimensions not available yet, using defaults');
+            const width = 800;
+            const height = 600;
+            canvas.width = width;
+            canvas.height = height;
             return;
         }
         
@@ -1937,6 +1960,8 @@ class ExportEngine {
 // Initialize the professional viewer when DOM is ready
 document.addEventListener('DOMContentLoaded', async function() {
     try {
+        // Wait a bit for DOM to fully settle
+        await new Promise(resolve => setTimeout(resolve, 100));
         window.professionalViewer = new ProfessionalDicomViewer();
         
         // Export global functions for template compatibility
