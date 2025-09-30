@@ -654,21 +654,27 @@ class DicomMobileSupport {
     }
     
     handleResize() {
-        const canvas = document.getElementById('dicomCanvas');
-        if (!canvas) return;
-        
-        if (this.isMobile) {
-            // Adjust canvas size for mobile
-            const container = canvas.parentElement;
-            if (container) {
-                canvas.width = container.clientWidth;
-                canvas.height = window.innerHeight - 120; // Account for toolbar
+        try {
+            const canvas = document.getElementById('dicomCanvas');
+            if (!canvas) return;
+            
+            if (this.isMobile) {
+                // Adjust canvas size for mobile
+                const container = canvas.parentElement;
+                if (container && container.clientWidth && container.clientHeight) {
+                    canvas.width = container.clientWidth;
+                    canvas.height = window.innerHeight - 120; // Account for toolbar
+                }
             }
-        }
-        
-        // Re-render if viewer is available
-        if (this.viewer && this.viewer.renderer && this.viewer.currentImage) {
-            this.viewer.renderer.handleResize();
+            
+            // Re-render if viewer is available
+            if (this.viewer && this.viewer.renderer && this.viewer.currentImage) {
+                if (typeof this.viewer.renderer.handleResize === 'function') {
+                    this.viewer.renderer.handleResize();
+                }
+            }
+        } catch (error) {
+            console.error('Error in mobile handleResize:', error);
         }
     }
     

@@ -994,13 +994,23 @@ class Enhanced3DReconstruction {
     }
 
     handleResize() {
-        const container = document.getElementById('viewport3DContainer');
-        if (!container) return;
+        try {
+            const container = document.getElementById('viewport3DContainer');
+            if (!container) return;
 
-        const rect = container.getBoundingClientRect();
-        this.renderer.setSize(rect.width, rect.height);
-        this.camera.aspect = rect.width / rect.height;
-        this.camera.updateProjectionMatrix();
+            const rect = container.getBoundingClientRect();
+            if (rect && rect.width > 0 && rect.height > 0) {
+                if (this.renderer) {
+                    this.renderer.setSize(rect.width, rect.height);
+                }
+                if (this.camera) {
+                    this.camera.aspect = rect.width / rect.height;
+                    this.camera.updateProjectionMatrix();
+                }
+            }
+        } catch (error) {
+            console.error('Error in 3D handleResize:', error);
+        }
     }
 
     showLoading(show) {
