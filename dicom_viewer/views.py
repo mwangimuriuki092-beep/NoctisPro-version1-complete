@@ -3976,10 +3976,18 @@ def print_dicom_image(request):
                     # Extract comprehensive metadata
                     enhanced_metadata = file_handler.extract_dicom_metadata(ds)
                     enhanced_metadata.update({
-                        'facility': image.series.study.facility.name if image.series.study.facility else 'Unknown',
-                        'accession_number': image.series.study.accession_number,
-                        'study_uid': image.series.study.study_instance_uid,
-                        'series_uid': image.series.series_instance_uid,
+                        'facility': (image.series.study.facility.name 
+                                   if image.series and image.series.study and image.series.study.facility 
+                                   else 'Unknown'),
+                        'accession_number': (image.series.study.accession_number 
+                                           if image.series and image.series.study 
+                                           else 'Unknown'),
+                        'study_uid': (image.series.study.study_instance_uid 
+                                    if image.series and image.series.study 
+                                    else 'Unknown'),
+                        'series_uid': (image.series.series_instance_uid 
+                                     if image.series 
+                                     else 'Unknown'),
                         'image_uid': image.sop_instance_uid,
                         'slice_location': image.slice_location,
                         'instance_number': image.instance_number,
@@ -6031,7 +6039,9 @@ def api_image_data_professional(request, image_id):
         
         # Check facility permissions
         if user.is_facility_user() and getattr(user, 'facility', None):
-            if image.series.study.facility != user.facility:
+            if (not image.series or not image.series.study or 
+                not image.series.study.facility or 
+                image.series.study.facility != user.facility):
                 return JsonResponse({'error': 'Permission denied'}, status=403)
         
         # Load DICOM file
@@ -6216,7 +6226,9 @@ def api_ai_analysis(request):
         
         # Check facility permissions
         if user.is_facility_user() and getattr(user, 'facility', None):
-            if image.series.study.facility != user.facility:
+            if (not image.series or not image.series.study or 
+                not image.series.study.facility or 
+                image.series.study.facility != user.facility):
                 return JsonResponse({'error': 'Permission denied'}, status=403)
         
         # Simulate AI analysis (in production, this would call actual AI models)
@@ -6283,7 +6295,9 @@ def api_image_data(request, image_id):
         
         # Check facility permissions
         if user.is_facility_user() and getattr(user, 'facility', None):
-            if image.series.study.facility != user.facility:
+            if (not image.series or not image.series.study or 
+                not image.series.study.facility or 
+                image.series.study.facility != user.facility):
                 return JsonResponse({'error': 'Permission denied'}, status=403)
         
         # Read DICOM file and extract pixel data
