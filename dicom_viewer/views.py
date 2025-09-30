@@ -386,7 +386,7 @@ def api_image_metadata(request, image_id):
         'image_position': image.image_position,
         'file_size': image.file_size,
         'series_id': image.series.id,
-        'study_id': image.series.study.id,
+        'study_id': image.series.study.id if image.series and image.series.study else None,
     }
     
     return JsonResponse(data)
@@ -1082,8 +1082,11 @@ def api_dicom_image_display(request, image_id):
     user = request.user
     
     # Check permissions
-    if user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        if (not image.series or not image.series.study or 
+            not image.series.study.facility or 
+            image.series.study.facility != user.facility):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
     
     # Always attempt to return a response (avoid 500 for robustness)
     warnings = {}
@@ -1270,8 +1273,8 @@ def api_dicom_image_display(request, image_id):
             'default_window_level': float(default_window_level) if default_window_level is not None else 40.0,
             'modality': getattr(ds, 'Modality', '') if ds is not None else (image.series.modality or ''),
             'series_description': getattr(ds, 'SeriesDescription', '') if ds is not None else getattr(image.series, 'series_description', ''),
-            'patient_name': str(getattr(ds, 'PatientName', '')) if ds is not None else (getattr(image.series.study.patient, 'full_name', '') if hasattr(image.series.study, 'patient') else ''),
-            'study_date': str(getattr(ds, 'StudyDate', '')) if ds is not None else (getattr(image.series.study, 'study_date', '') or ''),
+            'patient_name': str(getattr(ds, 'PatientName', '')) if ds is not None else (getattr(image.series.study.patient, 'full_name', '') if image.series and image.series.study and hasattr(image.series.study, 'patient') else ''),
+            'study_date': str(getattr(ds, 'StudyDate', '')) if ds is not None else (getattr(image.series.study, 'study_date', '') if image.series and image.series.study else ''),
             'bits_allocated': getattr(ds, 'BitsAllocated', 16) if ds is not None else 16,
             'bits_stored': getattr(ds, 'BitsStored', 16) if ds is not None else 16,
             'photometric_interpretation': getattr(ds, 'PhotometricInterpretation', '') if ds is not None else '',
@@ -1314,8 +1317,8 @@ def api_dicom_image_display(request, image_id):
                 'default_window_level': 40.0,
                 'modality': image.series.modality if hasattr(image.series, 'modality') else '',
                 'series_description': getattr(image.series, 'series_description', ''),
-                'patient_name': getattr(image.series.study.patient, 'full_name', '') if hasattr(image.series.study, 'patient') else '',
-                'study_date': str(getattr(image.series.study, 'study_date', '')),
+                'patient_name': getattr(image.series.study.patient, 'full_name', '') if image.series and image.series.study and hasattr(image.series.study, 'patient') else '',
+                'study_date': str(getattr(image.series.study, 'study_date', '')) if image.series and image.series.study else '',
                 'bits_allocated': 16,
                 'bits_stored': 16,
                 'photometric_interpretation': ''
@@ -1442,8 +1445,11 @@ def api_hounsfield_units(request):
                 user = request.user
                 
                 # Check permissions
-                if user.is_facility_user() and getattr(user, 'facility', None) and dicom_image.series.study.facility != user.facility:
-                    return JsonResponse({'error': 'Permission denied'}, status=403)
+                if user.is_facility_user() and getattr(user, 'facility', None):
+                    if (not dicom_image.series or not dicom_image.series.study or 
+                        not dicom_image.series.study.facility or 
+                        dicom_image.series.study.facility != user.facility):
+                        return JsonResponse({'error': 'Permission denied'}, status=403)
                 
                 # Load DICOM file and calculate actual HU value
                 dicom_path = os.path.join(settings.MEDIA_ROOT, str(dicom_image.file_path))
@@ -1497,8 +1503,11 @@ def api_auto_window(request, image_id):
             user = request.user
             
             # Check permissions
-            if user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
-                return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+            if user.is_facility_user() and getattr(user, 'facility', None):
+                if (not image.series or not image.series.study or 
+                    not image.series.study.facility or 
+                    image.series.study.facility != user.facility):
+                    return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
             
             # Load DICOM file and analyze
             dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
@@ -2885,8 +2894,11 @@ def web_series_images(request, series_id):
 @login_required
 def web_dicom_image(request, image_id):
     image = get_object_or_404(DicomImage, id=image_id)
-    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and image.series.study.facility != request.user.facility:
-        return HttpResponse(status=403)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None):
+        if (not image.series or not image.series.study or 
+            not image.series.study.facility or 
+            image.series.study.facility != request.user.facility):
+            return HttpResponse(status=403)
     window_width = float(request.GET.get('ww', 400))
     window_level = float(request.GET.get('wl', 40))
     inv_param = request.GET.get('invert')
@@ -2977,8 +2989,11 @@ def web_save_measurement(request):
         unit = data.get('unit', 'mm')
         notes = data.get('notes', '')
         image = get_object_or_404(DicomImage, id=image_id)
-        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
-            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user():
+            if (not image.series or not image.series.study or 
+                not image.series.study.facility or 
+                image.series.study.facility != request.user.facility):
+                return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         measurement = Measurement.objects.create(
             user=request.user,
             image=image,
@@ -3006,8 +3021,11 @@ def web_save_annotation(request):
         text = data.get('text')
         color = data.get('color', '#FFFF00')
         image = get_object_or_404(DicomImage, id=image_id)
-        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
-            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user():
+            if (not image.series or not image.series.study or 
+                not image.series.study.facility or 
+                image.series.study.facility != request.user.facility):
+                return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         annotation = Annotation.objects.create(
             user=request.user,
             image=image,
@@ -3024,8 +3042,11 @@ def web_save_annotation(request):
 @login_required
 def web_get_measurements(request, image_id):
     image = get_object_or_404(DicomImage, id=image_id)
-    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
-        return JsonResponse({'measurements': []})
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user():
+        if (not image.series or not image.series.study or 
+            not image.series.study.facility or 
+            image.series.study.facility != request.user.facility):
+            return JsonResponse({'measurements': []})
     measurements = Measurement.objects.filter(image=image, user=request.user)
     data = [{
         'id': m.id,
@@ -3042,8 +3063,11 @@ def web_get_measurements(request, image_id):
 @login_required
 def web_get_annotations(request, image_id):
     image = get_object_or_404(DicomImage, id=image_id)
-    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
-        return JsonResponse({'annotations': []})
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user():
+        if (not image.series or not image.series.study or 
+            not image.series.study.facility or 
+            image.series.study.facility != request.user.facility):
+            return JsonResponse({'annotations': []})
     annotations = Annotation.objects.filter(image=image, user=request.user)
     data = [{
         'id': a.id,
@@ -3241,8 +3265,11 @@ def api_hu_value(request):
             x = int(float(request.GET.get('x')))
             y = int(float(request.GET.get('y')))
             image = get_object_or_404(DicomImage, id=image_id)
-            if user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
-                return JsonResponse({'error': 'Permission denied'}, status=403)
+            if user.is_facility_user() and getattr(user, 'facility', None):
+                if (not image.series or not image.series.study or 
+                    not image.series.study.facility or 
+                    image.series.study.facility != user.facility):
+                    return JsonResponse({'error': 'Permission denied'}, status=403)
             dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
             ds = pydicom.dcmread(dicom_path)
             arr = ds.pixel_array.astype(np.float32)
