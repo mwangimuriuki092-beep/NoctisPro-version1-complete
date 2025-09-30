@@ -451,11 +451,15 @@ class MasterpieceVolumeBuilder:
             'modality': self.series.modality,
             'rows': first_image.file_path.name if first_image else None,
             'columns': first_image.file_path.name if first_image else None,
-            'study_date': self.series.study.study_date.isoformat() if self.series.study.study_date else None,
+            'study_date': (self.series.study.study_date.isoformat() 
+                         if self.series.study and self.series.study.study_date else None),
             'patient_info': {
-                'name': self.series.study.patient.full_name if self.series.study.patient else None,
-                'id': self.series.study.patient.patient_id if self.series.study.patient else None,
-                'age': self.series.study.patient.date_of_birth if self.series.study.patient else None
+                'name': (self.series.study.patient.full_name 
+                        if self.series.study and self.series.study.patient else None),
+                'id': (self.series.study.patient.patient_id 
+                      if self.series.study and self.series.study.patient else None),
+                'age': (self.series.study.patient.date_of_birth 
+                       if self.series.study and self.series.study.patient else None)
             }
         }
         

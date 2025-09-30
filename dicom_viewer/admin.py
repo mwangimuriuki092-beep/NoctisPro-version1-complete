@@ -84,8 +84,8 @@ class MeasurementAdmin(admin.ModelAdmin):
     def image_info(self, obj):
         return format_html(
             '<strong>Series {}</strong><br><small>{}</small>',
-            obj.image.series.series_number,
-            obj.image.series.study.accession_number
+            obj.image.series.series_number if obj.image.series else 'Unknown',
+            obj.image.series.study.accession_number if obj.image.series and obj.image.series.study else 'Unknown'
         )
     image_info.short_description = 'Image'
     
@@ -106,8 +106,8 @@ class AnnotationAdmin(admin.ModelAdmin):
     def image_info(self, obj):
         return format_html(
             '<strong>Series {}</strong><br><small>{}</small>',
-            obj.image.series.series_number,
-            obj.image.series.study.accession_number
+            obj.image.series.series_number if obj.image.series else 'Unknown',
+            obj.image.series.study.accession_number if obj.image.series and obj.image.series.study else 'Unknown'
         )
     image_info.short_description = 'Image'
     
@@ -133,8 +133,8 @@ class ReconstructionJobAdmin(admin.ModelAdmin):
     def series_info(self, obj):
         return format_html(
             '<strong>Series {}</strong><br><small>{}</small>',
-            obj.series.series_number,
-            obj.series.study.accession_number
+            obj.series.series_number if obj.series else 'Unknown',
+            obj.series.study.accession_number if obj.series and obj.series.study else 'Unknown'
         )
     series_info.short_description = 'Series'
     
