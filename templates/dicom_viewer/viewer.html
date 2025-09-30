@@ -225,9 +225,12 @@
         .dicom-canvas {
             width: 100%;
             height: 100%;
+            background: #000000;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: pixelated;
             image-rendering: -moz-crisp-edges;
+            border: 1px solid #333;
+            box-sizing: border-box;
             image-rendering: crisp-edges;
             cursor: crosshair;
             transition: transform 0.1s ease;
@@ -1068,8 +1071,8 @@
             <!-- Single Image View -->
             <div class="viewport-content" id="singleView">
                 <div class="image-container" id="imageContainer">
-                    <img class="dicom-image" id="dicomImage" alt="DICOM Image">
-                    <canvas class="dicom-canvas" id="dicomCanvas" style="display: none;"></canvas>
+                    <img class="dicom-image" id="dicomImage" alt="DICOM Image" style="display: none;">
+                    <canvas class="dicom-canvas" id="dicomCanvas"></canvas>
                     <div class="crosshair-overlay" id="crosshairOverlay" style="display: none;">
                         <div class="crosshair-line-h"></div>
                         <div class="crosshair-line-v"></div>
@@ -1397,9 +1400,9 @@
         let defaultWindowWidth = 400;
         let defaultWindowLevel = 40;
         
-        // Zoom and transformation variables - HTML file style
+        // Zoom and transformation variables - Unified for canvas rendering
         let zoom = 1.0;
-        let zoomFactor = 0.8; // Keep for backward compatibility
+        let zoomFactor = 1.0; // Main zoom variable
         let panX = 0;
         let panY = 0;
         let rotation = 0;
@@ -1467,9 +1470,35 @@
             setupKeyboardShortcuts();
             setupFileInput();
             
+            // Initialize canvas
+            const canvas = document.getElementById('dicomCanvas');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    // Set initial canvas size
+                    const container = canvas.parentElement;
+                    if (container) {
+                        const rect = container.getBoundingClientRect();
+                        canvas.width = Math.max(rect.width, 400);
+                        canvas.height = Math.max(rect.height, 400);
+                        
+                        // Clear with black background
+                        ctx.fillStyle = '#000000';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        console.log('Canvas initialized:', canvas.width, 'x', canvas.height);
+                    }
+                }
+            }
+            
             // Initialize UI state
             updateOverlayInfo();
             updateZoomInfo();
+            
+            // Add a simple test pattern to verify canvas is working
+            setTimeout(() => {
+                testCanvas();
+            }, 1000);
             
             showToast('DICOM Viewer initialized and ready', 'success');
         }
@@ -1720,14 +1749,26 @@
         }
 
         function setZoom(factor) {
-            zoomFactor = Math.max(0.25, Math.min(3.0, factor)); // Optimized zoom range: 25% to 300%
-            const zoomPercent = Math.round(zoomFactor * 100);
+            // Unify zoom variables
+            zoom = Math.max(0.25, Math.min(3.0, factor));
+            zoomFactor = zoom;
+            const zoomPercent = Math.round(zoom * 100);
             
-            document.getElementById('zoomSlider').value = zoomPercent;
-            document.getElementById('zoomValue').textContent = zoomPercent + '%';
-            document.getElementById('zoomInfo').textContent = `Zoom: ${zoomPercent}%`;
+            const zoomSlider = document.getElementById('zoomSlider');
+            const zoomValue = document.getElementById('zoomValue');
+            const zoomInfo = document.getElementById('zoomInfo');
+            if (zoomSlider) zoomSlider.value = zoomPercent;
+            if (zoomValue) zoomValue.textContent = zoomPercent + '%';
+            if (zoomInfo) zoomInfo.textContent = `Zoom: ${zoomPercent}%`;
             
-            applyTransform();
+            // Re-render canvas with new zoom
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            if (canvas && img && img.complete) {
+                renderImageToCanvas(img, canvas, currentSeries?.modality);
+            }
+            
+            console.log('Zoom set to:', zoomPercent + '%');
         }
 
         function handleZooming(deltaY) {
@@ -1739,7 +1780,15 @@
         function handlePanning(deltaX, deltaY) {
             panX += deltaX;
             panY += deltaY;
-            applyTransform();
+            
+            // Re-render canvas with new pan
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            if (canvas && img && img.complete) {
+                renderImageToCanvas(img, canvas, currentSeries?.modality);
+            }
+            
+            console.log('Pan updated:', panX, panY);
         }
 
         function applyTransform() {
@@ -1875,12 +1924,19 @@
                             canvasExists: !!canvas
                         });
                         
+                        // Robust image display with multiple fallbacks
                         if (canvas) {
+                            // First, ensure we have a visible fallback
+                            canvas.style.display = 'block';
+                            
                             try {
-                                // Always render to canvas - even if image isn't fully "complete"
+                                // Immediate render attempt
+                                renderImageToCanvas(dicomImage, canvas, currentSeries?.modality);
+                                
+                                // Delayed render to handle loading issues
                                 setTimeout(() => {
                                     renderImageToCanvas(dicomImage, canvas, currentSeries?.modality);
-                                }, 50);
+                                }, 100);
                                 
                                 // Apply modality-specific enhancements
                                 const modality = currentSeries?.modality?.toUpperCase();
@@ -1888,15 +1944,14 @@
                                     console.log('Applying X-ray enhancements');
                                     setZoom(1.0);
                                     
-                                    // Apply additional CSS enhancement for X-ray images
                                     setTimeout(() => {
                                         if (imageContainer) {
                                             imageContainer.style.filter = 'contrast(1.2) brightness(1.3)';
                                         }
-                                        if (windowPresets['chest_xray']) {
+                                        if (windowPresets && windowPresets['chest_xray']) {
                                             applyPreset('chest_xray');
                                         }
-                                    }, 100);
+                                    }, 150);
                                 } else if (modality && ['CT', 'MR', 'MRI'].includes(modality)) {
                                     console.log('Applying CT/MR enhancements');
                                     setZoom(1.0);
@@ -1905,25 +1960,44 @@
                                         if (imageContainer) {
                                             imageContainer.style.filter = 'contrast(1.1) brightness(1.2)';
                                         }
-                                    }, 100);
+                                    }, 150);
                                 }
                                 
-                                // Show canvas and hide image element
-                                dicomImage.style.display = 'none';
-                                canvas.style.display = 'block';
-                                console.log('Canvas display successful');
+                                console.log('Canvas rendering initiated');
                                 
                             } catch (canvasError) {
                                 console.error('Canvas rendering failed:', canvasError);
-                                // Fallback to image element
-                                canvas.style.display = 'none';
+                                // Emergency fallback - show image element
                                 dicomImage.style.display = 'block';
-                                console.log('Falling back to image element display');
+                                canvas.style.display = 'none';
+                                console.log('Emergency fallback to image element');
                             }
                         } else {
-                            console.error('Canvas element not found');
+                            console.error('Canvas element not found - using image element');
                             dicomImage.style.display = 'block';
                         }
+                        
+                        // Safety check - ensure something is visible after 200ms
+                        setTimeout(() => {
+                            const canvas = document.getElementById('dicomCanvas');
+                            const img = document.getElementById('dicomImage');
+                            
+                            if (canvas && canvas.style.display !== 'none') {
+                                // Canvas should be visible - check if it has content
+                                const ctx = canvas.getContext('2d');
+                                const imageData = ctx.getImageData(0, 0, 1, 1);
+                                const isEmpty = imageData.data.every(value => value === 0);
+                                
+                                if (isEmpty || canvas.width === 0 || canvas.height === 0) {
+                                    console.warn('Canvas appears empty, showing image element as fallback');
+                                    canvas.style.display = 'none';
+                                    img.style.display = 'block';
+                                }
+                            } else if (!img || img.style.display === 'none') {
+                                console.warn('No image visible, forcing image element display');
+                                if (img) img.style.display = 'block';
+                            }
+                        }, 200);
                         
                         hideLoading();
                         updateImageInfo(data.image_info);
@@ -2700,9 +2774,17 @@
             drawWidth = drawWidth * scale;
             drawHeight = drawHeight * scale;
             
-            // Center the image
-            let drawX = (displayWidth - drawWidth) / 2;
-            let drawY = (displayHeight - drawHeight) / 2;
+            // Center the image with pan offset
+            let drawX = (displayWidth - drawWidth) / 2 + panX;
+            let drawY = (displayHeight - drawHeight) / 2 + panY;
+            
+            // Apply zoom scaling
+            if (zoom !== 1.0) {
+                drawWidth *= zoom;
+                drawHeight *= zoom;
+                drawX = (displayWidth - drawWidth) / 2 + panX;
+                drawY = (displayHeight - drawHeight) / 2 + panY;
+            }
             
             // Apply enhanced modality-specific rendering settings
             if (['DX', 'CR', 'DR', 'XA', 'RF', 'MG'].includes(modality?.toUpperCase())) {
@@ -2732,12 +2814,19 @@
             }
             
             // Draw image with enhanced settings
-            ctx.drawImage(imgElement, drawX, drawY, drawWidth, drawHeight);
+            try {
+                ctx.drawImage(imgElement, drawX, drawY, drawWidth, drawHeight);
+                console.log(`Enhanced image rendered: ${drawWidth.toFixed(0)}x${drawHeight.toFixed(0)} at (${drawX.toFixed(0)},${drawY.toFixed(0)}) with ${modality || 'default'} modality`);
+            } catch (drawError) {
+                console.error('Error drawing image to canvas:', drawError);
+                // Try a simple draw without transforms
+                ctx.filter = 'none';
+                ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
+                console.log('Fallback image draw completed');
+            }
             
             // Reset filter for overlay elements
             ctx.filter = 'none';
-            
-            console.log(`Enhanced image rendered: ${drawWidth.toFixed(0)}x${drawHeight.toFixed(0)} at (${drawX.toFixed(0)},${drawY.toFixed(0)}) with ${modality || 'default'} modality`);
         }
         
         // Overlay drawing functions - HTML file style
@@ -3043,15 +3132,28 @@
         }
 
         function resetView() {
-            zoomFactor = 1.0; // Reset to normal zoom level - let canvas fix handle proper fit
+            zoom = 1.0;
+            zoomFactor = 1.0;
             panX = 0;
             panY = 0;
+            rotation = 0;
+            flipH = false;
+            flipV = false;
             
-            document.getElementById('zoomSlider').value = 100;
-            document.getElementById('zoomValue').textContent = '100%';
-            document.getElementById('zoomInfo').textContent = 'Zoom: 100%';
+            const zoomSlider = document.getElementById('zoomSlider');
+            const zoomValue = document.getElementById('zoomValue');
+            const zoomInfo = document.getElementById('zoomInfo');
+            if (zoomSlider) zoomSlider.value = 100;
+            if (zoomValue) zoomValue.textContent = '100%';
+            if (zoomInfo) zoomInfo.textContent = 'Zoom: 100%';
             
-            applyTransform();
+            // Re-render canvas with reset values
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            if (canvas && img && img.complete) {
+                renderImageToCanvas(img, canvas, currentSeries?.modality);
+            }
+            
             updateZoomInfo();
             showToast('View reset', 'success');
         }
