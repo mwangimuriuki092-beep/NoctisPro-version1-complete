@@ -1,4 +1,3 @@
-nohup: ignoring input
 2025-09-30 10:54:20,860 - dicom_receiver - INFO - [__init__:285] - DICOM Receiver initialized - AET: NOCTIS_SCP, Port: 11112, Max PDU: 16384
 2025-09-30 10:54:20,861 - dicom_receiver - INFO - [start:721] - Starting DICOM receiver on port 11112
 2025-09-30 10:54:20,893 - dicom_receiver - INFO - [setup_ae:312] - Application Entity configured successfully
