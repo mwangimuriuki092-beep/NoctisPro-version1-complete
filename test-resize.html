@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Resize Fix</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #testContainer {
+            width: 800px;
+            height: 600px;
+            border: 2px solid #333;
+            position: relative;
+            margin: 20px auto;
+            background: #f0f0f0;
+        }
+        #dicomCanvas {
+            width: 100%;
+            height: 100%;
+            background: white;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        #log {
+            margin: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            background: white;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #f5fff5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Testing Resize Fix for DICOM Viewer</h1>
+    
+    <div class="controls">
+        <button onclick="testResize()">Test Resize</button>
+        <button onclick="removeContainer()">Remove Container</button>
+        <button onclick="restoreContainer()">Restore Container</button>
+        <button onclick="triggerWindowResize()">Trigger Window Resize</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div id="testContainer">
+        <canvas id="dicomCanvas"></canvas>
+    </div>
+
+    <div id="log">
+        <div class="log-entry">Test page loaded. Click buttons to test resize functionality.</div>
+    </div>
+
+    <script src="/static/js/dicom-viewer-professional.js"></script>
+    <script>
+        let viewer;
+        let originalContainer;
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        async function initViewer() {
+            try {
+                viewer = new ProfessionalDicomViewer();
+                await viewer.init();
+                addLog('Viewer initialized successfully', 'success');
+            } catch (error) {
+                addLog(`Initialization error: ${error.message}`, 'error');
+            }
+        }
+
+        function testResize() {
+            try {
+                if (!viewer || !viewer.renderer) {
+                    addLog('Viewer not initialized', 'error');
+                    return;
+                }
+                
+                addLog('Testing handleResize...');
+                viewer.renderer.handleResize();
+                addLog('handleResize completed without errors', 'success');
+            } catch (error) {
+                addLog(`Resize error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        function removeContainer() {
+            const container = document.getElementById('testContainer');
+            if (container) {
+                originalContainer = container.parentNode.removeChild(container);
+                addLog('Container removed from DOM');
+                
+                // Try to resize after container is removed
+                setTimeout(() => {
+                    addLog('Attempting resize with removed container...');
+                    testResize();
+                }, 100);
+            }
+        }
+
+        function restoreContainer() {
+            if (originalContainer) {
+                const controls = document.querySelector('.controls');
+                controls.parentNode.insertBefore(originalContainer, controls.nextSibling);
+                addLog('Container restored to DOM', 'success');
+                
+                // Re-initialize canvas
+                setTimeout(() => {
+                    if (viewer && viewer.renderer) {
+                        viewer.renderer.canvas = document.getElementById('dicomCanvas');
+                        addLog('Canvas reference updated');
+                    }
+                }, 100);
+            }
+        }
+
+        function triggerWindowResize() {
+            addLog('Triggering window resize event...');
+            window.dispatchEvent(new Event('resize'));
+            setTimeout(() => {
+                addLog('Window resize event completed');
+            }, 100);
+        }
+
+        function clearLog() {
+            const log = document.getElementById('log');
+            log.innerHTML = '<div class="log-entry">Log cleared</div>';
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            initViewer();
+            
+            // Override console methods to capture logs
+            const originalWarn = console.warn;
+            const originalError = console.error;
+            const originalLog = console.log;
+            
+            console.warn = function(...args) {
+                originalWarn.apply(console, args);
+                addLog(`WARN: ${args.join(' ')}`, 'error');
+            };
+            
+            console.error = function(...args) {
+                originalError.apply(console, args);
+                addLog(`ERROR: ${args.join(' ')}`, 'error');
+            };
+            
+            console.log = function(...args) {
+                originalLog.apply(console, args);
+                const message = args.join(' ');
+                if (message.includes('✅')) {
+                    addLog(message, 'success');
+                } else if (!message.includes('Performance Stats')) {
+                    addLog(message);
+                }
+            };
+        });
+    </script>
+</body>
+</html>

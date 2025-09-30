@@ -867,7 +867,15 @@ class ProfessionalDicomViewer {
             if (this.currentImage && this.renderer && this.renderer.canvas) {
                 // Add a small delay to ensure DOM is stable
                 setTimeout(() => {
-                    this.renderer.handleResize();
+                    try {
+                        if (typeof this.renderer.handleResize === 'function') {
+                            this.renderer.handleResize();
+                        } else {
+                            console.warn('handleResize method not available on renderer');
+                        }
+                    } catch (error) {
+                        console.error('Error calling handleResize:', error);
+                    }
                 }, 10);
             }
         });
@@ -1417,45 +1425,56 @@ class DicomRenderer {
     }
     
     handleResize() {
-        const canvas = this.canvas;
-        if (!canvas) {
-            console.warn('Canvas not available for resize');
-            return;
-        }
+        try {
+            const canvas = this.canvas;
+            if (!canvas) {
+                console.warn('Canvas not available for resize');
+                return;
+            }
+            
+            const container = canvas.parentElement;
+            
+            // Check if container exists and has dimensions
+            if (!container) {
+                console.warn('Canvas container not available for resize');
+                return;
+            }
+            
+            // Additional safety check for container properties
+            if (typeof container.clientWidth === 'undefined' || typeof container.clientHeight === 'undefined') {
+                console.warn('Container does not have clientWidth/clientHeight properties');
+                return;
+            }
+            
+            // Ensure container is mounted in DOM and has computed dimensions
+            if (container.clientWidth === 0 || container.clientHeight === 0) {
+                console.warn('Container dimensions not available yet, using defaults');
+                const width = 800;
+                const height = 600;
+                canvas.width = width;
+                canvas.height = height;
+                return;
+            }
+            
+            // Use container dimensions if available, otherwise use default dimensions
+            const width = container.clientWidth || 800;
+            const height = container.clientHeight || 600;
         
-        const container = canvas.parentElement;
-        
-        // Check if container exists and has dimensions
-        if (!container) {
-            console.warn('Canvas container not available for resize');
-            return;
-        }
-        
-        // Ensure container is mounted in DOM and has computed dimensions
-        if (container.clientWidth === 0 || container.clientHeight === 0) {
-            console.warn('Container dimensions not available yet, using defaults');
-            const width = 800;
-            const height = 600;
             canvas.width = width;
             canvas.height = height;
-            return;
-        }
-        
-        // Use container dimensions if available, otherwise use default dimensions
-        const width = container.clientWidth || 800;
-        const height = container.clientHeight || 600;
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        console.log(`Canvas resized to: ${width}x${height}`);
-        
-        // Re-render current image if available
-        if (window.professionalViewer && window.professionalViewer.currentImage) {
-            window.professionalViewer.renderer.renderImage(
-                window.professionalViewer.currentImage,
-                window.professionalViewer.viewport
-            );
+            
+            console.log(`Canvas resized to: ${width}x${height}`);
+            
+            // Re-render current image if available
+            if (window.professionalViewer && window.professionalViewer.currentImage) {
+                window.professionalViewer.renderer.renderImage(
+                    window.professionalViewer.currentImage,
+                    window.professionalViewer.viewport
+                );
+            }
+        } catch (error) {
+            console.error('Error in handleResize:', error);
+            console.error('Error stack:', error.stack);
         }
     }
 }
