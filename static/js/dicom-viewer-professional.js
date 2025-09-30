@@ -864,7 +864,7 @@ class ProfessionalDicomViewer {
     setupResponsiveDesign() {
         // Handle window resize
         window.addEventListener('resize', () => {
-            if (this.currentImage) {
+            if (this.currentImage && this.renderer) {
                 this.renderer.handleResize();
             }
         });
@@ -1405,10 +1405,27 @@ class DicomRenderer {
     
     handleResize() {
         const canvas = this.canvas;
+        if (!canvas) {
+            console.warn('Canvas not available for resize');
+            return;
+        }
+        
         const container = canvas.parentElement;
         
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
+        // Check if container exists and has dimensions
+        if (!container) {
+            console.warn('Canvas container not available for resize');
+            return;
+        }
+        
+        // Use container dimensions if available, otherwise use default dimensions
+        const width = container.clientWidth || 800;
+        const height = container.clientHeight || 600;
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        console.log(`Canvas resized to: ${width}x${height}`);
         
         // Re-render current image if available
         if (window.professionalViewer && window.professionalViewer.currentImage) {
