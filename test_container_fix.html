@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Container Fix Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+        }
+        .test-container {
+            width: 800px;
+            height: 600px;
+            border: 1px solid #333;
+            position: relative;
+            margin: 20px auto;
+        }
+        canvas {
+            border: 1px solid #555;
+            background-color: #000;
+        }
+        .log {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏥 Container Fix Test</h1>
+    <p>This test verifies that container null errors are properly handled.</p>
+    
+    <div class="test-container" id="testContainer">
+        <canvas id="testCanvas" width="800" height="600"></canvas>
+    </div>
+    
+    <div>
+        <button onclick="testWithContainer()">Test With Container</button>
+        <button onclick="testWithoutContainer()">Test Without Container (Orphaned Canvas)</button>
+        <button onclick="testResize()">Test Resize</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div class="log" id="log"></div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Simulate the container access pattern from the DICOM viewer
+        function testContainerAccess(canvas) {
+            try {
+                log('Testing container access...');
+                
+                // Get container dimensions (the pattern that was causing the error)
+                const container = canvas.parentElement;
+                let displayWidth = 400;
+                let displayHeight = 400;
+                
+                if (container) {
+                    log('✅ Container found: ' + container.tagName);
+                    const rect = container.getBoundingClientRect();
+                    displayWidth = Math.max(rect.width, 400);
+                    displayHeight = Math.max(rect.height, 400);
+                    log(`✅ Container dimensions: ${displayWidth}x${displayHeight}`);
+                } else {
+                    log('⚠️ Canvas container not available, using default dimensions');
+                }
+                
+                // Set canvas size to container size
+                canvas.width = displayWidth;
+                canvas.height = displayHeight;
+                canvas.style.width = displayWidth + 'px';
+                canvas.style.height = displayHeight + 'px';
+                
+                log(`✅ Canvas resized to: ${displayWidth}x${displayHeight}`);
+                
+                // Draw something to verify it works
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(0, 0, displayWidth, displayHeight);
+                    ctx.fillStyle = '#0f0';
+                    ctx.fillRect(10, 10, 100, 50);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '16px Arial';
+                    ctx.fillText('Test Success!', 20, 35);
+                    log('✅ Canvas drawing completed');
+                }
+                
+                return true;
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+                return false;
+            }
+        }
+
+        function testWithContainer() {
+            log('=== Testing with container ===');
+            const canvas = document.getElementById('testCanvas');
+            testContainerAccess(canvas);
+        }
+
+        function testWithoutContainer() {
+            log('=== Testing without container (orphaned canvas) ===');
+            const canvas = document.createElement('canvas');
+            canvas.id = 'orphanedCanvas';
+            testContainerAccess(canvas);
+        }
+
+        function testResize() {
+            log('=== Testing resize functionality ===');
+            const canvas = document.getElementById('testCanvas');
+            
+            // Simulate the handleResize function from the DICOM viewer
+            try {
+                if (!canvas) {
+                    log('❌ Canvas not available for resize');
+                    return;
+                }
+                
+                const container = canvas.parentElement;
+                
+                // Check if container exists and has dimensions
+                if (!container) {
+                    log('⚠️ Canvas container not available for resize');
+                    return;
+                }
+                
+                // Ensure container is mounted in DOM and has computed dimensions
+                if (container.clientWidth === 0 || container.clientHeight === 0) {
+                    log('⚠️ Container dimensions not available yet, using defaults');
+                    const width = 800;
+                    const height = 600;
+                    canvas.width = width;
+                    canvas.height = height;
+                    return;
+                }
+                
+                // Use container dimensions if available, otherwise use default dimensions
+                const width = container.clientWidth || 800;
+                const height = container.clientHeight || 600;
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                log(`✅ Resize successful: ${width}x${height}`);
+                
+                // Redraw
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.fillStyle = '#00f';
+                    ctx.fillRect(10, 10, 100, 50);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '16px Arial';
+                    ctx.fillText('Resize Test!', 20, 35);
+                }
+                
+            } catch (error) {
+                log(`❌ Resize error: ${error.message}`);
+            }
+        }
+
+        // Initialize
+        log('🏥 Container Fix Test initialized');
+        log('Click buttons above to test different scenarios');
+        
+        // Auto-test on load
+        setTimeout(() => {
+            testWithContainer();
+        }, 1000);
+    </script>
+</body>
+</html>
