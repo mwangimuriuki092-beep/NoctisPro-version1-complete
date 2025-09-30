@@ -1367,101 +1367,119 @@
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            initializeViewer();
-            setupEventListeners();
-            
-            // Initialize measurement system
-            canvas = document.getElementById('dicomCanvas');
-            if (canvas) {
-                measurementSystem = new DICOMMeasurements(canvas);
-                window.measurementSystem = measurementSystem; // Make it globally accessible
-            }
-            
-            // Auto-hide disabled by default; user can manually toggle UI
-            
-            // Check if study ID is provided in URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const studyId = urlParams.get('study');
-            
-            if (studyId) {
-                // Load specific study
-                loadSpecificStudy(studyId);
-            } else {
-                // Load all studies for selection
-                loadStudies();
-            }
+            // Initialize viewer first, then setup event listeners after canvas is ready
+            initializeViewer().then(() => {
+                setupEventListeners();
+                
+                // Initialize measurement system
+                canvas = document.getElementById('dicomCanvas');
+                if (canvas) {
+                    measurementSystem = new DICOMMeasurements(canvas);
+                    window.measurementSystem = measurementSystem; // Make it globally accessible
+                }
+                
+                // Auto-hide disabled by default; user can manually toggle UI
+                
+                // Check if study ID is provided in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const studyId = urlParams.get('study');
+                
+                if (studyId) {
+                    // Load specific study
+                    loadSpecificStudy(studyId);
+                } else {
+                    // Load all studies for selection
+                    loadStudies();
+                }
+            }).catch(error => {
+                console.error('❌ Failed to initialize viewer:', error);
+                showToast('Failed to initialize DICOM viewer', 'error');
+            });
         });
 
         function initializeViewer() {
-            // Wait for a short delay to ensure DOM is fully ready
-            setTimeout(() => {
-                canvas = document.getElementById('dicomCanvas');
-                if (!canvas) {
-                    console.error('Canvas element not found');
-                    // Try to create canvas if it doesn't exist
-                    const viewport = document.querySelector('.canvas-container');
-                    if (viewport) {
-                        canvas = document.createElement('canvas');
-                        canvas.id = 'dicomCanvas';
-                        canvas.style.width = '100%';
-                        canvas.style.height = '100%';
-                        canvas.style.background = '#000';
-                        canvas.style.cursor = 'crosshair';
-                        viewport.appendChild(canvas);
-                        console.log('✅ Created missing canvas element');
-                    } else {
-                        console.error('❌ Cannot create canvas - viewport not found');
-                        return;
+            return new Promise((resolve, reject) => {
+                // Wait for a short delay to ensure DOM is fully ready
+                setTimeout(() => {
+                    try {
+                        canvas = document.getElementById('dicomCanvas');
+                        if (!canvas) {
+                            console.warn('Canvas element not found, attempting to create...');
+                            // Try to create canvas if it doesn't exist
+                            const viewport = document.querySelector('.canvas-container');
+                            if (viewport) {
+                                canvas = document.createElement('canvas');
+                                canvas.id = 'dicomCanvas';
+                                canvas.style.width = '100%';
+                                canvas.style.height = '100%';
+                                canvas.style.background = '#000';
+                                canvas.style.cursor = 'crosshair';
+                                viewport.appendChild(canvas);
+                                console.log('✅ Created missing canvas element');
+                            } else {
+                                console.error('❌ Cannot create canvas - viewport not found');
+                                reject(new Error('Canvas container not found'));
+                                return;
+                            }
+                        }
+                        
+                        // Ensure canvas has proper dimensions before getting context
+                        if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+                            canvas.width = 800;
+                            canvas.height = 600;
+                        } else {
+                            canvas.width = canvas.clientWidth;
+                            canvas.height = canvas.clientHeight;
+                }
+                
+                        ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                            console.error('Canvas context not available - trying alternative approach');
+                            // Force canvas recreation
+                            const parent = canvas.parentNode;
+                            const newCanvas = document.createElement('canvas');
+                            newCanvas.id = 'dicomCanvas';
+                            newCanvas.width = canvas.width;
+                            newCanvas.height = canvas.height;
+                            newCanvas.style.cssText = canvas.style.cssText;
+                            parent.replaceChild(newCanvas, canvas);
+                            canvas = newCanvas;
+                            ctx = canvas.getContext('2d');
+                            
+                            if (!ctx) {
+                                console.error('❌ Still cannot get canvas context after recreation');
+                                reject(new Error('Failed to get canvas context'));
+                                return;
+                            }
+                            console.log('✅ Canvas context obtained after recreation');
+                        }
+                        
+                        console.log('✅ Canvas context initialized successfully');
+                        
+                        // Disable image smoothing for crisp medical images
+                        if (ctx) {
+                            ctx.imageSmoothingEnabled = false;
+                            ctx.mozImageSmoothingEnabled = false;
+                            ctx.webkitImageSmoothingEnabled = false;
+                            ctx.msImageSmoothingEnabled = false;
+                        }
+                        
+                        // Set canvas size
+                        resizeCanvas();
+                        window.addEventListener('resize', resizeCanvas);
+                        
+                        // Initialize MPR canvases after main canvas is ready
+                        initializeMPRCanvases();
+                        
+                        // Resolve the promise to indicate successful initialization
+                        resolve();
+                        
+                    } catch (error) {
+                        console.error('❌ Error during viewer initialization:', error);
+                        reject(error);
                     }
-                }
-                
-                // Ensure canvas has proper dimensions before getting context
-                if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
-                    canvas.width = 800;
-                    canvas.height = 600;
-                } else {
-                    canvas.width = canvas.clientWidth;
-                    canvas.height = canvas.clientHeight;
-                }
-                
-                ctx = canvas.getContext('2d');
-                if (!ctx) {
-                    console.error('Canvas context not available - trying alternative approach');
-                    // Force canvas recreation
-                    const parent = canvas.parentNode;
-                    const newCanvas = document.createElement('canvas');
-                    newCanvas.id = 'dicomCanvas';
-                    newCanvas.width = canvas.width;
-                    newCanvas.height = canvas.height;
-                    newCanvas.style.cssText = canvas.style.cssText;
-                    parent.replaceChild(newCanvas, canvas);
-                    canvas = newCanvas;
-                    ctx = canvas.getContext('2d');
-                    
-                    if (!ctx) {
-                        console.error('❌ Still cannot get canvas context after recreation');
-                        return;
-                    }
-                    console.log('✅ Canvas context obtained after recreation');
-                }
-                
-                console.log('✅ Canvas context initialized successfully');
-                
-                // Disable image smoothing for crisp medical images
-                if (ctx) {
-                    ctx.imageSmoothingEnabled = false;
-                    ctx.mozImageSmoothingEnabled = false;
-                    ctx.webkitImageSmoothingEnabled = false;
-                    ctx.msImageSmoothingEnabled = false;
-                }
-                
-                // Set canvas size
-                resizeCanvas();
-                window.addEventListener('resize', resizeCanvas);
-                
-                // Initialize MPR canvases after main canvas is ready
-                initializeMPRCanvases();
-            }, 100);
+                }, 100);
+            });
         }
         
         function initializeMPRCanvases() {
@@ -1559,12 +1577,29 @@
                 });
             });
 
-            // Canvas mouse events
-            canvas.addEventListener('mousedown', handleMouseDown);
-            canvas.addEventListener('mousemove', handleMouseMove);
-            canvas.addEventListener('mouseup', handleMouseUp);
-            canvas.addEventListener('wheel', handleWheel);
-            canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent default right-click menu
+            // Canvas mouse events - ensure canvas exists before adding listeners
+            if (canvas) {
+                canvas.addEventListener('mousedown', handleMouseDown);
+                canvas.addEventListener('mousemove', handleMouseMove);
+                canvas.addEventListener('mouseup', handleMouseUp);
+                canvas.addEventListener('wheel', handleWheel);
+                canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent default right-click menu
+                console.log('✅ Canvas event listeners attached successfully');
+            } else {
+                console.error('❌ Cannot setup canvas event listeners - canvas is undefined');
+                // Try to get canvas again as fallback
+                canvas = document.getElementById('dicomCanvas');
+                if (canvas) {
+                    canvas.addEventListener('mousedown', handleMouseDown);
+                    canvas.addEventListener('mousemove', handleMouseMove);
+                    canvas.addEventListener('mouseup', handleMouseUp);
+                    canvas.addEventListener('wheel', handleWheel);
+                    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+                    console.log('✅ Canvas event listeners attached on retry');
+                } else {
+                    console.error('❌ Still cannot find canvas element for event listeners');
+                }
+            }
 
             // Keyboard shortcuts
             document.addEventListener('keydown', handleKeyDown);
@@ -1711,10 +1746,22 @@
 
         async function loadSpecificStudy(studyId) {
             try {
+                console.log('🏥 Loading specific study:', studyId);
                 showLoading(true);
                 // Load the specific study
                 const response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
+                console.log('📡 Study API response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+                console.log('📊 Study data received:', {
+                    hasStudy: !!data.study,
+                    seriesCount: data.series ? data.series.length : 0,
+                    studyData: data.study
+                });
                 
                 if (data && data.study && Array.isArray(data.series)) {
                     currentStudy = data.study;
@@ -1725,18 +1772,22 @@
                     
                     // Auto-load first series
                     if (data.series.length > 0) {
+                        console.log('🔄 Auto-loading first series:', data.series[0].id);
                         await loadSeries(data.series[0].id);
+                    } else {
+                        console.warn('⚠️ No series found in study');
                     }
                     
                     showToast(`Loaded study: ${currentStudy.patient_name}`, 'success');
                 } else {
-                    showToast('Failed to load study', 'error');
+                    console.error('❌ Invalid study data structure:', data);
+                    showToast('Failed to load study - invalid data', 'error');
                 }
                 
                 showLoading(false);
             } catch (error) {
-                console.error('Error loading specific study:', error);
-                showToast('Failed to load study', 'error');
+                console.error('❌ Error loading specific study:', error);
+                showToast(`Failed to load study: ${error.message}`, 'error');
                 showLoading(false);
             }
         }
@@ -1774,9 +1825,21 @@
 
         async function loadSeries(seriesId) {
             try {
+                console.log('📋 Loading series:', seriesId);
                 showLoading(true);
                 const response = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
+                console.log('📡 Series API response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+                console.log('📊 Series data received:', {
+                    hasSeries: !!data.series,
+                    imageCount: data.images ? data.images.length : 0,
+                    seriesData: data.series
+                });
                 
                 currentSeries = data.series;
                 imageData = data.images;
@@ -1787,13 +1850,20 @@
                 document.getElementById('totalSlices').textContent = imageData.length;
                 
                 updateImageInfo(currentSeries);
-                await loadCurrentImage();
+                
+                if (imageData.length > 0) {
+                    console.log('🖼️ Loading first image...');
+                    await loadCurrentImage();
+                } else {
+                    console.warn('⚠️ No images found in series');
+                    showToast('No images found in this series', 'warning');
+                }
                 
                 showLoading(false);
                 showToast(`Loaded ${imageData.length} images`, 'success');
             } catch (error) {
-                console.error('Error loading series:', error);
-                showToast('Failed to load series', 'error');
+                console.error('❌ Error loading series:', error);
+                showToast(`Failed to load series: ${error.message}`, 'error');
                 showLoading(false);
             }
         }
@@ -1842,7 +1912,21 @@
         }
 
         function renderDicomImage(imageData) {
-            if (!imageData.pixel_data || !ctx) return;
+            if (!imageData.pixel_data || !ctx) {
+                console.error('❌ Cannot render image:', {
+                    hasPixelData: !!imageData.pixel_data,
+                    hasContext: !!ctx,
+                    canvasExists: !!canvas
+                });
+                return;
+            }
+            
+            console.log('🎨 Rendering DICOM image:', {
+                columns: imageData.columns,
+                rows: imageData.rows,
+                pixelDataLength: imageData.pixel_data.length,
+                canvasSize: `${canvas.width}x${canvas.height}`
+            });
             
             // Create ImageData from pixel array
             const pixels = new Uint8ClampedArray(imageData.pixel_data.length * 4);
@@ -2683,8 +2767,15 @@
         }
 
         function updatePatientInfo(study) {
-            document.getElementById('patientInfo').textContent = 
-                `Patient: ${study.patient_name} | Study Date: ${study.study_date} | Modality: ${study.modality}`;
+            console.log('📋 Updating patient info:', study);
+            const patientInfoElement = document.getElementById('patientInfo');
+            if (patientInfoElement) {
+                patientInfoElement.textContent = 
+                    `Patient: ${study.patient_name} | Study Date: ${study.study_date} | Modality: ${study.modality}`;
+                console.log('✅ Patient info updated successfully');
+            } else {
+                console.error('❌ Patient info element not found');
+            }
         }
 
         function updateImageInfo(series) {
