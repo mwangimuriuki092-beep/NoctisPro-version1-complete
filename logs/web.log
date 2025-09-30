@@ -4,3 +4,15 @@ nohup: ignoring input
 [2025-09-30 10:54:12 +0000] [4652] [INFO] Using worker: sync
 [2025-09-30 10:54:12 +0000] [4656] [INFO] Booting worker with pid: 4656
 [2025-09-30 10:54:12 +0000] [4657] [INFO] Booting worker with pid: 4657
+[2025-09-30 11:07:08 +0000] [4652] [INFO] Handling signal: hup
+[2025-09-30 11:07:08 +0000] [4652] [INFO] Hang up: Master
+[2025-09-30 11:07:09 +0000] [8547] [INFO] Booting worker with pid: 8547
+[2025-09-30 11:07:09 +0000] [8546] [INFO] Booting worker with pid: 8546
+[2025-09-30 11:07:09 +0000] [4652] [ERROR] Worker (pid:4657) was sent SIGHUP!
+[2025-09-30 11:07:09 +0000] [4652] [ERROR] Worker (pid:4656) was sent SIGHUP!
+[2025-09-30 11:09:18 +0000] [4652] [INFO] Handling signal: hup
+[2025-09-30 11:09:18 +0000] [4652] [INFO] Hang up: Master
+[2025-09-30 11:09:18 +0000] [9269] [INFO] Booting worker with pid: 9269
+[2025-09-30 11:09:18 +0000] [9270] [INFO] Booting worker with pid: 9270
+[2025-09-30 11:09:18 +0000] [4652] [ERROR] Worker (pid:8546) was sent SIGHUP!
+[2025-09-30 11:09:18 +0000] [4652] [ERROR] Worker (pid:8547) was sent SIGHUP!

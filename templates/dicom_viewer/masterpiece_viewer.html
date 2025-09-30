@@ -1384,11 +1384,15 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const studyId = urlParams.get('study');
                 
+                console.log('🚀 Viewer initialized. Study ID from URL:', studyId);
+                
                 if (studyId) {
                     // Load specific study
+                    console.log('📋 Loading specific study:', studyId);
                     loadSpecificStudy(studyId);
                 } else {
                     // Load all studies for selection
+                    console.log('📋 Loading all studies for selection');
                     loadStudies();
                 }
             }).catch(error => {
@@ -1878,30 +1882,38 @@
                 const imageId = imageData[currentImageIndex].id;
                 console.log('Loading image ID:', imageId);
                 
-                const response = await fetch(`/dicom-viewer/api/image/${imageId}/data/`);
+                // Use the professional endpoint that returns base64 image
+                const response = await fetch(`/dicom-viewer/api/image/${imageId}/data/professional/`);
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
                 const data = await response.json();
                 console.log('Image data received:', {
-                    hasPixelData: !!data.pixel_data,
-                    columns: data.columns,
-                    rows: data.rows,
-                    pixelDataLength: data.pixel_data ? data.pixel_data.length : 0
+                    hasDataUrl: !!data.dataUrl,
+                    hasUrl: !!data.url,
+                    width: data.width,
+                    height: data.height,
+                    modality: data.modality
                 });
                 
-                if (!data.pixel_data) {
-                    showToast('No pixel data available for this image', 'warning');
+                if (!data.dataUrl && !data.url) {
+                    showToast('No image data available', 'warning');
                     return;
                 }
                 
                 // Update window/level from DICOM data
-                windowWidth = data.window_width || windowWidth;
-                windowLevel = data.window_center || windowLevel;
+                if (data.window_width) windowWidth = data.window_width;
+                if (data.window_center) windowLevel = data.window_center;
                 
                 updateSliders();
-                renderDicomImage(data);
+                
+                // Display the image
+                if (data.dataUrl) {
+                    displayBase64Image(data.dataUrl, data.width, data.height);
+                } else if (data.url) {
+                    displayImageFromUrl(data.url, data.width, data.height);
+                }
                 
                 showToast(`Image ${currentImageIndex + 1} loaded`, 'success');
                 
@@ -1911,6 +1923,66 @@
             }
         }
 
+        function displayBase64Image(dataUrl, width, height) {
+            if (!canvas || !ctx) {
+                console.error('Canvas or context not available');
+                return;
+            }
+            
+            const img = new Image();
+            img.onload = function() {
+                // Set canvas dimensions to match image
+                canvas.width = width || img.width;
+                canvas.height = height || img.height;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw the image
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                console.log('✅ Image displayed successfully');
+            };
+            
+            img.onerror = function() {
+                console.error('Failed to load image from data URL');
+                showToast('Failed to display image', 'error');
+            };
+            
+            img.src = dataUrl;
+        }
+        
+        function displayImageFromUrl(url, width, height) {
+            if (!canvas || !ctx) {
+                console.error('Canvas or context not available');
+                return;
+            }
+            
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = function() {
+                // Set canvas dimensions to match image
+                canvas.width = width || img.width;
+                canvas.height = height || img.height;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw the image
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                console.log('✅ Image displayed successfully from URL');
+            };
+            
+            img.onerror = function() {
+                console.error('Failed to load image from URL:', url);
+                showToast('Failed to display image', 'error');
+            };
+            
+            img.src = url;
+        }
+        
         function renderDicomImage(imageData) {
             if (!imageData.pixel_data || !ctx) {
                 console.error('❌ Cannot render image:', {
