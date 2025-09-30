@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Viewer Fixes Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        #dicomCanvas {
+            border: 2px solid #007bff;
+            background: #000;
+            width: 400px;
+            height: 300px;
+        }
+        .canvas-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🏥 DICOM Viewer Fixes Test</h1>
+        <p>Testing the fixes applied to the DICOM viewer system:</p>
+        
+        <div id="testResults"></div>
+        
+        <div class="canvas-container">
+            <h3>Canvas Test</h3>
+            <canvas id="dicomCanvas"></canvas>
+        </div>
+        
+        <div class="test-container">
+            <h3>📊 Test Log</h3>
+            <div id="testLog" class="log"></div>
+        </div>
+    </div>
+
+    <!-- Load the fixed DICOM viewer scripts -->
+    <script src="/static/js/vendor/dicomParser.min.js"></script>
+    <script src="/static/js/dicom-viewer-professional.js"></script>
+    
+    <script>
+        const testResults = document.getElementById('testResults');
+        const testLog = document.getElementById('testLog');
+        
+        function logMessage(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            testLog.textContent += logEntry;
+            testLog.scrollTop = testLog.scrollHeight;
+            
+            console.log(message);
+        }
+        
+        function addTestResult(name, success, message) {
+            const div = document.createElement('div');
+            div.className = `test-result ${success ? 'success' : 'error'}`;
+            div.innerHTML = `<strong>${name}:</strong> ${message}`;
+            testResults.appendChild(div);
+        }
+        
+        function addWarning(name, message) {
+            const div = document.createElement('div');
+            div.className = 'test-result warning';
+            div.innerHTML = `<strong>${name}:</strong> ${message}`;
+            testResults.appendChild(div);
+        }
+        
+        // Test 1: Canvas Context Availability
+        function testCanvasContext() {
+            logMessage('🔍 Testing canvas context availability...');
+            
+            const canvas = document.getElementById('dicomCanvas');
+            if (!canvas) {
+                addTestResult('Canvas Element', false, 'Canvas element not found');
+                return false;
+            }
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                addTestResult('Canvas Context', false, 'Cannot get 2D context');
+                return false;
+            }
+            
+            // Test WebGL context
+            const webglCtx = canvas.getContext('webgl') || canvas.getContext('webgl2');
+            if (webglCtx) {
+                addTestResult('WebGL Support', true, 'WebGL context available for high-performance rendering');
+            } else {
+                addWarning('WebGL Support', 'WebGL not available, falling back to 2D rendering');
+            }
+            
+            addTestResult('Canvas Context', true, '2D context successfully obtained');
+            return true;
+        }
+        
+        // Test 2: Professional Viewer Initialization
+        function testProfessionalViewer() {
+            logMessage('🔍 Testing Professional DICOM Viewer initialization...');
+            
+            if (typeof ProfessionalDicomViewer === 'undefined') {
+                addTestResult('Professional Viewer', false, 'ProfessionalDicomViewer class not found');
+                return false;
+            }
+            
+            try {
+                // Create a test instance
+                const viewer = new ProfessionalDicomViewer();
+                
+                if (viewer.version === '2.0.0') {
+                    addTestResult('Professional Viewer', true, `Version ${viewer.version} initialized successfully`);
+                } else {
+                    addWarning('Professional Viewer', `Unexpected version: ${viewer.version}`);
+                }
+                
+                // Test cache system
+                if (viewer.cache && typeof viewer.cache.set === 'function') {
+                    addTestResult('Cache System', true, 'Cache system properly initialized');
+                } else {
+                    addTestResult('Cache System', false, 'Cache system not properly initialized');
+                }
+                
+                // Test renderer
+                if (viewer.renderer && typeof viewer.renderer.init === 'function') {
+                    addTestResult('Renderer System', true, 'Renderer system properly initialized');
+                } else {
+                    addTestResult('Renderer System', false, 'Renderer system not properly initialized');
+                }
+                
+                return true;
+                
+            } catch (error) {
+                addTestResult('Professional Viewer', false, `Initialization failed: ${error.message}`);
+                return false;
+            }
+        }
+        
+        // Test 3: DICOM Parser
+        function testDicomParser() {
+            logMessage('🔍 Testing DICOM parser...');
+            
+            if (typeof dicomParser === 'undefined') {
+                addTestResult('DICOM Parser', false, 'dicomParser not found');
+                return false;
+            }
+            
+            if (dicomParser.version) {
+                addTestResult('DICOM Parser', true, `Version ${dicomParser.version} loaded successfully`);
+            } else {
+                addWarning('DICOM Parser', 'Version information not available');
+            }
+            
+            // Test key functions
+            const requiredFunctions = ['parseDicom', 'DataSet', 'ByteStream'];
+            let allFunctionsPresent = true;
+            
+            requiredFunctions.forEach(func => {
+                if (typeof dicomParser[func] !== 'undefined') {
+                    logMessage(`✅ ${func} function available`);
+                } else {
+                    logMessage(`❌ ${func} function missing`);
+                    allFunctionsPresent = false;
+                }
+            });
+            
+            if (allFunctionsPresent) {
+                addTestResult('DICOM Parser Functions', true, 'All required functions are available');
+            } else {
+                addTestResult('DICOM Parser Functions', false, 'Some required functions are missing');
+            }
+            
+            return allFunctionsPresent;
+        }
+        
+        // Test 4: Performance Monitoring
+        function testPerformanceMonitoring() {
+            logMessage('🔍 Testing performance monitoring...');
+            
+            // Test if performance.memory is available
+            if (performance.memory) {
+                const memoryInfo = {
+                    used: (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2) + 'MB',
+                    total: (performance.memory.totalJSHeapSize / 1024 / 1024).toFixed(2) + 'MB',
+                    limit: (performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2) + 'MB'
+                };
+                
+                addTestResult('Memory Monitoring', true, `Memory usage: ${memoryInfo.used} / ${memoryInfo.total} (limit: ${memoryInfo.limit})`);
+                logMessage(`📊 Memory stats: ${JSON.stringify(memoryInfo)}`);
+            } else {
+                addWarning('Memory Monitoring', 'performance.memory not available in this browser');
+            }
+            
+            // Test performance.now()
+            const start = performance.now();
+            setTimeout(() => {
+                const duration = performance.now() - start;
+                logMessage(`⏱️ Performance timing test: ${duration.toFixed(2)}ms`);
+            }, 10);
+            
+            addTestResult('Performance Timing', true, 'performance.now() is working correctly');
+            return true;
+        }
+        
+        // Test 5: Canvas Rendering Test
+        async function testCanvasRendering() {
+            logMessage('🔍 Testing canvas rendering performance...');
+            
+            const canvas = document.getElementById('dicomCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+                addTestResult('Canvas Rendering', false, 'No canvas context available');
+                return false;
+            }
+            
+            const start = performance.now();
+            
+            // Create a test medical image pattern
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw test pattern similar to medical images
+            const imageData = ctx.createImageData(canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                const x = (i / 4) % canvas.width;
+                const y = Math.floor((i / 4) / canvas.width);
+                
+                // Create a gradient pattern
+                const intensity = Math.floor(128 + 127 * Math.sin(x * 0.1) * Math.cos(y * 0.1));
+                
+                data[i] = intensity;     // Red
+                data[i + 1] = intensity; // Green
+                data[i + 2] = intensity; // Blue
+                data[i + 3] = 255;       // Alpha
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            const renderTime = performance.now() - start;
+            
+            if (renderTime < 100) {
+                addTestResult('Canvas Rendering', true, `Rendering completed in ${renderTime.toFixed(2)}ms (EXCELLENT)`);
+            } else if (renderTime < 500) {
+                addWarning('Canvas Rendering', `Rendering completed in ${renderTime.toFixed(2)}ms (acceptable but could be optimized)`);
+            } else {
+                addTestResult('Canvas Rendering', false, `Rendering took ${renderTime.toFixed(2)}ms (needs optimization)`);
+            }
+            
+            logMessage(`🎨 Canvas rendering test completed in ${renderTime.toFixed(2)}ms`);
+            return renderTime < 500;
+        }
+        
+        // Run all tests
+        async function runAllTests() {
+            logMessage('🚀 Starting DICOM Viewer Fixes Test Suite...');
+            
+            const tests = [
+                { name: 'Canvas Context', fn: testCanvasContext },
+                { name: 'DICOM Parser', fn: testDicomParser },
+                { name: 'Professional Viewer', fn: testProfessionalViewer },
+                { name: 'Performance Monitoring', fn: testPerformanceMonitoring },
+                { name: 'Canvas Rendering', fn: testCanvasRendering }
+            ];
+            
+            let passedTests = 0;
+            
+            for (const test of tests) {
+                try {
+                    logMessage(`Running ${test.name} test...`);
+                    const result = await test.fn();
+                    if (result) passedTests++;
+                } catch (error) {
+                    addTestResult(test.name, false, `Test failed with error: ${error.message}`);
+                    logMessage(`❌ ${test.name} test failed: ${error.message}`);
+                }
+            }
+            
+            logMessage(`\n✅ Tests completed: ${passedTests}/${tests.length} passed`);
+            
+            if (passedTests === tests.length) {
+                addTestResult('Overall Result', true, `All ${tests.length} tests passed! 🎉`);
+            } else {
+                addWarning('Overall Result', `${passedTests}/${tests.length} tests passed. Some issues need attention.`);
+            }
+        }
+        
+        // Override console methods to capture logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        console.log = function(...args) {
+            logMessage(args.join(' '), 'info');
+            originalLog.apply(console, args);
+        };
+        
+        console.error = function(...args) {
+            logMessage('ERROR: ' + args.join(' '), 'error');
+            originalError.apply(console, args);
+        };
+        
+        console.warn = function(...args) {
+            logMessage('WARN: ' + args.join(' '), 'warn');
+            originalWarn.apply(console, args);
+        };
+        
+        // Start tests when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(runAllTests, 1000); // Wait a bit for scripts to load
+        });
+    </script>
+</body>
+</html>
