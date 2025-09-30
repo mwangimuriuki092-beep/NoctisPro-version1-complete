@@ -1393,28 +1393,78 @@
         });
 
         function initializeViewer() {
-            canvas = document.getElementById('dicomCanvas');
-            if (!canvas) {
-                console.error('Canvas element not found');
-                return;
-            }
-            
-            ctx = canvas.getContext('2d');
-            if (!ctx) {
-                console.error('Canvas context not available');
-                return;
-            }
-            
-            // Disable image smoothing for crisp medical images
-            ctx.imageSmoothingEnabled = false;
-            ctx.mozImageSmoothingEnabled = false;
-            ctx.webkitImageSmoothingEnabled = false;
-            ctx.msImageSmoothingEnabled = false;
-            
-            // Set canvas size
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-            
+            // Wait for a short delay to ensure DOM is fully ready
+            setTimeout(() => {
+                canvas = document.getElementById('dicomCanvas');
+                if (!canvas) {
+                    console.error('Canvas element not found');
+                    // Try to create canvas if it doesn't exist
+                    const viewport = document.querySelector('.canvas-container');
+                    if (viewport) {
+                        canvas = document.createElement('canvas');
+                        canvas.id = 'dicomCanvas';
+                        canvas.style.width = '100%';
+                        canvas.style.height = '100%';
+                        canvas.style.background = '#000';
+                        canvas.style.cursor = 'crosshair';
+                        viewport.appendChild(canvas);
+                        console.log('✅ Created missing canvas element');
+                    } else {
+                        console.error('❌ Cannot create canvas - viewport not found');
+                        return;
+                    }
+                }
+                
+                // Ensure canvas has proper dimensions before getting context
+                if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+                    canvas.width = 800;
+                    canvas.height = 600;
+                } else {
+                    canvas.width = canvas.clientWidth;
+                    canvas.height = canvas.clientHeight;
+                }
+                
+                ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    console.error('Canvas context not available - trying alternative approach');
+                    // Force canvas recreation
+                    const parent = canvas.parentNode;
+                    const newCanvas = document.createElement('canvas');
+                    newCanvas.id = 'dicomCanvas';
+                    newCanvas.width = canvas.width;
+                    newCanvas.height = canvas.height;
+                    newCanvas.style.cssText = canvas.style.cssText;
+                    parent.replaceChild(newCanvas, canvas);
+                    canvas = newCanvas;
+                    ctx = canvas.getContext('2d');
+                    
+                    if (!ctx) {
+                        console.error('❌ Still cannot get canvas context after recreation');
+                        return;
+                    }
+                    console.log('✅ Canvas context obtained after recreation');
+                }
+                
+                console.log('✅ Canvas context initialized successfully');
+                
+                // Disable image smoothing for crisp medical images
+                if (ctx) {
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.mozImageSmoothingEnabled = false;
+                    ctx.webkitImageSmoothingEnabled = false;
+                    ctx.msImageSmoothingEnabled = false;
+                }
+                
+                // Set canvas size
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+                
+                // Initialize MPR canvases after main canvas is ready
+                initializeMPRCanvases();
+            }, 100);
+        }
+        
+        function initializeMPRCanvases() {
             // Initialize MPR canvases
             mprCanvases = {
                 axial: document.getElementById('axialCanvas'),

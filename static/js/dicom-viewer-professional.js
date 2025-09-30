@@ -211,23 +211,43 @@ class ProfessionalDicomViewer {
     }
     
     async preloadImages(images) {
-        // Preload next 3 and previous 1 images for smooth navigation
+        // Preload next 5 and previous 2 images for smooth navigation
         const preloadPromises = [];
         const currentIndex = this.currentImageIndex;
         
-        for (let i = Math.max(0, currentIndex - 1); i < Math.min(images.length, currentIndex + 4); i++) {
-            if (i !== currentIndex && !this.cache.has(images[i].id)) {
+        // Prioritize images closer to current position
+        const preloadRange = [
+            ...Array.from({length: 2}, (_, i) => currentIndex - i - 1).filter(i => i >= 0).reverse(),
+            ...Array.from({length: 5}, (_, i) => currentIndex + i + 1).filter(i => i < images.length)
+        ];
+        
+        for (const i of preloadRange) {
+            if (!this.cache.has(images[i].id)) {
+                this.cache.markForPreload(images[i].id);
                 preloadPromises.push(this.preloadSingleImage(images[i].id));
             }
         }
         
-        await Promise.all(preloadPromises);
+        // Stagger the preload requests to avoid overwhelming the server
+        for (let i = 0; i < preloadPromises.length; i += 3) {
+            const batch = preloadPromises.slice(i, i + 3);
+            await Promise.all(batch);
+            if (i + 3 < preloadPromises.length) {
+                await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay between batches
+            }
+        }
     }
     
     async preloadSingleImage(imageId) {
         try {
             const response = await fetch(`/dicom-viewer/api/image/${imageId}/data/professional/`);
             const imageData = await response.json();
+            
+            // Add compression hint for better memory usage
+            if (imageData.pixelData && imageData.pixelData.length > 1024 * 1024) {
+                console.log(`📦 Large image detected (${(imageData.pixelData.length / 1024 / 1024).toFixed(1)}MB), consider compression`);
+            }
+            
             this.cache.set(imageId, imageData);
         } catch (error) {
             console.warn('Failed to preload image:', imageId);
@@ -894,9 +914,29 @@ class DicomRenderer {
     }
     
     async init() {
-        this.canvas = document.getElementById('dicomCanvas');
+        // Wait for canvas to be available
+        let attempts = 0;
+        const maxAttempts = 50; // 5 seconds max
+        
+        while (attempts < maxAttempts) {
+            this.canvas = document.getElementById('dicomCanvas');
+            if (this.canvas) break;
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+        
         if (!this.canvas) {
-            throw new Error('DICOM canvas not found');
+            throw new Error('DICOM canvas not found after waiting');
+        }
+        
+        // Ensure canvas has proper dimensions
+        if (this.canvas.clientWidth === 0 || this.canvas.clientHeight === 0) {
+            this.canvas.width = 800;
+            this.canvas.height = 600;
+        } else {
+            this.canvas.width = this.canvas.clientWidth;
+            this.canvas.height = this.canvas.clientHeight;
         }
         
         // Try WebGL first for better performance
@@ -905,6 +945,7 @@ class DicomRenderer {
             if (this.context) {
                 this.webglSupported = true;
                 console.log('✅ WebGL rendering enabled');
+                this.initWebGLShaders();
             }
         } catch (e) {
             console.warn('WebGL not available, falling back to 2D');
@@ -913,12 +954,149 @@ class DicomRenderer {
         // Fallback to 2D context
         if (!this.context) {
             this.context = this.canvas.getContext('2d');
+            if (!this.context) {
+                throw new Error('Cannot get 2D canvas context');
+            }
         }
         
-        // Enable image smoothing control
+        // Enable high-quality image rendering
         if (this.context.imageSmoothingEnabled !== undefined) {
+            this.context.imageSmoothingEnabled = false; // Crisp medical images
             this.context.imageSmoothingQuality = 'high';
         }
+        
+        console.log('✅ Canvas renderer initialized successfully');
+    }
+    
+    initWebGLShaders() {
+        if (!this.webglSupported) return;
+        
+        const gl = this.context;
+        
+        // Vertex shader source
+        const vertexShaderSource = `
+            attribute vec2 a_position;
+            attribute vec2 a_texCoord;
+            varying vec2 v_texCoord;
+            void main() {
+                gl_Position = vec4(a_position, 0.0, 1.0);
+                v_texCoord = a_texCoord;
+            }
+        `;
+        
+        // Fragment shader source for medical imaging
+        const fragmentShaderSource = `
+            precision mediump float;
+            uniform sampler2D u_image;
+            uniform float u_windowWidth;
+            uniform float u_windowCenter;
+            uniform bool u_invert;
+            varying vec2 v_texCoord;
+            
+            void main() {
+                vec4 color = texture2D(u_image, v_texCoord);
+                float gray = color.r;
+                
+                // Apply windowing
+                float minValue = u_windowCenter - u_windowWidth / 2.0;
+                float maxValue = u_windowCenter + u_windowWidth / 2.0;
+                
+                float windowed;
+                if (gray <= minValue) {
+                    windowed = 0.0;
+                } else if (gray >= maxValue) {
+                    windowed = 1.0;
+                } else {
+                    windowed = (gray - minValue) / u_windowWidth;
+                }
+                
+                if (u_invert) {
+                    windowed = 1.0 - windowed;
+                }
+                
+                gl_FragColor = vec4(windowed, windowed, windowed, 1.0);
+            }
+        `;
+        
+        // Create and compile shaders
+        const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+        const fragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+        
+        // Create program
+        this.shaderProgram = gl.createProgram();
+        gl.attachShader(this.shaderProgram, vertexShader);
+        gl.attachShader(this.shaderProgram, fragmentShader);
+        gl.linkProgram(this.shaderProgram);
+        
+        if (!gl.getProgramParameter(this.shaderProgram, gl.LINK_STATUS)) {
+            console.error('WebGL program failed to link:', gl.getProgramInfoLog(this.shaderProgram));
+            this.webglSupported = false;
+            return;
+        }
+        
+        // Get attribute and uniform locations
+        this.programInfo = {
+            attribLocations: {
+                vertexPosition: gl.getAttribLocation(this.shaderProgram, 'a_position'),
+                textureCoord: gl.getAttribLocation(this.shaderProgram, 'a_texCoord'),
+            },
+            uniformLocations: {
+                image: gl.getUniformLocation(this.shaderProgram, 'u_image'),
+                windowWidth: gl.getUniformLocation(this.shaderProgram, 'u_windowWidth'),
+                windowCenter: gl.getUniformLocation(this.shaderProgram, 'u_windowCenter'),
+                invert: gl.getUniformLocation(this.shaderProgram, 'u_invert'),
+            },
+        };
+        
+        // Create buffers
+        this.buffers = this.initBuffers(gl);
+        
+        console.log('✅ WebGL shaders initialized for medical imaging');
+    }
+    
+    createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error('Shader compilation error:', gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        
+        return shader;
+    }
+    
+    initBuffers(gl) {
+        // Positions for a quad that covers the entire canvas
+        const positions = [
+            -1.0, -1.0,
+             1.0, -1.0,
+            -1.0,  1.0,
+             1.0,  1.0,
+        ];
+        
+        // Texture coordinates
+        const textureCoords = [
+            0.0, 0.0,
+            1.0, 0.0,
+            0.0, 1.0,
+            1.0, 1.0,
+        ];
+        
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+        
+        const textureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoords), gl.STATIC_DRAW);
+        
+        return {
+            position: positionBuffer,
+            textureCoord: textureCoordBuffer,
+        };
     }
     
     async renderImage(imageData, viewport) {
@@ -941,17 +1119,91 @@ class DicomRenderer {
     }
     
     async renderWebGL(imageData, viewport) {
-        // High-performance WebGL rendering
-        // TODO: Implement WebGL shaders for optimal performance
-        console.log('🚀 WebGL rendering (placeholder)');
+        const gl = this.context;
+        
+        // Clear the canvas
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        
+        // Use our shader program
+        gl.useProgram(this.shaderProgram);
+        
+        // Create texture from image data
+        const texture = this.createTexture(gl, imageData);
+        
+        // Set up vertex data
+        this.setupVertexData(gl);
+        
+        // Set uniforms
+        gl.uniform1i(this.programInfo.uniformLocations.image, 0);
+        gl.uniform1f(this.programInfo.uniformLocations.windowWidth, viewport.windowWidth / 65535.0);
+        gl.uniform1f(this.programInfo.uniformLocations.windowCenter, viewport.windowCenter / 65535.0);
+        gl.uniform1i(this.programInfo.uniformLocations.invert, viewport.invert ? 1 : 0);
+        
+        // Bind texture
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        
+        // Draw
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        
+        // Clean up
+        gl.deleteTexture(texture);
+        
+        console.log('🚀 WebGL high-performance rendering completed');
+    }
+    
+    createTexture(gl, imageData) {
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        
+        // Create image element if we have a URL
+        if (imageData.dataUrl || imageData.url) {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            return new Promise((resolve) => {
+                img.onload = () => {
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                    resolve(texture);
+                };
+                img.src = imageData.dataUrl || imageData.url;
+            });
+        }
+        
+        // Fallback: create empty texture
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        
+        return texture;
+    }
+    
+    setupVertexData(gl) {
+        // Position attribute
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.position);
+        gl.vertexAttribPointer(this.programInfo.attribLocations.vertexPosition, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(this.programInfo.attribLocations.vertexPosition);
+        
+        // Texture coordinate attribute
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.textureCoord);
+        gl.vertexAttribPointer(this.programInfo.attribLocations.textureCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(this.programInfo.attribLocations.textureCoord);
     }
     
     async render2D(imageData, viewport) {
         const ctx = this.context;
         const canvas = this.canvas;
         
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Clear canvas with solid black background
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Apply viewport transformations
         ctx.save();
@@ -970,14 +1222,40 @@ class DicomRenderer {
             ctx.rotate(viewport.rotation * Math.PI / 180);
         }
         
+        // Use cached image if available
+        const cacheKey = `${imageData.id}_${viewport.windowWidth}_${viewport.windowCenter}_${viewport.invert}`;
+        if (this.imageCache && this.imageCache.has(cacheKey)) {
+            const cachedCanvas = this.imageCache.get(cacheKey);
+            ctx.drawImage(
+                cachedCanvas,
+                -cachedCanvas.width / 2,
+                -cachedCanvas.height / 2
+            );
+            ctx.restore();
+            return;
+        }
+        
         // Create image element
         const img = new Image();
+        img.crossOrigin = 'anonymous';
         
         return new Promise((resolve, reject) => {
             img.onload = () => {
                 try {
-                    // Apply windowing
-                    const processedCanvas = this.applyWindowing(img, viewport);
+                    // Apply windowing (optimized)
+                    const processedCanvas = this.applyWindowingOptimized(img, viewport);
+                    
+                    // Cache the processed image
+                    if (!this.imageCache) {
+                        this.imageCache = new Map();
+                    }
+                    this.imageCache.set(cacheKey, processedCanvas);
+                    
+                    // Limit cache size
+                    if (this.imageCache.size > 20) {
+                        const firstKey = this.imageCache.keys().next().value;
+                        this.imageCache.delete(firstKey);
+                    }
                     
                     // Draw processed image
                     ctx.drawImage(
@@ -1009,6 +1287,63 @@ class DicomRenderer {
                 reject(new Error('No image data available'));
             }
         });
+    }
+    
+    applyWindowingOptimized(img, viewport) {
+        // Create off-screen canvas for processing
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        
+        // Draw original image
+        tempCtx.drawImage(img, 0, 0);
+        
+        // Get image data
+        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const data = imageData.data;
+        
+        // Pre-calculate windowing values
+        const { windowWidth, windowCenter, invert } = viewport;
+        const minValue = windowCenter - windowWidth / 2;
+        const maxValue = windowCenter + windowWidth / 2;
+        const windowRange = windowWidth || 1; // Prevent division by zero
+        
+        // Create lookup table for performance
+        const lut = new Uint8Array(65536);
+        for (let i = 0; i < 65536; i++) {
+            let newValue;
+            if (i <= minValue) {
+                newValue = 0;
+            } else if (i >= maxValue) {
+                newValue = 255;
+            } else {
+                newValue = Math.round(((i - minValue) / windowRange) * 255);
+            }
+            
+            if (invert) {
+                newValue = 255 - newValue;
+            }
+            
+            lut[i] = newValue;
+        }
+        
+        // Apply windowing using lookup table (much faster)
+        for (let i = 0; i < data.length; i += 4) {
+            const gray = data[i]; // Assuming grayscale or using red channel
+            const newValue = lut[gray];
+            
+            data[i] = newValue;     // Red
+            data[i + 1] = newValue; // Green
+            data[i + 2] = newValue; // Blue
+            // Alpha stays the same
+        }
+        
+        // Put processed data back
+        tempCtx.putImageData(imageData, 0, 0);
+        
+        return tempCanvas;
     }
     
     applyWindowing(img, viewport) {
@@ -1088,18 +1423,37 @@ class DicomRenderer {
 class DicomCache {
     constructor() {
         this.cache = new Map();
-        this.maxSize = 100; // Maximum number of cached images
-        this.maxMemory = 500 * 1024 * 1024; // 500MB max memory usage
+        this.maxSize = 50; // Reduced for better memory management
+        this.maxMemory = 200 * 1024 * 1024; // 200MB max memory usage
         this.currentMemory = 0;
+        this.accessTimes = new Map(); // Track access times for LRU
+        this.preloadQueue = new Set(); // Track preloading to avoid duplicates
     }
     
     async init() {
         console.log('💾 Cache initialized');
+        
+        // Monitor memory usage and cleanup if needed
+        setInterval(() => {
+            this.cleanupIfNeeded();
+        }, 10000); // Check every 10 seconds
+    }
+    
+    cleanupIfNeeded() {
+        if (this.currentMemory > this.maxMemory * 0.8) {
+            console.log('🧹 Running cache cleanup due to high memory usage');
+            this.evictOldest(Math.floor(this.cache.size * 0.3)); // Remove 30% of cache
+        }
     }
     
     set(key, data) {
-        // Estimate memory usage
-        const memoryUsage = JSON.stringify(data).length * 2; // Rough estimate
+        // Skip if already in preload queue to prevent duplicates
+        if (this.preloadQueue.has(key)) {
+            return;
+        }
+        
+        // Estimate memory usage more accurately
+        const memoryUsage = this.estimateMemoryUsage(data);
         
         // Check if we need to evict items
         while (this.cache.size >= this.maxSize || 
@@ -1107,20 +1461,27 @@ class DicomCache {
             this.evictOldest();
         }
         
+        const now = Date.now();
         this.cache.set(key, {
             data: data,
-            timestamp: Date.now(),
-            memory: memoryUsage
+            timestamp: now,
+            memory: memoryUsage,
+            accessCount: 1
         });
         
+        this.accessTimes.set(key, now);
         this.currentMemory += memoryUsage;
+        this.preloadQueue.delete(key); // Remove from preload queue if it was there
     }
     
     get(key) {
         const item = this.cache.get(key);
         if (item) {
-            // Update timestamp for LRU
-            item.timestamp = Date.now();
+            // Update access tracking for better LRU
+            const now = Date.now();
+            item.timestamp = now;
+            item.accessCount++;
+            this.accessTimes.set(key, now);
             return item.data;
         }
         return null;
@@ -1130,22 +1491,39 @@ class DicomCache {
         return this.cache.has(key);
     }
     
-    evictOldest() {
-        let oldestKey = null;
-        let oldestTime = Infinity;
-        
-        for (const [key, item] of this.cache.entries()) {
-            if (item.timestamp < oldestTime) {
-                oldestTime = item.timestamp;
-                oldestKey = key;
-            }
+    estimateMemoryUsage(data) {
+        if (data.pixelData) {
+            return data.pixelData.byteLength || data.pixelData.length * 4; // Assume 4 bytes per pixel
         }
+        if (data.dataUrl) {
+            return data.dataUrl.length * 2; // UTF-16 encoding
+        }
+        // Fallback to JSON stringification
+        try {
+            return JSON.stringify(data).length * 2;
+        } catch (e) {
+            return 1024 * 1024; // 1MB default estimate
+        }
+    }
+    
+    evictOldest(count = 1) {
+        // Sort by access time and access count for better eviction
+        const entries = Array.from(this.cache.entries()).sort((a, b) => {
+            const scoreA = a[1].timestamp + (a[1].accessCount * 10000); // Boost frequently accessed items
+            const scoreB = b[1].timestamp + (b[1].accessCount * 10000);
+            return scoreA - scoreB;
+        });
         
-        if (oldestKey) {
-            const item = this.cache.get(oldestKey);
+        for (let i = 0; i < Math.min(count, entries.length); i++) {
+            const [key, item] = entries[i];
             this.currentMemory -= item.memory;
-            this.cache.delete(oldestKey);
+            this.cache.delete(key);
+            this.accessTimes.delete(key);
         }
+    }
+    
+    markForPreload(key) {
+        this.preloadQueue.add(key);
     }
     
     clear() {
