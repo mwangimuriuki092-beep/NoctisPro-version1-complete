@@ -1451,64 +1451,6 @@
         let renderingQueue = [];
         let isRendering = false;
         
-        // Test canvas functionality - TEMPORARY FOR TESTING
-        function testCanvas() {
-            const canvas = document.getElementById('dicomCanvas');
-            if (!canvas) {
-                console.error('Canvas not found for testing');
-                return;
-            }
-            
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                console.error('Canvas context not available');
-                return;
-            }
-            
-            // Only draw test pattern if no image is loaded
-            if (!currentSeries && !images.length) {
-                console.log('Drawing test pattern to verify canvas functionality');
-                
-                // Clear canvas
-                ctx.fillStyle = '#000000';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw test pattern
-                ctx.strokeStyle = '#00ff00';
-                ctx.lineWidth = 2;
-                
-                // Draw crosshairs
-                ctx.beginPath();
-                ctx.moveTo(canvas.width / 2, 0);
-                ctx.lineTo(canvas.width / 2, canvas.height);
-                ctx.moveTo(0, canvas.height / 2);
-                ctx.lineTo(canvas.width, canvas.height / 2);
-                ctx.stroke();
-                
-                // Draw corner markers
-                ctx.strokeStyle = '#ffff00';
-                const margin = 20;
-                const size = 10;
-                
-                // Top-left
-                ctx.strokeRect(margin, margin, size, size);
-                // Top-right
-                ctx.strokeRect(canvas.width - margin - size, margin, size, size);
-                // Bottom-left
-                ctx.strokeRect(margin, canvas.height - margin - size, size, size);
-                // Bottom-right
-                ctx.strokeRect(canvas.width - margin - size, canvas.height - margin - size, size, size);
-                
-                // Add text
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '16px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('DICOM Viewer Ready', canvas.width / 2, canvas.height / 2 + 30);
-                ctx.fillText('Load a DICOM file to begin', canvas.width / 2, canvas.height / 2 + 50);
-                
-                console.log('Test pattern drawn successfully');
-            }
-        }
         
         // Professional initialization
         document.addEventListener('DOMContentLoaded', function() {
@@ -1554,10 +1496,6 @@
             updateOverlayInfo();
             updateZoomInfo();
             
-            // Add a simple test pattern to verify canvas is working
-            setTimeout(() => {
-                testCanvas();
-            }, 1000);
             
             showToast('DICOM Viewer initialized and ready', 'success');
         }
@@ -3179,7 +3117,15 @@
 
         function toggleInvert() {
             inverted = !inverted;
-            updateImageDisplay();
+            
+            // Re-render canvas with invert state
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            if (canvas && img && img.complete) {
+                renderImageToCanvas(img, canvas, currentSeries?.modality);
+            } else {
+                updateImageDisplay();
+            }
             
             // Update tool visual state
             const tool = document.querySelector('[data-tool="invert"]');
@@ -3188,6 +3134,8 @@
             } else {
                 tool.classList.remove('active');
             }
+            
+            showToast(`Invert ${inverted ? 'enabled' : 'disabled'}`, 'success');
         }
 
         function resetView() {
@@ -3215,6 +3163,104 @@
             
             updateZoomInfo();
             showToast('View reset', 'success');
+        }
+
+        // Add missing resetZoom function
+        function resetZoom() {
+            setZoom(1.0);
+            showToast('Zoom reset to 100%', 'success');
+        }
+
+        // Helper function to get patient details for export/print
+        function getPatientDetails() {
+            const currentImage = images[currentImageIndex];
+            const details = {
+                patientName: 'Unknown Patient',
+                patientId: 'Unknown ID',
+                studyDate: 'Unknown Date',
+                studyDescription: 'Unknown Study',
+                seriesDescription: 'Unknown Series',
+                modality: 'Unknown Modality',
+                institution: 'Noctis Pro PACS',
+                windowWidth: windowWidth,
+                windowLevel: windowLevel,
+                sliceInfo: `${currentImageIndex + 1}/${images.length}`,
+                timestamp: new Date().toLocaleString()
+            };
+
+            // Try to get patient info from current study
+            if (currentStudy) {
+                details.patientName = currentStudy.patient_name || details.patientName;
+                details.patientId = currentStudy.patient_id || details.patientId;
+                details.studyDate = currentStudy.study_date || details.studyDate;
+                details.studyDescription = currentStudy.study_description || details.studyDescription;
+            }
+
+            // Try to get series info
+            if (currentSeries) {
+                details.seriesDescription = currentSeries.series_description || details.seriesDescription;
+                details.modality = currentSeries.modality || details.modality;
+            }
+
+            // Try to get info from current image
+            if (currentImage) {
+                details.patientName = currentImage.patient_name || details.patientName;
+                details.patientId = currentImage.patient_id || details.patientId;
+                details.studyDate = currentImage.study_date || details.studyDate;
+                details.modality = currentImage.modality || details.modality;
+            }
+
+            return details;
+        }
+
+        // Helper function to create canvas with patient details overlay
+        function createExportCanvas() {
+            const canvas = document.getElementById('dicomCanvas');
+            if (!canvas) return null;
+
+            // Create a new canvas for export
+            const exportCanvas = document.createElement('canvas');
+            const ctx = exportCanvas.getContext('2d');
+            
+            // Set canvas size
+            exportCanvas.width = canvas.width;
+            exportCanvas.height = canvas.height;
+            
+            // Draw the main image
+            ctx.drawImage(canvas, 0, 0);
+            
+            // Add patient details overlay
+            const details = getPatientDetails();
+            
+            // Add semi-transparent background for text
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, 10, 300, 120);
+            
+            // Add text overlay
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'left';
+            
+            let yPos = 25;
+            ctx.fillText(`Patient: ${details.patientName}`, 15, yPos);
+            yPos += 15;
+            ctx.fillText(`ID: ${details.patientId}`, 15, yPos);
+            yPos += 15;
+            ctx.fillText(`Study: ${details.studyDate}`, 15, yPos);
+            yPos += 15;
+            ctx.fillText(`Modality: ${details.modality}`, 15, yPos);
+            yPos += 15;
+            ctx.fillText(`W/L: ${details.windowWidth}/${details.windowLevel}`, 15, yPos);
+            yPos += 15;
+            ctx.fillText(`Slice: ${details.sliceInfo}`, 15, yPos);
+            yPos += 15;
+            ctx.fillText(`${details.timestamp}`, 15, yPos);
+            
+            // Add institution name in bottom right
+            ctx.textAlign = 'right';
+            ctx.fillText(details.institution, exportCanvas.width - 15, exportCanvas.height - 15);
+            
+            return exportCanvas;
         }
 
         // Measurement System - Professional grade from PyQt
@@ -3592,26 +3638,22 @@
             }
             
             try {
-                const dicomImage = document.getElementById('dicomImage');
-                if (!dicomImage.src) {
+                // Use canvas with patient details
+                const exportCanvas = createExportCanvas();
+                if (!exportCanvas) {
                     showToast('No image loaded', 'warning');
                     return;
                 }
                 
                 // Create download link
                 const link = document.createElement('a');
+                const details = getPatientDetails();
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `dicom_image_${timestamp}.png`;
-                
-                // Convert image to canvas for export
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = dicomImage.naturalWidth;
-                canvas.height = dicomImage.naturalHeight;
-                ctx.drawImage(dicomImage, 0, 0);
+                const patientName = details.patientName.replace(/[^a-zA-Z0-9]/g, '_');
+                const filename = `${patientName}_${details.modality}_${timestamp}.png`;
                 
                 link.download = filename;
-                link.href = canvas.toDataURL('image/png');
+                link.href = exportCanvas.toDataURL('image/png');
                 
                 document.body.appendChild(link);
                 link.click();
@@ -3758,43 +3800,85 @@
                     return;
                 }
                 
-                // Create print window
+                // Use canvas with patient details
+                const exportCanvas = createExportCanvas();
+                if (!exportCanvas) {
+                    showToast('No image loaded', 'warning');
+                    return;
+                }
+                
+                const details = getPatientDetails();
+                const imageDataUrl = exportCanvas.toDataURL('image/png');
+                
+                // Create enhanced print window with patient details
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write(`
                     <html>
                         <head>
-                            <title>Noctis Pro DICOM Print</title>
+                            <title>Noctis Pro DICOM Print - ${details.patientName}</title>
                             <style>
                                 @media print {
                                     body { margin: 0; padding: 20px; }
-                                    .header { text-align: center; margin-bottom: 20px; }
-                                    .image-container { text-align: center; }
+                                    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #00d4ff; padding-bottom: 10px; }
+                                    .image-container { text-align: center; margin: 20px 0; }
                                     .image-info { margin-top: 20px; font-size: 12px; }
+                                    .patient-details { margin-bottom: 20px; }
                                     .no-print { display: none; }
                                 }
                                 body { font-family: Arial, sans-serif; }
-                                .header h1 { color: #00d4ff; margin: 0; }
-                                .image-container img { max-width: 100%; height: auto; }
-                                .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+                                .header h1 { color: #00d4ff; margin: 0; font-size: 24px; }
+                                .header p { margin: 5px 0; color: #666; }
+                                .image-container img { max-width: 100%; height: auto; border: 1px solid #ccc; }
+                                .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+                                .info-section { background: #f8f9fa; padding: 10px; border-radius: 4px; }
+                                .info-section h4 { margin: 0 0 10px 0; color: #00d4ff; font-size: 14px; }
+                                .detail-row { display: flex; justify-content: space-between; margin: 5px 0; }
+                                .detail-row strong { color: #333; }
                             </style>
                         </head>
                         <body>
                             <div class="header">
                                 <h1>Noctis Pro PACS</h1>
-                                <p>Medical Image Print - ${new Date().toLocaleString()}</p>
+                                <p>Medical Imaging System - Professional DICOM Print</p>
+                                <p>Print Date: ${details.timestamp}</p>
                             </div>
-                            <div class="image-container">
-                                <img src="${dicomImage.src}" alt="DICOM Image" />
-                            </div>
-                            <div class="image-info">
+                            
+                            <div class="patient-details">
                                 <div class="info-grid">
-                                    <div><strong>Study:</strong> ${document.getElementById('studyStatus').textContent}</div>
-                                    <div><strong>Series:</strong> ${document.getElementById('seriesStatus').textContent}</div>
-                                    <div><strong>Image:</strong> ${document.getElementById('sliceValue').textContent}</div>
-                                    <div><strong>Window/Level:</strong> ${document.getElementById('wwValue').textContent}/${document.getElementById('wlValue').textContent}</div>
+                                    <div class="info-section">
+                                        <h4>Patient Information</h4>
+                                        <div class="detail-row"><span>Name:</span><strong>${details.patientName}</strong></div>
+                                        <div class="detail-row"><span>ID:</span><strong>${details.patientId}</strong></div>
+                                        <div class="detail-row"><span>Study Date:</span><strong>${details.studyDate}</strong></div>
+                                    </div>
+                                    <div class="info-section">
+                                        <h4>Study Information</h4>
+                                        <div class="detail-row"><span>Modality:</span><strong>${details.modality}</strong></div>
+                                        <div class="detail-row"><span>Series:</span><strong>${details.seriesDescription}</strong></div>
+                                        <div class="detail-row"><span>Image:</span><strong>${details.sliceInfo}</strong></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="info-grid" style="margin-top: 15px;">
+                                    <div class="info-section">
+                                        <h4>Display Settings</h4>
+                                        <div class="detail-row"><span>Window Width:</span><strong>${details.windowWidth}</strong></div>
+                                        <div class="detail-row"><span>Window Level:</span><strong>${details.windowLevel}</strong></div>
+                                        <div class="detail-row"><span>Inverted:</span><strong>${inverted ? 'Yes' : 'No'}</strong></div>
+                                    </div>
+                                    <div class="info-section">
+                                        <h4>Institution</h4>
+                                        <div class="detail-row"><span>Facility:</span><strong>${details.institution}</strong></div>
+                                        <div class="detail-row"><span>System:</span><strong>DICOM Viewer v2.0</strong></div>
+                                    </div>
                                 </div>
                             </div>
-                            <button class="no-print" onclick="window.print()" style="position: fixed; top: 10px; right: 10px; padding: 10px 20px; background: #00d4ff; color: white; border: none; border-radius: 4px; cursor: pointer;">Print</button>
+                            
+                            <div class="image-container">
+                                <img src="${imageDataUrl}" alt="DICOM Medical Image" />
+                            </div>
+                            
+                            <button class="no-print" onclick="window.print()" style="position: fixed; top: 10px; right: 10px; padding: 10px 20px; background: #00d4ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🖨️ Print</button>
                         </body>
                     </html>
                 `);
@@ -3805,7 +3889,7 @@
                     printWindow.print();
                 }, 1000);
 
-                showToast('Print dialog opened', 'success');
+                showToast('Print dialog opened with patient details', 'success');
             } catch (error) {
                 console.error('Error printing image:', error);
                 showToast('Error printing image', 'error');
@@ -4645,9 +4729,6 @@
             generatePET(); // Same as PET SUV for now
         }
 
-        function exportCurrentImage() {
-            exportImage(); // Use existing export function
-        }
 
         // Comprehensive AI Analysis Function
         async function runAIAnalysis(analysisType) {
