@@ -18,6 +18,10 @@ from io import BytesIO
 from PIL import Image
 from django.utils import timezone
 import uuid
+import logging
+
+# Configure audit logger
+audit_logger = logging.getLogger('dicom_audit')
 
 from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
@@ -374,9 +378,16 @@ def api_image_metadata(request, image_id):
     image = get_object_or_404(DicomImage, id=image_id)
     user = request.user
     
-    # Check permissions - Allow all authenticated users for now
-    # TODO: Implement proper facility-based permissions after user setup
-    pass  # Allow all authenticated users to view images
+    # Check facility-based permissions
+    if not check_dicom_access_permission(user, image):
+        return JsonResponse({
+            'success': False,
+            'error': 'Access denied: You do not have permission to view this image',
+            'error_code': 'PERMISSION_DENIED'
+        }, status=403)
+    
+    # Log DICOM access for audit trail
+    log_dicom_access(user, image, 'VIEW_IMAGE', request)
     
     data = {
         'id': image.id,
@@ -6466,3 +6477,136 @@ def api_series_sr_export(request, series_id):
     study = series.study
     # Delegate to the study-level SR export
     return api_export_dicom_sr(request, study.id)
+
+
+# ============================================================================
+# SECURITY AND AUDIT FUNCTIONS
+# ============================================================================
+
+def check_dicom_access_permission(user, image):
+    """
+    Check if user has permission to access a DICOM image
+    Based on facility permissions and user roles
+    """
+    try:
+        # Superusers have access to everything
+        if user.is_superuser:
+            return True
+            
+        # Staff users have broader access
+        if user.is_staff:
+            return True
+            
+        # Check facility-based permissions
+        if hasattr(user, 'facility') and user.facility:
+            # Get the study associated with this image
+            study = None
+            if hasattr(image, 'series'):
+                study = image.series.study
+            elif hasattr(image, 'study'):
+                study = image.study
+            
+            if study and hasattr(study, 'facility'):
+                # User can only access images from their facility
+                return study.facility == user.facility
+        
+        # Check if user has specific permissions
+        user_facilities = get_user_facilities(user)
+        if user_facilities:
+            study = None
+            if hasattr(image, 'series'):
+                study = image.series.study
+            elif hasattr(image, 'study'):
+                study = image.study
+                
+            if study and hasattr(study, 'facility'):
+                return study.facility in user_facilities
+        
+        # Default: deny access if no specific permissions found
+        return False
+        
+    except Exception as e:
+        audit_logger.error(f"Error checking DICOM access permission for user {user.id}: {str(e)}")
+        return False
+
+
+def get_user_facilities(user):
+    """Get all facilities a user has access to"""
+    try:
+        facilities = []
+        
+        # Direct facility assignment
+        if hasattr(user, 'facility') and user.facility:
+            facilities.append(user.facility)
+        
+        # Additional facilities through groups or permissions
+        if hasattr(user, 'additional_facilities'):
+            facilities.extend(user.additional_facilities.all())
+        
+        return facilities
+        
+    except Exception as e:
+        audit_logger.error(f"Error getting user facilities for user {user.id}: {str(e)}")
+        return []
+
+
+def log_dicom_access(user, image, action, request=None):
+    """
+    Log DICOM access for audit trail
+    """
+    try:
+        # Prepare audit log data
+        log_data = {
+            'user_id': user.id,
+            'username': user.username,
+            'action': action,
+            'image_id': getattr(image, 'id', None),
+            'timestamp': timezone.now().isoformat(),
+        }
+        
+        # Add study/series information if available
+        if hasattr(image, 'series'):
+            log_data['series_id'] = image.series.id
+            if hasattr(image.series, 'study'):
+                log_data['study_id'] = image.series.study.id
+                log_data['patient_id'] = getattr(image.series.study, 'patient_id', None)
+        
+        # Add request information if available
+        if request:
+            log_data['ip_address'] = get_client_ip(request)
+            log_data['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
+            log_data['session_key'] = request.session.session_key
+        
+        # Log to audit logger
+        audit_logger.info(f"DICOM_ACCESS: {json.dumps(log_data)}")
+        
+        # Also log to database if audit model exists
+        try:
+            from .models import DicomAuditLog
+            DicomAuditLog.objects.create(
+                user=user,
+                action=action,
+                image_id=getattr(image, 'id', None),
+                ip_address=log_data.get('ip_address'),
+                user_agent=log_data.get('user_agent', '')[:500],  # Limit length
+                metadata=json.dumps(log_data)
+            )
+        except ImportError:
+            # Audit model doesn't exist, just log to file
+            pass
+        except Exception as db_error:
+            audit_logger.error(f"Error saving audit log to database: {str(db_error)}")
+        
+    except Exception as e:
+        # Never let audit logging break the main functionality
+        audit_logger.error(f"Error logging DICOM access: {str(e)}")
+
+
+def get_client_ip(request):
+    """Get the real IP address of the client"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
