@@ -1451,6 +1451,65 @@
         let renderingQueue = [];
         let isRendering = false;
         
+        // Test canvas functionality - TEMPORARY FOR TESTING
+        function testCanvas() {
+            const canvas = document.getElementById('dicomCanvas');
+            if (!canvas) {
+                console.error('Canvas not found for testing');
+                return;
+            }
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Canvas context not available');
+                return;
+            }
+            
+            // Only draw test pattern if no image is loaded
+            if (!currentSeries && !images.length) {
+                console.log('Drawing test pattern to verify canvas functionality');
+                
+                // Clear canvas
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw test pattern
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                
+                // Draw crosshairs
+                ctx.beginPath();
+                ctx.moveTo(canvas.width / 2, 0);
+                ctx.lineTo(canvas.width / 2, canvas.height);
+                ctx.moveTo(0, canvas.height / 2);
+                ctx.lineTo(canvas.width, canvas.height / 2);
+                ctx.stroke();
+                
+                // Draw corner markers
+                ctx.strokeStyle = '#ffff00';
+                const margin = 20;
+                const size = 10;
+                
+                // Top-left
+                ctx.strokeRect(margin, margin, size, size);
+                // Top-right
+                ctx.strokeRect(canvas.width - margin - size, margin, size, size);
+                // Bottom-left
+                ctx.strokeRect(margin, canvas.height - margin - size, size, size);
+                // Bottom-right
+                ctx.strokeRect(canvas.width - margin - size, canvas.height - margin - size, size, size);
+                
+                // Add text
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('DICOM Viewer Ready', canvas.width / 2, canvas.height / 2 + 30);
+                ctx.fillText('Load a DICOM file to begin', canvas.width / 2, canvas.height / 2 + 50);
+                
+                console.log('Test pattern drawn successfully');
+            }
+        }
+        
         // Professional initialization
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
