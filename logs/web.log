@@ -16,3 +16,33 @@ nohup: ignoring input
 [2025-09-30 11:09:18 +0000] [9270] [INFO] Booting worker with pid: 9270
 [2025-09-30 11:09:18 +0000] [4652] [ERROR] Worker (pid:8546) was sent SIGHUP!
 [2025-09-30 11:09:18 +0000] [4652] [ERROR] Worker (pid:8547) was sent SIGHUP!
+[2025-09-30 19:21:25 +0000] [4652] [CRITICAL] WORKER TIMEOUT (pid:9269)
+[2025-09-30 19:21:25 +0000] [4652] [CRITICAL] WORKER TIMEOUT (pid:9270)
+[2025-09-30 19:21:25 +0000] [9270] [INFO] Worker exiting (pid: 9270)
+[2025-09-30 19:21:25 +0000] [9269] [INFO] Worker exiting (pid: 9269)
+🚀 Noctis Pro PACS Settings Loaded:
+   • Debug Mode: False
+   • Internet Access: False
+   • HTTPS Enabled: True
+   • Domain Name: localhost
+   • Tailnet Mode: False
+   • Allowed Hosts: 4 configured
+   • Database: sqlite3
+   • Security: Production profile
+   • Network Mode: Local/Private
+🚀 Noctis Pro PACS Settings Loaded:
+   • Debug Mode: False
+   • Internet Access: False
+   • HTTPS Enabled: True
+   • Domain Name: localhost
+   • Tailnet Mode: False
+   • Allowed Hosts: 4 configured
+   • Database: sqlite3
+   • Security: Production profile
+   • Network Mode: Local/Private
+[2025-09-30 19:21:25 +0000] [4652] [INFO] Handling signal: hup
+[2025-09-30 19:21:25 +0000] [4652] [INFO] Hang up: Master
+[2025-09-30 19:21:25 +0000] [4652] [ERROR] Worker (pid:9269) was sent SIGHUP!
+[2025-09-30 19:21:25 +0000] [11701] [INFO] Booting worker with pid: 11701
+[2025-09-30 19:21:25 +0000] [11702] [INFO] Booting worker with pid: 11702
+[2025-09-30 19:21:25 +0000] [4652] [ERROR] Worker (pid:9270) was sent SIGHUP!
