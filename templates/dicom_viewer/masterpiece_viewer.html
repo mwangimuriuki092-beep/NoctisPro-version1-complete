@@ -1132,11 +1132,11 @@
                 </div>
                 
                 <div class="recon-controls">
-                    <button class="recon-btn" onclick="generateMPR()">
+                    <button class="recon-btn" onclick="generateMPRViews()">
                         <i class="fas fa-th-large"></i>
                         <span>MPR</span>
                     </button>
-                    <button class="recon-btn" onclick="generateMIP()">
+                    <button class="recon-btn" onclick="generateMIPView()">
                         <i class="fas fa-compress-arrows-alt"></i>
                         <span>MIP</span>
                     </button>
@@ -2585,6 +2585,23 @@
             });
         }
 
+        function updateOverlayLabels() {
+            // Update overlay information display
+            try {
+                const wwEl = document.getElementById('windowWidth');
+                const wlEl = document.getElementById('windowLevel');
+                const sliceEl = document.getElementById('currentSlice');
+                const zoomEl = document.getElementById('zoomLevel');
+                
+                if (wwEl) wwEl.textContent = windowWidth;
+                if (wlEl) wlEl.textContent = windowLevel;
+                if (sliceEl) sliceEl.textContent = currentImageIndex + 1;
+                if (zoomEl) zoomEl.textContent = Math.round(zoom * 100) + '%';
+            } catch (error) {
+                console.warn('Error updating overlay labels:', error);
+            }
+        }
+
         function drawCrosshair() {
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
@@ -2730,6 +2747,61 @@
                 
                 container.appendChild(item);
             });
+        }
+
+        async function fetchReferences() {
+            // Fetch reference materials or similar cases based on current study
+            const query = document.getElementById('referenceQuery')?.value || '';
+            
+            if (!query && !currentStudy) {
+                showToast('Please load a study or enter a query', 'warning');
+                return;
+            }
+            
+            showToast('Fetching references...', 'info');
+            
+            try {
+                // Build query from current study if available
+                const searchQuery = query || (currentStudy ? currentStudy.description : '');
+                
+                // Make API call to fetch references (adjust endpoint as needed)
+                const response = await fetch(`/ai/search-references/?q=${encodeURIComponent(searchQuery)}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    displayReferences(data);
+                    showToast(`Found ${data.length || 0} references`, 'success');
+                } else {
+                    showToast('Failed to fetch references', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching references:', error);
+                showToast('Error fetching references', 'error');
+            }
+        }
+
+        function displayReferences(references) {
+            const container = document.getElementById('referencesList');
+            if (!container) return;
+            
+            if (!references || references.length === 0) {
+                container.innerHTML = '<p style="padding: 10px; color: var(--text-muted);">No references found.</p>';
+                return;
+            }
+            
+            container.innerHTML = references.map(ref => `
+                <div style="padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer;" 
+                     onclick="openReference('${ref.id}')">
+                    <div style="font-weight: bold; color: var(--accent-color);">${ref.title || 'Reference'}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${ref.description || ''}</div>
+                </div>
+            `).join('');
+        }
+
+        function openReference(refId) {
+            // Open reference in new tab or modal
+            console.log('Opening reference:', refId);
+            showToast('Reference opened', 'info');
         }
 
         function clearAllMeasurements() {
@@ -2911,7 +2983,70 @@
             document.getElementById('hounsfield').textContent = '-';
         }
 
+        // Helper Functions
+        function getCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) return meta.getAttribute('content');
+            
+            // Fallback to cookie
+            const name = 'csrftoken';
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function displayReconstructionResult(data, type) {
+            // Display reconstruction result in a modal or viewer
+            console.log(`Displaying ${type} reconstruction:`, data);
+            showToast(`${type} reconstruction displayed`, 'success');
+            // TODO: Implement actual display logic based on your UI requirements
+        }
+
         // MPR and 3D Functions
+        async function generateMIPView() {
+            // MIP (Maximum Intensity Projection) reconstruction
+            if (!currentSeries || !imageData || imageData.length === 0) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            showToast('Generating MIP reconstruction...', 'info');
+            
+            try {
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/mip/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast('MIP reconstruction completed', 'success');
+                    // Display the MIP result
+                    if (data.image_url) {
+                        // Show in a modal or new view
+                        displayReconstructionResult(data, 'MIP');
+                    }
+                } else {
+                    showToast('MIP reconstruction failed', 'error');
+                }
+            } catch (error) {
+                console.error('MIP generation error:', error);
+                showToast('Error generating MIP', 'error');
+            }
+        }
+
         async function generateMPRViews() {
             if (!currentSeries) return;
             

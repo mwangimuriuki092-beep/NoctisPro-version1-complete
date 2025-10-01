@@ -27,6 +27,13 @@ class SessionTimeoutManager {
             document.addEventListener(event, this.resetTimeout.bind(this), true);
         });
         
+        // Add window close/unload handler to logout
+        window.addEventListener('beforeunload', this.handleWindowClose.bind(this));
+        window.addEventListener('unload', this.handleWindowClose.bind(this));
+        
+        // Add visibility change handler for tab switching
+        document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
+        
         // Start the timeout
         this.resetTimeout();
         
@@ -346,6 +353,39 @@ class SessionTimeoutManager {
         }
     }
     
+    handleWindowClose(event) {
+        // Log out user when window closes
+        if (this.isActive) {
+            // Use sendBeacon for reliable logout on page unload
+            const logoutUrl = '/accounts/logout/';
+            const csrfToken = this.getCookie('csrftoken');
+            
+            // Use navigator.sendBeacon for reliable async request
+            if (navigator.sendBeacon) {
+                const formData = new FormData();
+                formData.append('csrfmiddlewaretoken', csrfToken);
+                navigator.sendBeacon(logoutUrl, formData);
+            } else {
+                // Fallback to synchronous XMLHttpRequest
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', logoutUrl, false); // Synchronous
+                xhr.setRequestHeader('X-CSRFToken', csrfToken);
+                xhr.send();
+            }
+        }
+    }
+    
+    handleVisibilityChange() {
+        // Pause/resume timeout based on visibility
+        if (document.hidden) {
+            // Tab is hidden - we could pause the timeout or leave it running
+            console.log('Tab hidden - timeout continues');
+        } else {
+            // Tab is visible - reset activity
+            this.resetTimeout();
+        }
+    }
+    
     destroy() {
         this.isActive = false;
         
@@ -353,6 +393,10 @@ class SessionTimeoutManager {
         this.activityEvents.forEach(event => {
             document.removeEventListener(event, this.resetTimeout.bind(this), true);
         });
+        
+        window.removeEventListener('beforeunload', this.handleWindowClose.bind(this));
+        window.removeEventListener('unload', this.handleWindowClose.bind(this));
+        document.removeEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
         
         // Clear timers
         if (this.warningTimer) clearTimeout(this.warningTimer);
