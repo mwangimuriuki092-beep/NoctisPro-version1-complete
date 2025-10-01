@@ -88,14 +88,35 @@ class ProfessionalDicomViewer {
     async loadStudy(studyId) {
         const startTime = performance.now();
         
+        if (!studyId) {
+            this.showToast('No study selected', 'warning');
+            return;
+        }
+        
         try {
-            this.showLoading('Loading study...');
+            this.showLoading('Loading study data...');
+            console.log('Loading study:', studyId);
             
-            const response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
-            const data = await response.json();
+            // Try the API endpoint first
+            let response = await fetch(`/dicom-viewer/api/study/${studyId}/`);
+            let data = await response.json();
+            
+            // If that fails, try alternate endpoint
+            if (!data.study && !data.series) {
+                response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
+                data = await response.json();
+            }
+            
+            console.log('Study data received:', data);
             
             if (data.study && data.series) {
                 this.currentStudy = data.study;
+                
+                // Hide welcome screen and show viewer
+                const welcomeScreen = document.getElementById('welcomeScreen');
+                const singleView = document.getElementById('singleView');
+                if (welcomeScreen) welcomeScreen.style.display = 'none';
+                if (singleView) singleView.style.display = 'flex';
                 
                 // Update UI
                 this.updateStudyInfo(data.study);
@@ -103,14 +124,26 @@ class ProfessionalDicomViewer {
                 
                 // Auto-load first series
                 if (data.series.length > 0) {
+                    console.log('Auto-loading first series:', data.series[0].id);
+                    
+                    // Update series selector
+                    const seriesSelect = document.getElementById('seriesSelect');
+                    if (seriesSelect) {
+                        seriesSelect.value = data.series[0].id;
+                    }
+                    
                     await this.loadSeries(data.series[0].id);
+                } else {
+                    this.hideLoading();
+                    this.showToast('No series found in this study', 'warning');
+                    return;
                 }
                 
                 const loadTime = performance.now() - startTime;
                 this.performance.loadTime = loadTime;
                 
                 console.log(`📊 Study loaded in ${loadTime.toFixed(2)}ms`);
-                this.showToast(`Study loaded (${loadTime.toFixed(0)}ms)`, 'success');
+                this.showToast(`Study loaded: ${this.currentStudy.patient_name || 'Unknown Patient'}`, 'success');
                 
             } else {
                 throw new Error('Invalid study data received');
@@ -118,7 +151,7 @@ class ProfessionalDicomViewer {
             
         } catch (error) {
             console.error('Error loading study:', error);
-            this.showToast('Failed to load study', 'error');
+            this.showToast('Error loading study: ' + error.message, 'error');
         } finally {
             this.hideLoading();
         }
@@ -130,13 +163,61 @@ class ProfessionalDicomViewer {
         try {
             this.showLoading('Loading series...');
             
-            const response = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
-            const data = await response.json();
+            // Try the web endpoint first (used by the HTML)
+            let response = await fetch(`/dicom-viewer/web/series/${seriesId}/images/`);
+            let data = await response.json();
             
-            if (data.images && data.images.length > 0) {
+            // If that fails, try the API endpoint
+            if (!data.images || data.images.length === 0) {
+                response = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
+                data = await response.json();
+            }
+            
+            if (data.series && data.images && data.images.length > 0) {
+                this.currentSeries = data.series;
+                this.currentImages = data.images;
+                this.currentImageIndex = 0;
+                
+                console.log(`Loaded ${data.images.length} images for series`);
+                
+                // Update series info in UI
+                const seriesStatus = document.getElementById('seriesStatus');
+                if (seriesStatus) {
+                    seriesStatus.textContent = `${this.currentSeries.series_description || 'Unnamed Series'} (${data.images.length} images)`;
+                }
+                
+                const imageCount = document.getElementById('imageCount');
+                if (imageCount) {
+                    imageCount.textContent = data.images.length;
+                }
+                
+                // Update slice slider
+                const sliceSlider = document.getElementById('sliceSlider');
+                if (sliceSlider) {
+                    sliceSlider.max = Math.max(0, data.images.length - 1);
+                    sliceSlider.value = 0;
+                }
+                
+                // Preload images for performance
+                await this.preloadImages(data.images);
+                
+                // Load first image
+                await this.loadImage(data.images[0].id);
+                
+                // Update navigation
+                this.updateImageNavigation();
+                
+                const loadTime = performance.now() - startTime;
+                console.log(`📊 Series loaded in ${loadTime.toFixed(2)}ms`);
+                this.showToast(`Series loaded: ${data.images.length} images (${loadTime.toFixed(0)}ms)`, 'success');
+                
+            } else if (data.images && data.images.length > 0) {
+                // Legacy format without series object
                 this.currentSeries = data;
                 this.currentImages = data.images;
                 this.currentImageIndex = 0;
+                
+                console.log(`Loaded ${data.images.length} images (legacy format)`);
                 
                 // Preload images for performance
                 await this.preloadImages(data.images);
@@ -173,15 +254,74 @@ class ProfessionalDicomViewer {
             if (!imageData) {
                 this.performance.cacheMisses++;
                 
-                // Load from server using professional API
-                const response = await fetch(`/dicom-viewer/api/image/${imageId}/data/professional/`);
-                imageData = await response.json();
+                // Try multiple endpoints to get image data
+                let response;
+                let data;
+                
+                // Try professional API first
+                try {
+                    response = await fetch(`/dicom-viewer/api/image/${imageId}/data/professional/`);
+                    data = await response.json();
+                    if (data && (data.dataUrl || data.url)) {
+                        imageData = data;
+                    }
+                } catch (e) {
+                    console.warn('Professional API failed, trying display endpoint');
+                }
+                
+                // Try display endpoint if professional API failed
+                if (!imageData) {
+                    try {
+                        const displayUrl = `/dicom-viewer/api/image/${imageId}/display/?ww=${this.viewport.windowWidth}&wl=${this.viewport.windowCenter}&invert=${this.viewport.invert}`;
+                        response = await fetch(displayUrl);
+                        
+                        // Check if response is JSON or image
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            data = await response.json();
+                            if (data.url || data.dataUrl) {
+                                imageData = data;
+                            }
+                        } else if (contentType && contentType.includes('image')) {
+                            // Direct image response - convert to blob URL
+                            const blob = await response.blob();
+                            const url = URL.createObjectURL(blob);
+                            imageData = {
+                                id: imageId,
+                                url: url,
+                                dataUrl: url,
+                                width: 512, // Default, will be updated after load
+                                height: 512
+                            };
+                        }
+                    } catch (e) {
+                        console.warn('Display endpoint failed, trying raw endpoint');
+                    }
+                }
+                
+                // Final fallback: try raw endpoint
+                if (!imageData) {
+                    const rawUrl = `/dicom-viewer/image/${imageId}/`;
+                    imageData = {
+                        id: imageId,
+                        url: rawUrl,
+                        dataUrl: rawUrl,
+                        width: 512,
+                        height: 512
+                    };
+                }
                 
                 // Cache the image
-                this.cache.set(imageId, imageData);
+                if (imageData) {
+                    this.cache.set(imageId, imageData);
+                }
                 
             } else {
                 this.performance.cacheHits++;
+            }
+            
+            if (!imageData) {
+                throw new Error('Failed to load image data from any endpoint');
             }
             
             // Render the image
@@ -604,9 +744,20 @@ class ProfessionalDicomViewer {
             series.forEach(s => {
                 const option = document.createElement('option');
                 option.value = s.id;
-                option.textContent = `Series ${s.series_number}: ${s.description || 'Unnamed'} (${s.image_count} images)`;
+                const seriesNum = s.series_number || 'Unknown';
+                const seriesDesc = s.description || s.series_description || 'Unnamed Series';
+                const imageCount = s.image_count || 0;
+                option.textContent = `Series ${seriesNum}: ${seriesDesc} (${imageCount} images)`;
                 seriesSelect.appendChild(option);
             });
+            
+            // Ensure onchange handler is set up
+            seriesSelect.onchange = async (e) => {
+                const selectedSeriesId = e.target.value;
+                if (selectedSeriesId) {
+                    await this.loadSeries(selectedSeriesId);
+                }
+            };
         }
     }
     
@@ -1125,7 +1276,13 @@ class DicomRenderer {
         
         try {
             if (this.webglSupported) {
-                await this.renderWebGL(imageData, viewport);
+                try {
+                    await this.renderWebGL(imageData, viewport);
+                } catch (webglError) {
+                    console.warn('WebGL rendering failed, falling back to 2D:', webglError);
+                    this.webglSupported = false; // Disable WebGL for future renders
+                    await this.render2D(imageData, viewport);
+                }
             } else {
                 await this.render2D(imageData, viewport);
             }
@@ -1149,8 +1306,8 @@ class DicomRenderer {
         // Use our shader program
         gl.useProgram(this.shaderProgram);
         
-        // Create texture from image data
-        const texture = this.createTexture(gl, imageData);
+        // Create texture from image data (await for async loading)
+        const texture = await this.createTexture(gl, imageData);
         
         // Set up vertex data
         this.setupVertexData(gl);
@@ -1183,27 +1340,50 @@ class DicomRenderer {
             const img = new Image();
             img.crossOrigin = 'anonymous';
             
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 img.onload = () => {
-                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                    try {
+                        gl.bindTexture(gl.TEXTURE_2D, texture);
+                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                        console.log('✅ WebGL texture created successfully:', img.width, 'x', img.height);
+                        resolve(texture);
+                    } catch (error) {
+                        console.error('❌ Failed to create WebGL texture:', error);
+                        reject(error);
+                    }
+                };
+                
+                img.onerror = (error) => {
+                    console.error('❌ Failed to load image for texture:', imageData.dataUrl || imageData.url);
+                    // Create a fallback texture
+                    gl.bindTexture(gl.TEXTURE_2D, texture);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                    resolve(texture);
+                    resolve(texture); // Resolve with fallback rather than reject
                 };
-                img.src = imageData.dataUrl || imageData.url;
+                
+                const imageUrl = imageData.dataUrl || imageData.url;
+                console.log('📥 Loading image for WebGL texture:', imageUrl);
+                img.src = imageUrl;
             });
         }
         
         // Fallback: create empty texture
+        console.log('⚠️ No image URL provided, creating empty texture');
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         
-        return texture;
+        return Promise.resolve(texture);
     }
     
     setupVertexData(gl) {
@@ -1221,6 +1401,13 @@ class DicomRenderer {
     async render2D(imageData, viewport) {
         const ctx = this.context;
         const canvas = this.canvas;
+        
+        console.log('🎨 Starting 2D render:', {
+            canvasSize: `${canvas.width}x${canvas.height}`,
+            hasDataUrl: !!imageData.dataUrl,
+            hasUrl: !!imageData.url,
+            viewport: viewport
+        });
         
         // Clear canvas with solid black background
         ctx.fillStyle = '#000000';
@@ -1247,6 +1434,7 @@ class DicomRenderer {
         const cacheKey = `${imageData.id}_${viewport.windowWidth}_${viewport.windowCenter}_${viewport.invert}`;
         if (this.imageCache && this.imageCache.has(cacheKey)) {
             const cachedCanvas = this.imageCache.get(cacheKey);
+            console.log('✅ Using cached image:', cacheKey);
             ctx.drawImage(
                 cachedCanvas,
                 -cachedCanvas.width / 2,
@@ -1263,6 +1451,8 @@ class DicomRenderer {
         return new Promise((resolve, reject) => {
             img.onload = () => {
                 try {
+                    console.log('✅ Image loaded for 2D rendering:', img.width, 'x', img.height);
+                    
                     // Apply windowing (optimized)
                     const processedCanvas = this.applyWindowingOptimized(img, viewport);
                     
@@ -1285,26 +1475,31 @@ class DicomRenderer {
                         -processedCanvas.height / 2
                     );
                     
+                    console.log('✅ 2D rendering completed successfully');
                     ctx.restore();
                     resolve();
                     
                 } catch (error) {
+                    console.error('❌ Error in 2D rendering:', error);
                     ctx.restore();
                     reject(error);
                 }
             };
             
-            img.onerror = () => {
+            img.onerror = (error) => {
+                console.error('❌ Failed to load image for 2D rendering:', imageData.dataUrl || imageData.url);
                 ctx.restore();
                 reject(new Error('Failed to load image'));
             };
             
             // Load image data
-            if (imageData.dataUrl) {
-                img.src = imageData.dataUrl;
-            } else if (imageData.url) {
-                img.src = imageData.url;
+            const imageUrl = imageData.dataUrl || imageData.url;
+            if (imageUrl) {
+                console.log('📥 Loading image for 2D rendering:', imageUrl.substring(0, 100) + '...');
+                img.src = imageUrl;
             } else {
+                console.error('❌ No image URL available');
+                ctx.restore();
                 reject(new Error('No image data available'));
             }
         });
@@ -2022,16 +2217,150 @@ document.addEventListener('DOMContentLoaded', async function() {
         };
         
         // Additional compatibility functions
-        window.loadFromLocalFiles = () => window.professionalViewer.showToast('Local file loading available', 'info');
+        window.loadFromLocalFiles = async function() {
+            try {
+                const fileInput = document.getElementById('fileInput');
+                if (!fileInput) {
+                    // Create hidden file input if it doesn't exist
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.id = 'fileInput';
+                    input.style.display = 'none';
+                    input.multiple = true;
+                    input.setAttribute('webkitdirectory', '');
+                    input.setAttribute('directory', '');
+                    input.setAttribute('accept', '.dcm,.dicom,*');
+                    document.body.appendChild(input);
+                    
+                    input.addEventListener('change', async function(e) {
+                        const files = e.target.files;
+                        if (files && files.length > 0) {
+                            await processLocalDicomFiles(files);
+                        }
+                    });
+                    
+                    input.click();
+                } else {
+                    fileInput.value = '';
+                    fileInput.setAttribute('webkitdirectory', '');
+                    fileInput.setAttribute('directory', '');
+                    fileInput.setAttribute('accept', '.dcm,.dicom,*');
+                    fileInput.multiple = true;
+                    fileInput.click();
+                }
+                window.professionalViewer.showToast('📁 Select a DICOM folder or files', 'info');
+            } catch (e) {
+                console.error('Error opening file browser:', e);
+                window.professionalViewer.showToast('File browser opened', 'info');
+            }
+        };
+        
+        window.processLocalDicomFiles = async function(files) {
+            if (!files || files.length === 0) return;
+            
+            try {
+                window.professionalViewer.showLoading('Processing local DICOM files...');
+                
+                // Check if dicomParser is available
+                if (typeof dicomParser === 'undefined') {
+                    window.professionalViewer.showToast('DICOM parser not available', 'warning');
+                    window.professionalViewer.hideLoading();
+                    return;
+                }
+                
+                // Filter for DICOM files
+                const dicomFiles = Array.from(files).filter(f => {
+                    const name = (f.name || '').toLowerCase();
+                    return name.endsWith('.dcm') || name.endsWith('.dicom') || f.size > 132;
+                });
+                
+                if (dicomFiles.length === 0) {
+                    window.professionalViewer.hideLoading();
+                    window.professionalViewer.showToast('No DICOM files found in selection', 'warning');
+                    return;
+                }
+                
+                // Sort files naturally
+                dicomFiles.sort((a, b) => {
+                    const aPath = a.webkitRelativePath || a.name;
+                    const bPath = b.webkitRelativePath || b.name;
+                    return aPath.localeCompare(bPath, undefined, { numeric: true });
+                });
+                
+                // Create FormData and upload to server for processing
+                const formData = new FormData();
+                dicomFiles.forEach((file, index) => {
+                    formData.append('files', file);
+                });
+                
+                const response = await fetch('/dicom-viewer/api/upload-local/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrf-token]')?.content || ''
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.study_id) {
+                    window.professionalViewer.showToast(`Successfully processed ${dicomFiles.length} DICOM files`, 'success');
+                    await window.loadStudy(data.study_id);
+                } else {
+                    window.professionalViewer.showToast('Failed to process DICOM files', 'error');
+                }
+                
+                window.professionalViewer.hideLoading();
+                
+            } catch (error) {
+                console.error('Error processing local DICOM files:', error);
+                window.professionalViewer.hideLoading();
+                window.professionalViewer.showToast('Error processing files: ' + error.message, 'error');
+            }
+        };
+        
         window.loadFromExternalMedia = () => window.professionalViewer.showToast('External media loading available', 'info');
+        
         window.loadStudies = async () => {
             try {
-                const response = await fetch('/worklist/api/studies/');
+                const response = await fetch('/dicom-viewer/api/studies/');
                 const data = await response.json();
-                if (data.success) {
-                    window.professionalViewer.showToast(`Loaded ${data.studies.length} studies`, 'success');
+                if (data.success && data.studies) {
+                    const studySelect = document.getElementById('studySelect') || document.getElementById('studySelector');
+                    if (studySelect) {
+                        studySelect.innerHTML = '<option value="">Select Study from System</option>';
+                        
+                        data.studies.forEach(study => {
+                            const option = document.createElement('option');
+                            option.value = study.id;
+                            option.textContent = `${study.patient_name} - ${study.accession_number} (${study.modality})`;
+                            studySelect.appendChild(option);
+                        });
+                        
+                        window.professionalViewer.showToast(`Loaded ${data.studies.length} studies`, 'success');
+                    }
+                } else {
+                    // Try fallback endpoint
+                    const fallbackResponse = await fetch('/worklist/api/studies/');
+                    const fallbackData = await fallbackResponse.json();
+                    if (fallbackData.success && fallbackData.studies) {
+                        const studySelect = document.getElementById('studySelect') || document.getElementById('studySelector');
+                        if (studySelect) {
+                            studySelect.innerHTML = '<option value="">Select Study from System</option>';
+                            
+                            fallbackData.studies.forEach(study => {
+                                const option = document.createElement('option');
+                                option.value = study.id;
+                                option.textContent = `${study.patient_name} - ${study.accession_number} (${study.modality})`;
+                                studySelect.appendChild(option);
+                            });
+                            
+                            window.professionalViewer.showToast(`Loaded ${fallbackData.studies.length} studies`, 'success');
+                        }
+                    }
                 }
             } catch (error) {
+                console.error('Error loading studies:', error);
                 window.professionalViewer.showToast('Failed to load studies', 'error');
             }
         };
