@@ -1287,6 +1287,7 @@
         let currentSeries = null;
         let currentImageIndex = 0;
         let imageData = [];
+        let currentImageData = null;  // Store currently loaded image data for re-rendering
         let activeTool = 'windowing';
         let viewMode = 'single'; // 'single' or 'mpr'
         let measurements = [];
@@ -1546,6 +1547,11 @@
                 ctx.mozImageSmoothingEnabled = false;
                 ctx.webkitImageSmoothingEnabled = false;
                 ctx.msImageSmoothingEnabled = false;
+                
+                // Re-render current image if available
+                if (currentImageData && currentImageData.pixel_data) {
+                    renderDicomImage(currentImageData);
+                }
             }
             
             // Resize MPR canvases
@@ -1900,6 +1906,9 @@
                 windowWidth = data.window_width || windowWidth;
                 windowLevel = data.window_center || windowLevel;
                 
+                // Store current image data for re-rendering
+                currentImageData = data;
+                
                 updateSliders();
                 renderDicomImage(data);
                 
@@ -1925,7 +1934,10 @@
                 columns: imageData.columns,
                 rows: imageData.rows,
                 pixelDataLength: imageData.pixel_data.length,
-                canvasSize: `${canvas.width}x${canvas.height}`
+                canvasSize: `${canvas.width}x${canvas.height}`,
+                windowWidth: windowWidth,
+                windowLevel: windowLevel,
+                pixelDataSample: imageData.pixel_data.slice(0, 10)
             });
             
             // Create ImageData from pixel array
@@ -1946,14 +1958,18 @@
                 pixels[i * 4 + 3] = 255;   // A
             }
             
+            // Log a sample of the processed pixel values for debugging
+            console.log('🔍 Processed pixel sample:', Array.from(pixels.slice(0, 40)));
+            
             const imgData = new ImageData(pixels, imageData.columns, imageData.rows);
             
             // Use canvas dimensions directly
             const canvasWidth = canvas.width;
             const canvasHeight = canvas.height;
             
-            // Clear canvas
-            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            // Clear canvas with black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
             
             // Calculate scaling to fit image in canvas while maintaining aspect ratio
             const imageAspect = imgData.width / imgData.height;
@@ -1978,6 +1994,13 @@
             const drawX = (canvasWidth - drawWidth) / 2 + panX;
             const drawY = (canvasHeight - drawHeight) / 2 + panY;
             
+            // Create a temporary canvas for the image data
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = imgData.width;
+            tempCanvas.height = imgData.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.putImageData(imgData, 0, 0);
+            
             // Apply transformations if needed
             if (rotation !== 0 || flipH || flipV) {
                 ctx.save();
@@ -1986,22 +2009,14 @@
                 if (rotation !== 0) ctx.rotate(rotation * Math.PI / 180);
                 if (flipH || flipV) ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
                 
-                // Put image data directly to canvas at transformed position
-                ctx.translate(-drawWidth / 2, -drawHeight / 2);
-                
-                // Scale the context to draw the image at the right size
-                ctx.scale(scale, scale);
-                ctx.putImageData(imgData, -imgData.width / 2, -imgData.height / 2);
+                // Draw the temp canvas at the center with proper scaling
+                ctx.drawImage(tempCanvas, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
                 
                 ctx.restore();
             } else {
                 // Simple case - no transformations
-                // Scale context and put image data directly
-                ctx.save();
-                ctx.translate(drawX, drawY);
-                ctx.scale(scale, scale);
-                ctx.putImageData(imgData, 0, 0);
-                ctx.restore();
+                // Draw image directly at the calculated position
+                ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight);
             }
             
             // Always draw measurements and annotations after rendering the image
@@ -2188,6 +2203,13 @@
         }
 
         // UI Update Functions
+        function redrawCurrentImage() {
+            // Re-render the current image with updated window/level settings
+            if (currentImageData && currentImageData.pixel_data) {
+                renderDicomImage(currentImageData);
+            }
+        }
+
         function updateWindowWidth(value) {
             windowWidth = parseInt(value);
             document.getElementById('wwValue').textContent = windowWidth;

@@ -6366,8 +6366,6 @@ def api_image_data(request, image_id):
                 'instance_number': image.instance_number,
                 'columns': getattr(ds, 'Columns', 512),
                 'rows': getattr(ds, 'Rows', 512),
-                'window_center': getattr(ds, 'WindowCenter', 128),
-                'window_width': getattr(ds, 'WindowWidth', 256),
                 'pixel_spacing': list(pixel_spacing) if pixel_spacing is not None else [1.0, 1.0],
                 'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
                 'image_position': list(image_position) if image_position is not None else [0, 0, 0],
@@ -6397,9 +6395,17 @@ def api_image_data(request, image_id):
                 data['pixel_data'] = pixel_array.flatten().tolist()
                 data['pixel_min'] = pixel_min
                 data['pixel_max'] = pixel_max
+                
+                # Since we normalized pixel data to 0-255, set window values accordingly
+                # This ensures proper windowing in the frontend
+                data['window_center'] = 128
+                data['window_width'] = 256
             else:
                 data['pixel_data'] = None
                 data['error'] = 'No pixel data available'
+                # Default window values even if no pixel data
+                data['window_center'] = getattr(ds, 'WindowCenter', 128)
+                data['window_width'] = getattr(ds, 'WindowWidth', 256)
             
             return JsonResponse(data)
             
