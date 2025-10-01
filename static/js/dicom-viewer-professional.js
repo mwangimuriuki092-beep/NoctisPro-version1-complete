@@ -1309,6 +1309,11 @@ class DicomRenderer {
         // Create texture from image data (await for async loading)
         const texture = await this.createTexture(gl, imageData);
         
+        // Verify texture is valid
+        if (!texture || !gl.isTexture(texture)) {
+            throw new Error('Failed to create valid WebGL texture');
+        }
+        
         // Set up vertex data
         this.setupVertexData(gl);
         
@@ -1331,8 +1336,13 @@ class DicomRenderer {
         console.log('🚀 WebGL high-performance rendering completed');
     }
     
-    createTexture(gl, imageData) {
+    async createTexture(gl, imageData) {
         const texture = gl.createTexture();
+        if (!texture) {
+            console.error('❌ Failed to create WebGL texture object');
+            return null;
+        }
+        
         gl.bindTexture(gl.TEXTURE_2D, texture);
         
         // Create image element if we have a URL
@@ -1340,50 +1350,61 @@ class DicomRenderer {
             const img = new Image();
             img.crossOrigin = 'anonymous';
             
-            return new Promise((resolve, reject) => {
-                img.onload = () => {
-                    try {
-                        gl.bindTexture(gl.TEXTURE_2D, texture);
-                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                        console.log('✅ WebGL texture created successfully:', img.width, 'x', img.height);
-                        resolve(texture);
-                    } catch (error) {
-                        console.error('❌ Failed to create WebGL texture:', error);
-                        reject(error);
-                    }
-                };
-                
-                img.onerror = (error) => {
-                    console.error('❌ Failed to load image for texture:', imageData.dataUrl || imageData.url);
-                    // Create a fallback texture
-                    gl.bindTexture(gl.TEXTURE_2D, texture);
-                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                    resolve(texture); // Resolve with fallback rather than reject
-                };
-                
-                const imageUrl = imageData.dataUrl || imageData.url;
-                console.log('📥 Loading image for WebGL texture:', imageUrl);
-                img.src = imageUrl;
-            });
+            try {
+                await new Promise((resolve, reject) => {
+                    img.onload = () => {
+                        try {
+                            gl.bindTexture(gl.TEXTURE_2D, texture);
+                            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                            console.log('✅ WebGL texture created successfully:', img.width, 'x', img.height);
+                            resolve();
+                        } catch (error) {
+                            console.error('❌ Failed to create WebGL texture:', error);
+                            reject(error);
+                        }
+                    };
+                    
+                    img.onerror = (error) => {
+                        console.error('❌ Failed to load image for texture:', imageData.dataUrl || imageData.url);
+                        // Create a fallback texture on error
+                        try {
+                            gl.bindTexture(gl.TEXTURE_2D, texture);
+                            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
+                            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                            console.log('⚠️ Created fallback texture after image load error');
+                            resolve();
+                        } catch (fallbackError) {
+                            reject(fallbackError);
+                        }
+                    };
+                    
+                    const imageUrl = imageData.dataUrl || imageData.url;
+                    console.log('📥 Loading image for WebGL texture:', imageUrl);
+                    img.src = imageUrl;
+                });
+            } catch (error) {
+                console.error('❌ Texture creation failed:', error);
+                gl.deleteTexture(texture);
+                return null;
+            }
+        } else {
+            // Fallback: create empty texture
+            console.log('⚠️ No image URL provided, creating empty texture');
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         }
         
-        // Fallback: create empty texture
-        console.log('⚠️ No image URL provided, creating empty texture');
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        
-        return Promise.resolve(texture);
+        return texture;
     }
     
     setupVertexData(gl) {
