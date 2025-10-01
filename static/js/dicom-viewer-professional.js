@@ -1072,6 +1072,7 @@ class DicomRenderer {
     constructor() {
         this.canvas = null;
         this.context = null;
+        this.context2d = null;
         this.webglSupported = false;
     }
     
@@ -1123,17 +1124,28 @@ class DicomRenderer {
             console.warn('WebGL not available, falling back to 2D');
         }
         
-        // Fallback to 2D context
-        if (!this.context) {
+        // Always get a 2D context as fallback (use a separate canvas if WebGL is enabled)
+        if (this.webglSupported) {
+            // Create a hidden 2D canvas for fallback rendering
+            const canvas2d = document.createElement('canvas');
+            canvas2d.width = this.canvas.width;
+            canvas2d.height = this.canvas.height;
+            this.canvas2d = canvas2d;
+            this.context2d = canvas2d.getContext('2d');
+            if (!this.context2d) {
+                console.warn('Failed to create 2D fallback context');
+            } else {
+                this.context2d.imageSmoothingEnabled = false;
+                this.context2d.imageSmoothingQuality = 'high';
+            }
+        } else {
+            // Use main canvas for 2D rendering if WebGL is not supported
             this.context = this.canvas.getContext('2d');
+            this.context2d = this.context;
             if (!this.context) {
                 throw new Error('Cannot get 2D canvas context');
             }
-        }
-        
-        // Enable high-quality image rendering
-        if (this.context.imageSmoothingEnabled !== undefined) {
-            this.context.imageSmoothingEnabled = false; // Crisp medical images
+            this.context.imageSmoothingEnabled = false;
             this.context.imageSmoothingQuality = 'high';
         }
         
@@ -1311,6 +1323,7 @@ class DicomRenderer {
         
         // Verify texture is valid
         if (!texture || !gl.isTexture(texture)) {
+            console.error('❌ Failed to create valid WebGL texture, texture is:', texture);
             throw new Error('Failed to create valid WebGL texture');
         }
         
@@ -1323,20 +1336,32 @@ class DicomRenderer {
         gl.uniform1f(this.programInfo.uniformLocations.windowCenter, viewport.windowCenter / 65535.0);
         gl.uniform1i(this.programInfo.uniformLocations.invert, viewport.invert ? 1 : 0);
         
-        // Bind texture
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
+        // Bind texture (double check it's still valid)
+        if (gl.isTexture(texture)) {
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+        } else {
+            throw new Error('Texture became invalid before binding');
+        }
         
         // Draw
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         
         // Clean up
-        gl.deleteTexture(texture);
+        if (texture && gl.isTexture(texture)) {
+            gl.deleteTexture(texture);
+        }
         
         console.log('🚀 WebGL high-performance rendering completed');
     }
     
     async createTexture(gl, imageData) {
+        console.log('🔧 createTexture called with imageData:', {
+            hasDataUrl: !!imageData.dataUrl,
+            hasUrl: !!imageData.url,
+            id: imageData.id
+        });
+        
         const texture = gl.createTexture();
         if (!texture) {
             console.error('❌ Failed to create WebGL texture object');
@@ -1350,10 +1375,20 @@ class DicomRenderer {
             const img = new Image();
             img.crossOrigin = 'anonymous';
             
+            const imageUrl = imageData.dataUrl || imageData.url;
+            console.log('📥 Loading image for WebGL texture:', imageUrl);
+            
             try {
                 await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        console.error('❌ Image load timeout after 10 seconds');
+                        reject(new Error('Image load timeout'));
+                    }, 10000);
+                    
                     img.onload = () => {
+                        clearTimeout(timeout);
                         try {
+                            console.log('📥 Image loaded successfully, dimensions:', img.width, 'x', img.height);
                             gl.bindTexture(gl.TEXTURE_2D, texture);
                             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
                             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -1363,13 +1398,14 @@ class DicomRenderer {
                             console.log('✅ WebGL texture created successfully:', img.width, 'x', img.height);
                             resolve();
                         } catch (error) {
-                            console.error('❌ Failed to create WebGL texture:', error);
+                            console.error('❌ Failed to create WebGL texture from image:', error);
                             reject(error);
                         }
                     };
                     
                     img.onerror = (error) => {
-                        console.error('❌ Failed to load image for texture:', imageData.dataUrl || imageData.url);
+                        clearTimeout(timeout);
+                        console.error('❌ Failed to load image for texture:', imageUrl, error);
                         // Create a fallback texture on error
                         try {
                             gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -1381,29 +1417,39 @@ class DicomRenderer {
                             console.log('⚠️ Created fallback texture after image load error');
                             resolve();
                         } catch (fallbackError) {
+                            console.error('❌ Fallback texture creation also failed:', fallbackError);
                             reject(fallbackError);
                         }
                     };
                     
-                    const imageUrl = imageData.dataUrl || imageData.url;
-                    console.log('📥 Loading image for WebGL texture:', imageUrl);
                     img.src = imageUrl;
                 });
             } catch (error) {
                 console.error('❌ Texture creation failed:', error);
-                gl.deleteTexture(texture);
+                if (texture && gl.isTexture(texture)) {
+                    gl.deleteTexture(texture);
+                }
                 return null;
             }
         } else {
             // Fallback: create empty texture
-            console.log('⚠️ No image URL provided, creating empty texture');
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            console.log('⚠️ No image URL provided in imageData, creating empty texture');
+            try {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            } catch (error) {
+                console.error('❌ Failed to create empty texture:', error);
+                if (texture && gl.isTexture(texture)) {
+                    gl.deleteTexture(texture);
+                }
+                return null;
+            }
         }
         
+        console.log('✅ Texture creation completed, returning texture');
         return texture;
     }
     
@@ -1420,8 +1466,13 @@ class DicomRenderer {
     }
     
     async render2D(imageData, viewport) {
-        const ctx = this.context;
-        const canvas = this.canvas;
+        // Use 2D context (either the main canvas or fallback canvas)
+        const ctx = this.context2d;
+        const canvas = this.canvas2d || this.canvas;
+        
+        if (!ctx) {
+            throw new Error('2D rendering context not available');
+        }
         
         console.log('🎨 Starting 2D render:', {
             canvasSize: `${canvas.width}x${canvas.height}`,
@@ -1496,8 +1547,19 @@ class DicomRenderer {
                         -processedCanvas.height / 2
                     );
                     
-                    console.log('✅ 2D rendering completed successfully');
                     ctx.restore();
+                    
+                    // If using fallback 2D canvas, copy to main WebGL canvas
+                    if (this.canvas2d && this.canvas2d !== this.canvas) {
+                        const mainCtx = this.canvas.getContext('2d', { willReadFrequently: true });
+                        if (mainCtx) {
+                            mainCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                            mainCtx.drawImage(this.canvas2d, 0, 0);
+                            console.log('✅ Copied 2D fallback rendering to main canvas');
+                        }
+                    }
+                    
+                    console.log('✅ 2D rendering completed successfully');
                     resolve();
                     
                 } catch (error) {
@@ -1678,6 +1740,12 @@ class DicomRenderer {
         
             canvas.width = width;
             canvas.height = height;
+            
+            // Also resize the 2D fallback canvas if it exists
+            if (this.canvas2d && this.canvas2d !== this.canvas) {
+                this.canvas2d.width = width;
+                this.canvas2d.height = height;
+            }
             
             console.log(`Canvas resized to: ${width}x${height}`);
             
