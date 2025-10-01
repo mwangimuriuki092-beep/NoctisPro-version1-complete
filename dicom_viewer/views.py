@@ -6366,8 +6366,6 @@ def api_image_data(request, image_id):
                 'instance_number': image.instance_number,
                 'columns': getattr(ds, 'Columns', 512),
                 'rows': getattr(ds, 'Rows', 512),
-                'window_center': getattr(ds, 'WindowCenter', 128),
-                'window_width': getattr(ds, 'WindowWidth', 256),
                 'pixel_spacing': list(pixel_spacing) if pixel_spacing is not None else [1.0, 1.0],
                 'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
                 'image_position': list(image_position) if image_position is not None else [0, 0, 0],
@@ -6394,12 +6392,35 @@ def api_image_data(request, image_id):
                 else:
                     pixel_array = np.zeros_like(pixel_array, dtype=np.uint8)
                 
-                data['pixel_data'] = pixel_array.flatten().tolist()
+                # Convert to base64 for more efficient transfer
+                import base64
+                from io import BytesIO
+                from PIL import Image
+                
+                # Create PIL Image from normalized pixel array
+                pil_image = Image.fromarray(pixel_array, mode='L')
+                
+                # Convert to PNG and encode as base64
+                buffer = BytesIO()
+                pil_image.save(buffer, format='PNG', optimize=False)
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                
+                # Return as data URL for direct use in Image()
+                data['data_url'] = f'data:image/png;base64,{image_base64}'
                 data['pixel_min'] = pixel_min
                 data['pixel_max'] = pixel_max
+                
+                # Since we normalized pixel data to 0-255, set window values accordingly
+                # This ensures proper windowing in the frontend
+                data['window_center'] = 128
+                data['window_width'] = 256
             else:
                 data['pixel_data'] = None
                 data['error'] = 'No pixel data available'
+                # Default window values even if no pixel data
+                data['window_center'] = getattr(ds, 'WindowCenter', 128)
+                data['window_width'] = getattr(ds, 'WindowWidth', 256)
             
             return JsonResponse(data)
             
