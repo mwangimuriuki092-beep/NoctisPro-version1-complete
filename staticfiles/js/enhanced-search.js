@@ -12,8 +12,6 @@ class EnhancedSearch {
     
     init() {
         this.enhanceExistingSearch();
-        this.addSearchSuggestions();
-        this.addSearchHistory();
     }
     
     enhanceExistingSearch() {
