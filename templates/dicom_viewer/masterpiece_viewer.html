@@ -2784,7 +2784,14 @@
             const container = document.getElementById('referencesList');
             if (!container) return;
             
-            if (!references || references.length === 0) {
+            // Handle non-array responses
+            if (!Array.isArray(references)) {
+                console.warn('References is not an array:', references);
+                container.innerHTML = '<p style="padding: 10px; color: var(--text-muted);">No references found.</p>';
+                return;
+            }
+            
+            if (references.length === 0) {
                 container.innerHTML = '<p style="padding: 10px; color: var(--text-muted);">No references found.</p>';
                 return;
             }
