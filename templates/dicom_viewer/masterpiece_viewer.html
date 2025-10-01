@@ -1892,12 +1892,13 @@
                 const data = await response.json();
                 console.log('Image data received:', {
                     hasPixelData: !!data.pixel_data,
+                    hasDataUrl: !!data.data_url,
                     columns: data.columns,
                     rows: data.rows,
                     pixelDataLength: data.pixel_data ? data.pixel_data.length : 0
                 });
                 
-                if (!data.pixel_data) {
+                if (!data.pixel_data && !data.data_url) {
                     showToast('No pixel data available for this image', 'warning');
                     return;
                 }
@@ -1921,12 +1922,19 @@
         }
 
         function renderDicomImage(imageData) {
-            if (!imageData.pixel_data || !ctx) {
+            if ((!imageData.pixel_data && !imageData.data_url) || !ctx) {
                 console.error('❌ Cannot render image:', {
                     hasPixelData: !!imageData.pixel_data,
+                    hasDataUrl: !!imageData.data_url,
                     hasContext: !!ctx,
                     canvasExists: !!canvas
                 });
+                return;
+            }
+            
+            // If we have data_url, use the more efficient image-based rendering
+            if (imageData.data_url) {
+                renderDicomImageFromUrl(imageData);
                 return;
             }
             
@@ -2027,6 +2035,84 @@
             }
             
             updateOverlayLabels();
+        }
+
+        function renderDicomImageFromUrl(imageData) {
+            console.log('🎨 Rendering DICOM image from URL:', {
+                hasDataUrl: !!imageData.data_url,
+                canvasSize: `${canvas.width}x${canvas.height}`,
+                windowWidth: windowWidth,
+                windowLevel: windowLevel
+            });
+            
+            const img = new Image();
+            img.onload = function() {
+                // Clear canvas with black background
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Calculate scaling to fit image in canvas while maintaining aspect ratio
+                const imageAspect = img.width / img.height;
+                const canvasAspect = canvas.width / canvas.height;
+                
+                let scale = 1;
+                if (imageAspect > canvasAspect) {
+                    scale = canvas.width / img.width;
+                } else {
+                    scale = canvas.height / img.height;
+                }
+                
+                // Apply zoom
+                scale *= zoom;
+                
+                const drawWidth = img.width * scale;
+                const drawHeight = img.height * scale;
+                
+                // Center the image with pan offset
+                const drawX = (canvas.width - drawWidth) / 2 + panX;
+                const drawY = (canvas.height - drawHeight) / 2 + panY;
+                
+                // Apply transformations if needed
+                if (rotation !== 0 || flipH || flipV) {
+                    ctx.save();
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    
+                    if (rotation !== 0) ctx.rotate(rotation * Math.PI / 180);
+                    if (flipH || flipV) ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+                    
+                    ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                }
+                
+                // Apply inversion if needed
+                if (inverted) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'difference';
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.restore();
+                }
+                
+                // Draw measurements and annotations
+                drawMeasurements();
+                drawAnnotations();
+                if (crosshair) {
+                    drawCrosshair();
+                }
+                
+                updateOverlayLabels();
+                
+                console.log('✅ Image rendered successfully from URL');
+            };
+            
+            img.onerror = function() {
+                console.error('❌ Failed to load image from data URL');
+                showToast('Failed to render image', 'error');
+            };
+            
+            img.src = imageData.data_url;
         }
 
         function applyWindowing(pixelValue, ww, wl) {

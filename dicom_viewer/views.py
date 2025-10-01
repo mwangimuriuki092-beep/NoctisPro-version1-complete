@@ -6392,7 +6392,22 @@ def api_image_data(request, image_id):
                 else:
                     pixel_array = np.zeros_like(pixel_array, dtype=np.uint8)
                 
-                data['pixel_data'] = pixel_array.flatten().tolist()
+                # Convert to base64 for more efficient transfer
+                import base64
+                from io import BytesIO
+                from PIL import Image
+                
+                # Create PIL Image from normalized pixel array
+                pil_image = Image.fromarray(pixel_array, mode='L')
+                
+                # Convert to PNG and encode as base64
+                buffer = BytesIO()
+                pil_image.save(buffer, format='PNG', optimize=False)
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                
+                # Return as data URL for direct use in Image()
+                data['data_url'] = f'data:image/png;base64,{image_base64}'
                 data['pixel_min'] = pixel_min
                 data['pixel_max'] = pixel_max
                 
