@@ -6383,44 +6383,49 @@ def api_image_data(request, image_id):
                 if slope != 1 or intercept != 0:
                     pixel_array = pixel_array * slope + intercept
                 
-                # Normalize to 8-bit for display
+                # Store original pixel data statistics for proper windowing
                 pixel_min = float(np.min(pixel_array))
                 pixel_max = float(np.max(pixel_array))
                 
+                # Normalize to 0-255 range for display (will be windowed on client side)
                 if pixel_max > pixel_min:
-                    pixel_array = ((pixel_array - pixel_min) / (pixel_max - pixel_min) * 255).astype(np.uint8)
+                    pixel_array_normalized = ((pixel_array - pixel_min) / (pixel_max - pixel_min) * 255).astype(np.uint8)
                 else:
-                    pixel_array = np.zeros_like(pixel_array, dtype=np.uint8)
+                    pixel_array_normalized = np.zeros_like(pixel_array, dtype=np.uint8)
                 
-                # Convert to base64 for more efficient transfer
-                import base64
-                from io import BytesIO
-                from PIL import Image
+                # Flatten and convert to list for JSON serialization
+                pixel_data_list = pixel_array_normalized.flatten().tolist()
                 
-                # Create PIL Image from normalized pixel array
-                pil_image = Image.fromarray(pixel_array, mode='L')
-                
-                # Convert to PNG and encode as base64
-                buffer = BytesIO()
-                pil_image.save(buffer, format='PNG', optimize=False)
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                
-                # Return as data URL for direct use in Image()
-                data['data_url'] = f'data:image/png;base64,{image_base64}'
+                # Add pixel data array for client-side rendering (matching working HTML code)
+                data['pixel_data'] = pixel_data_list
                 data['pixel_min'] = pixel_min
                 data['pixel_max'] = pixel_max
                 
-                # Since we normalized pixel data to 0-255, set window values accordingly
-                # This ensures proper windowing in the frontend
-                data['window_center'] = 128
-                data['window_width'] = 256
+                # Get window values from DICOM or use defaults
+                window_center = getattr(ds, 'WindowCenter', None)
+                window_width = getattr(ds, 'WindowWidth', None)
+                
+                # Handle multiple window values (take first if list/sequence)
+                if window_center is not None:
+                    if hasattr(window_center, '__iter__') and not isinstance(window_center, str):
+                        window_center = window_center[0]
+                    data['window_center'] = float(window_center)
+                else:
+                    data['window_center'] = 40
+                
+                if window_width is not None:
+                    if hasattr(window_width, '__iter__') and not isinstance(window_width, str):
+                        window_width = window_width[0]
+                    data['window_width'] = float(window_width)
+                else:
+                    data['window_width'] = 400
+                    
             else:
                 data['pixel_data'] = None
                 data['error'] = 'No pixel data available'
                 # Default window values even if no pixel data
-                data['window_center'] = getattr(ds, 'WindowCenter', 128)
-                data['window_width'] = getattr(ds, 'WindowWidth', 256)
+                data['window_center'] = 40
+                data['window_width'] = 400
             
             return JsonResponse(data)
             

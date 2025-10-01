@@ -1869,7 +1869,49 @@
                     const pixelData = await pixelResponse.json();
                     if (pixelData && pixelData.pixel_data) {
                         currentImageData = pixelData; // Store for HTML-style rendering
-                        console.log('Pixel data loaded for HTML-style rendering');
+                        
+                        // Initialize window/level from DICOM data (only on first load)
+                        if (pixelData.window_width && pixelData.window_center) {
+                            windowWidth = pixelData.window_width;
+                            windowLevel = pixelData.window_center;
+                            
+                            // Update UI sliders
+                            document.getElementById('wwSlider').value = windowWidth;
+                            document.getElementById('wlSlider').value = windowLevel;
+                            document.getElementById('wwValue').textContent = windowWidth;
+                            document.getElementById('wlValue').textContent = windowLevel;
+                        }
+                        
+                        console.log('Pixel data loaded for HTML-style rendering:', {
+                            pixelCount: pixelData.pixel_data.length,
+                            columns: pixelData.columns,
+                            rows: pixelData.rows,
+                            windowWidth: windowWidth,
+                            windowLevel: windowLevel
+                        });
+                        
+                        // Immediately render to canvas with pixel data (don't wait for image element)
+                        const canvas = document.getElementById('dicomCanvas');
+                        if (canvas) {
+                            console.log('Rendering pixel data directly to canvas...');
+                            renderDicomImageData(currentImageData, canvas);
+                            
+                            // Hide welcome screen and show image view
+                            const welcomeScreen = document.getElementById('welcomeScreen');
+                            const singleView = document.getElementById('singleView');
+                            if (welcomeScreen) welcomeScreen.style.display = 'none';
+                            if (singleView) singleView.style.display = 'flex';
+                            
+                            hideLoading();
+                            updateImageInfo(data.image_info);
+                            showToast('DICOM image loaded successfully', 'success');
+                            
+                            // Don't need to load image element if we have pixel data
+                            return;
+                        }
+                    } else {
+                        console.warn('No pixel_data in response:', pixelData);
+                        currentImageData = null;
                     }
                 } catch (pixelError) {
                     console.warn('Could not load pixel data, using image element rendering:', pixelError);
@@ -2613,10 +2655,14 @@
             
             // Try pixel data rendering first, then fallback to image element
             if (currentImageData && currentImageData.pixel_data) {
-                console.log('Using DICOM pixel data rendering');
-                renderDicomImageData(currentImageData, canvas);
+                console.log('Using DICOM pixel data rendering with', currentImageData.pixel_data.length, 'pixels');
+                const success = renderDicomImageData(currentImageData, canvas);
+                if (!success) {
+                    console.warn('Pixel data rendering failed, falling back to image element rendering');
+                    renderImageElementToCanvas(imgElement, canvas, modality);
+                }
             } else {
-                console.log('Using image element rendering');
+                console.log('Using image element rendering (no pixel data available)');
                 renderImageElementToCanvas(imgElement, canvas, modality);
             }
         }
@@ -2635,9 +2681,9 @@
             const height = imageData.rows || imageData.height || 512;
             const pixelData = imageData.pixel_data;
 
-            // Update window/level from DICOM data - SAME AS HTML FILE
-            const ww = imageData.window_width || windowWidth;
-            const wl = imageData.window_center || windowLevel;
+            // Use current window/level settings (not from DICOM data) - SAME AS HTML FILE
+            const ww = windowWidth;
+            const wl = windowLevel;
 
             // Create ImageData from pixel array - SAME AS HTML FILE
             const pixels = new Uint8ClampedArray(pixelData.length * 4);
