@@ -1276,7 +1276,13 @@ class DicomRenderer {
         
         try {
             if (this.webglSupported) {
-                await this.renderWebGL(imageData, viewport);
+                try {
+                    await this.renderWebGL(imageData, viewport);
+                } catch (webglError) {
+                    console.warn('WebGL rendering failed, falling back to 2D:', webglError);
+                    this.webglSupported = false; // Disable WebGL for future renders
+                    await this.render2D(imageData, viewport);
+                }
             } else {
                 await this.render2D(imageData, viewport);
             }
@@ -1334,27 +1340,50 @@ class DicomRenderer {
             const img = new Image();
             img.crossOrigin = 'anonymous';
             
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 img.onload = () => {
-                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                    try {
+                        gl.bindTexture(gl.TEXTURE_2D, texture);
+                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                        console.log('✅ WebGL texture created successfully:', img.width, 'x', img.height);
+                        resolve(texture);
+                    } catch (error) {
+                        console.error('❌ Failed to create WebGL texture:', error);
+                        reject(error);
+                    }
+                };
+                
+                img.onerror = (error) => {
+                    console.error('❌ Failed to load image for texture:', imageData.dataUrl || imageData.url);
+                    // Create a fallback texture
+                    gl.bindTexture(gl.TEXTURE_2D, texture);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                    resolve(texture);
+                    resolve(texture); // Resolve with fallback rather than reject
                 };
-                img.src = imageData.dataUrl || imageData.url;
+                
+                const imageUrl = imageData.dataUrl || imageData.url;
+                console.log('📥 Loading image for WebGL texture:', imageUrl);
+                img.src = imageUrl;
             });
         }
         
         // Fallback: create empty texture
+        console.log('⚠️ No image URL provided, creating empty texture');
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         
-        return texture;
+        return Promise.resolve(texture);
     }
     
     setupVertexData(gl) {
@@ -1372,6 +1401,13 @@ class DicomRenderer {
     async render2D(imageData, viewport) {
         const ctx = this.context;
         const canvas = this.canvas;
+        
+        console.log('🎨 Starting 2D render:', {
+            canvasSize: `${canvas.width}x${canvas.height}`,
+            hasDataUrl: !!imageData.dataUrl,
+            hasUrl: !!imageData.url,
+            viewport: viewport
+        });
         
         // Clear canvas with solid black background
         ctx.fillStyle = '#000000';
@@ -1398,6 +1434,7 @@ class DicomRenderer {
         const cacheKey = `${imageData.id}_${viewport.windowWidth}_${viewport.windowCenter}_${viewport.invert}`;
         if (this.imageCache && this.imageCache.has(cacheKey)) {
             const cachedCanvas = this.imageCache.get(cacheKey);
+            console.log('✅ Using cached image:', cacheKey);
             ctx.drawImage(
                 cachedCanvas,
                 -cachedCanvas.width / 2,
@@ -1414,6 +1451,8 @@ class DicomRenderer {
         return new Promise((resolve, reject) => {
             img.onload = () => {
                 try {
+                    console.log('✅ Image loaded for 2D rendering:', img.width, 'x', img.height);
+                    
                     // Apply windowing (optimized)
                     const processedCanvas = this.applyWindowingOptimized(img, viewport);
                     
@@ -1436,26 +1475,31 @@ class DicomRenderer {
                         -processedCanvas.height / 2
                     );
                     
+                    console.log('✅ 2D rendering completed successfully');
                     ctx.restore();
                     resolve();
                     
                 } catch (error) {
+                    console.error('❌ Error in 2D rendering:', error);
                     ctx.restore();
                     reject(error);
                 }
             };
             
-            img.onerror = () => {
+            img.onerror = (error) => {
+                console.error('❌ Failed to load image for 2D rendering:', imageData.dataUrl || imageData.url);
                 ctx.restore();
                 reject(new Error('Failed to load image'));
             };
             
             // Load image data
-            if (imageData.dataUrl) {
-                img.src = imageData.dataUrl;
-            } else if (imageData.url) {
-                img.src = imageData.url;
+            const imageUrl = imageData.dataUrl || imageData.url;
+            if (imageUrl) {
+                console.log('📥 Loading image for 2D rendering:', imageUrl.substring(0, 100) + '...');
+                img.src = imageUrl;
             } else {
+                console.error('❌ No image URL available');
+                ctx.restore();
                 reject(new Error('No image data available'));
             }
         });
