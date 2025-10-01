@@ -2765,7 +2765,7 @@
                 const searchQuery = query || (currentStudy ? currentStudy.description : '');
                 
                 // Make API call to fetch references (adjust endpoint as needed)
-                const response = await fetch(`/ai/search-references/?q=${encodeURIComponent(searchQuery)}`);
+                const response = await fetch(`/ai/api/references/?q=${encodeURIComponent(searchQuery)}`);
                 
                 if (response.ok) {
                     const data = await response.json();
