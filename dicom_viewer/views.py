@@ -1111,7 +1111,7 @@ def api_dicom_image_display(request, image_id):
         ds = None
         try:
             dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
-            ds = pydicom.dcmread(dicom_path, stop_before_pixels=False)
+            ds = pydicom.dcmread(dicom_path, stop_before_pixels=False, force=True)
         except Exception as e:
             warnings['dicom_read_error'] = str(e)
 
@@ -6354,7 +6354,7 @@ def api_image_data(request, image_id):
                 return JsonResponse({'error': 'DICOM file not found'}, status=404)
             
             # Read DICOM data
-            ds = pydicom.dcmread(dicom_path)
+            ds = pydicom.dcmread(dicom_path, force=True)
             
             # Extract basic image information with safe attribute handling
             pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
