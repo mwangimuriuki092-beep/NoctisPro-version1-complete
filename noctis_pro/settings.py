@@ -64,7 +64,7 @@ ALLOWED_HOSTS = list(filter(lambda x: x and x.strip(), list(set(ALLOWED_HOSTS)))
 # Application definition
 
 INSTALLED_APPS = [
-    'daphne',  # Re-enabled for ASGI support
+    # 'daphne',  # Re-enabled for ASGI support
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -72,8 +72,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'corsheaders',  # Re-enabled for API access
-    'channels',  # Re-enabled for WebSocket support
+    # 'corsheaders',  # Re-enabled for API access
+    # 'channels',  # Re-enabled for WebSocket support
     
     # Custom apps - ENABLED FOR MEDICAL EMERGENCY
     'accounts',
@@ -87,7 +87,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Re-enabled
+    # 'corsheaders.middleware.CorsMiddleware',  # Re-enabled
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -116,7 +116,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'noctis_pro.wsgi.application'
-ASGI_APPLICATION = 'noctis_pro.asgi.application'  # Re-enabled for Daphne
+# ASGI_APPLICATION = 'noctis_pro.asgi.application'  # Re-enabled for Daphne
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
