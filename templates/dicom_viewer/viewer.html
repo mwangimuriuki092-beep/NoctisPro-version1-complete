@@ -1457,6 +1457,27 @@
             initializeViewer();
             loadAvailableStudies();
             
+            // CRITICAL FIX: Ensure canvas is visible and properly sized
+            const canvas = document.getElementById('dicomCanvas');
+            if (canvas) {
+                canvas.style.display = 'block';
+                canvas.style.visibility = 'visible';
+                const container = canvas.parentElement;
+                if (container) {
+                    const rect = container.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        canvas.width = Math.max(rect.width, 400);
+                        canvas.height = Math.max(rect.height, 400);
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            ctx.fillStyle = '#000000';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            console.log('Canvas properly initialized and visible:', canvas.width, 'x', canvas.height);
+                        }
+                    }
+                }
+            }
+            
             // Check for study ID in URL
             const urlParams = new URLSearchParams(window.location.search);
             const studyId = urlParams.get('study') || '{{ study_id|default:"" }}';
@@ -1471,9 +1492,16 @@
             setupKeyboardShortcuts();
             setupFileInput();
             
-            // Initialize canvas
+            // Initialize canvas - CRITICAL FIX
             const canvas = document.getElementById('dicomCanvas');
             if (canvas) {
+                // Force canvas to be visible and properly styled
+                canvas.style.display = 'block';
+                canvas.style.visibility = 'visible';
+                canvas.style.opacity = '1';
+                canvas.style.position = 'relative';
+                canvas.style.zIndex = '1';
+                
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
                     // Set initial canvas size
@@ -1487,9 +1515,11 @@
                         ctx.fillStyle = '#000000';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         
-                        console.log('Canvas initialized:', canvas.width, 'x', canvas.height);
+                        console.log('✅ Canvas initialized and visible:', canvas.width, 'x', canvas.height);
                     }
                 }
+            } else {
+                console.error('❌ Canvas element not found!');
             }
             
             // Initialize UI state
@@ -2667,19 +2697,32 @@
             }
         }
         
-        // HTML File Style DICOM Rendering - EXACT SAME AS HTML FILE
+        // HTML File Style DICOM Rendering - EXACT SAME AS HTML FILE - WITH FIXES
         function renderDicomImageData(imageData, canvas) {
             if (!imageData || !imageData.pixel_data || !canvas) {
-                console.error('Invalid image data or canvas');
+                console.error('Invalid image data or canvas for rendering');
                 return false;
             }
 
             const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Failed to get canvas context');
+                return false;
+            }
             
             // Extract image dimensions
             const width = imageData.columns || imageData.width || 512;
             const height = imageData.rows || imageData.height || 512;
             const pixelData = imageData.pixel_data;
+
+            console.log('Rendering DICOM image:', {
+                width: width,
+                height: height,
+                pixelCount: pixelData.length,
+                expectedPixels: width * height,
+                windowWidth: windowWidth,
+                windowLevel: windowLevel
+            });
 
             // Use current window/level settings (not from DICOM data) - SAME AS HTML FILE
             const ww = windowWidth;
@@ -2707,13 +2750,27 @@
             
             const imgData = new ImageData(pixels, width, height);
             
-            // Set canvas size to match container
+            // Set canvas size to match container - CRITICAL FIX
             const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height;
+            const containerWidth = Math.max(rect.width, 400);
+            const containerHeight = Math.max(rect.height, 400);
+            
+            if (canvas.width !== containerWidth || canvas.height !== containerHeight) {
+                canvas.width = containerWidth;
+                canvas.height = containerHeight;
+                console.log('Canvas resized to:', containerWidth, 'x', containerHeight);
+            }
+            
+            // CRITICAL FIX: Ensure canvas is visible
+            canvas.style.display = 'block';
+            canvas.style.visibility = 'visible';
             
             // Clear and draw - SAME AS HTML FILE METHOD
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Fill with black background first
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // Enhanced rendering with transformations (matching HTML file)
             if (zoom !== 1.0 || panX !== 0 || panY !== 0 || rotation !== 0 || flipH || flipV) {
@@ -2734,19 +2791,23 @@
                 ctx.restore();
             } else {
                 // Simple rendering - center the image on canvas
-                const x = (canvas.width - width) / 2;
-                const y = (canvas.height - height) / 2;
+                const x = Math.max(0, Math.floor((canvas.width - width) / 2));
+                const y = Math.max(0, Math.floor((canvas.height - height) / 2));
                 ctx.putImageData(imgData, x, y);
             }
             
             // Draw overlays (measurements, annotations, etc.)
-            drawMeasurements();
-            drawAnnotations();
-            if (showCrosshair) {
-                drawCrosshair();
+            try {
+                drawMeasurements();
+                drawAnnotations();
+                if (showCrosshair) {
+                    drawCrosshair();
+                }
+            } catch (overlayError) {
+                console.warn('Error drawing overlays:', overlayError);
             }
             
-            console.log('DICOM image rendered using HTML-style direct pixel manipulation');
+            console.log('✅ DICOM image rendered successfully using HTML-style direct pixel manipulation');
             return true;
         }
         
