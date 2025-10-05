@@ -173,7 +173,7 @@ class DicomCanvasFix {
         try {
             console.log(`Loading series ${seriesId}...`);
             
-            const response = await fetch(`/dicom-viewer/series/${seriesId}/images/`, {
+            const response = await fetch(`/dicom-viewer/web/series/${seriesId}/images/`, {
                 method: 'GET',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
@@ -212,7 +212,7 @@ class DicomCanvasFix {
                 return;
             }
             
-            const response = await fetch(`/dicom-viewer/image/${imageId}/`, {
+            const response = await fetch(`/dicom-viewer/web/image/${imageId}/`, {
                 method: 'GET',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',

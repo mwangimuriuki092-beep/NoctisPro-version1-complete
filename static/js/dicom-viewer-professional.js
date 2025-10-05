@@ -98,7 +98,7 @@ class ProfessionalDicomViewer {
             console.log('Loading study:', studyId);
             
             // Try the web endpoint first
-            let response = await fetch(`/dicom-viewer/study/${studyId}/`);
+            let response = await fetch(`/dicom-viewer/web/study/${studyId}/`);
             let data = await response.json();
             
             // If that fails, try API endpoint
@@ -164,7 +164,12 @@ class ProfessionalDicomViewer {
             this.showLoading('Loading series...');
             
             // Get series images from web endpoint
-            let response = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
+            let response = await fetch(`/dicom-viewer/web/series/${seriesId}/images/`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: Failed to fetch series ${seriesId}`);
+            }
+            
             let data = await response.json();
             
             if (data.series && data.images && data.images.length > 0) {
@@ -232,7 +237,7 @@ class ProfessionalDicomViewer {
             
         } catch (error) {
             console.error('Error loading series:', error);
-            this.showToast('Failed to load series', 'error');
+            this.showToast(`Failed to load series ${seriesId}: ${error.message}`, 'error');
         } finally {
             this.hideLoading();
         }
@@ -295,7 +300,7 @@ class ProfessionalDicomViewer {
                 
                 // Final fallback: try raw endpoint
                 if (!imageData) {
-                    const rawUrl = `/dicom-viewer/image/${imageId}/`;
+                    const rawUrl = `/dicom-viewer/web/image/${imageId}/`;
                     imageData = {
                         id: imageId,
                         url: rawUrl,
