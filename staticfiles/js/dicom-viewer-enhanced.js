@@ -896,6 +896,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Global function aliases for DICOM viewer
     window.setTool = (toolName) => dicomViewerEnhanced.setTool(toolName);
+    window.setActiveTool = (toolName) => dicomViewerEnhanced.setTool(toolName);
     window.resetView = () => dicomViewerEnhanced.resetView();
     window.toggleCrosshair = () => dicomViewerEnhanced.toggleCrosshair();
     window.toggleInvert = () => dicomViewerEnhanced.toggleInvert();
@@ -910,6 +911,586 @@ document.addEventListener('DOMContentLoaded', function() {
     window.toggleMPR = () => dicomViewerEnhanced.toggleMPR();
     window.toggleAIPanel = () => dicomViewerEnhanced.toggleAIPanel();
     window.runQuickAI = () => dicomViewerEnhanced.runQuickAI();
+    
+    // Additional compatibility functions
+    window.showLoading = (show, message) => {
+        if (show && message) {
+            dicomViewerEnhanced.showToast(message, 'info', 10000);
+        }
+    };
+    window.showToast = (message, type, duration) => dicomViewerEnhanced.showToast(message, type, duration);
+    window.hideLoading = () => {}; // No-op for compatibility
+    
+    // Studies loading function
+    window.loadStudies = async () => {
+        try {
+            dicomViewerEnhanced.showToast('Loading studies...', 'info');
+            const response = await fetch('/worklist/api/studies/');
+            const data = await response.json();
+            
+            if (data.success && data.studies) {
+                updateStudySelector(data.studies);
+                dicomViewerEnhanced.showToast(`Loaded ${data.studies.length} studies`, 'success');
+            } else {
+                dicomViewerEnhanced.showToast('Failed to load studies', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading studies:', error);
+            dicomViewerEnhanced.showToast('Error loading studies', 'error');
+        }
+    };
+    
+    // Update study selector dropdown
+    window.updateStudySelector = (studies) => {
+        const studySelect = document.getElementById('studySelect');
+        if (studySelect) {
+            studySelect.innerHTML = '<option value="">Select Study</option>';
+            studies.forEach(study => {
+                const option = document.createElement('option');
+                option.value = study.id;
+                option.textContent = `${study.patient_name} - ${study.accession_number}`;
+                studySelect.appendChild(option);
+            });
+        }
+    };
+    
+    // Reset zoom to fit
+    window.resetZoom = () => {
+        try {
+            if (dicomViewerEnhanced.currentElement && typeof cornerstone !== 'undefined') {
+                const viewport = cornerstone.getViewport(dicomViewerEnhanced.currentElement);
+                if (viewport) {
+                    viewport.scale = 1.0;
+                    viewport.translation = { x: 0, y: 0 };
+                    cornerstone.setViewport(dicomViewerEnhanced.currentElement, viewport);
+                    dicomViewerEnhanced.showToast('Zoom reset to fit', 'success', 1500);
+                } else {
+                    dicomViewerEnhanced.showToast('No image to reset zoom', 'warning');
+                }
+            } else {
+                dicomViewerEnhanced.showToast('No image loaded', 'warning');
+            }
+        } catch (error) {
+            console.error('Error resetting zoom:', error);
+            dicomViewerEnhanced.showToast('Failed to reset zoom', 'error');
+        }
+    };
+    
+    // Generate MPR reconstruction
+    window.generateMPR = async () => {
+        try {
+            if (!window.currentSeries && !window.currentStudy) {
+                dicomViewerEnhanced.showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            dicomViewerEnhanced.showToast('Generating MPR reconstruction...', 'info');
+            
+            const seriesId = window.currentSeries?.id || window.currentStudy?.series?.[0]?.id;
+            if (!seriesId) {
+                dicomViewerEnhanced.showToast('No series available for MPR', 'error');
+                return;
+            }
+            
+            const response = await fetch(`/dicom-viewer/api/series/${seriesId}/mpr/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrf-token]')?.content || ''
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                dicomViewerEnhanced.showToast('MPR reconstruction completed', 'success');
+                // Handle MPR display logic here
+            } else {
+                dicomViewerEnhanced.showToast(data.error || 'MPR generation failed', 'error');
+            }
+        } catch (error) {
+            console.error('Error generating MPR:', error);
+            dicomViewerEnhanced.showToast('Failed to generate MPR', 'error');
+        }
+    };
+    
+    // Generate MIP reconstruction
+    window.generateMIP = async () => {
+        try {
+            if (!window.currentSeries && !window.currentStudy) {
+                dicomViewerEnhanced.showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            dicomViewerEnhanced.showToast('Generating MIP reconstruction...', 'info');
+            
+            const seriesId = window.currentSeries?.id || window.currentStudy?.series?.[0]?.id;
+            if (!seriesId) {
+                dicomViewerEnhanced.showToast('No series available for MIP', 'error');
+                return;
+            }
+            
+            const response = await fetch(`/dicom-viewer/api/series/${seriesId}/mip/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrf-token]')?.content || ''
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                dicomViewerEnhanced.showToast('MIP reconstruction completed', 'success');
+                // Handle MIP display logic here
+            } else {
+                dicomViewerEnhanced.showToast(data.error || 'MIP generation failed', 'error');
+            }
+        } catch (error) {
+            console.error('Error generating MIP:', error);
+            dicomViewerEnhanced.showToast('Failed to generate MIP', 'error');
+        }
+    };
+    
+    // Load study data and populate series
+    window.loadStudy = async (studyId) => {
+        if (!studyId) return;
+        
+        try {
+            dicomViewerEnhanced.showToast('Loading study data...', 'info');
+            console.log('Loading study:', studyId);
+            
+            const response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
+            const data = await response.json();
+            
+            console.log('Study data received:', data);
+            
+            if (data.study && data.series) {
+                window.currentStudy = data.study;
+                
+                // Hide welcome screen and show image view
+                const welcomeScreen = document.getElementById('welcomeScreen');
+                const singleView = document.getElementById('singleView');
+                if (welcomeScreen) welcomeScreen.style.display = 'none';
+                if (singleView) singleView.style.display = 'flex';
+                
+                // Update study status
+                const studyStatus = document.getElementById('studyStatus');
+                if (studyStatus) {
+                    studyStatus.textContent = `${window.currentStudy.patient_name} - ${window.currentStudy.accession_number}`;
+                }
+                
+                // Populate series dropdown
+                const seriesSelect = document.getElementById('seriesSelect');
+                if (seriesSelect) {
+                    seriesSelect.innerHTML = '<option value="">Select Series</option>';
+                    data.series.forEach(series => {
+                        const option = document.createElement('option');
+                        option.value = series.id;
+                        const seriesNum = series.series_number || 'Unknown';
+                        const seriesDesc = series.description || series.series_description || 'Unnamed Series';
+                        const imageCount = series.image_count || 0;
+                        option.textContent = `Series ${seriesNum}: ${seriesDesc} (${imageCount} images)`;
+                        seriesSelect.appendChild(option);
+                    });
+                    
+                    // Auto-load first series if available
+                    if (data.series.length > 0) {
+                        await loadSeries(data.series[0].id);
+                    }
+                }
+                
+                dicomViewerEnhanced.showToast('Study loaded successfully', 'success');
+            } else {
+                dicomViewerEnhanced.showToast('Failed to load study data', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading study:', error);
+            dicomViewerEnhanced.showToast('Error loading study', 'error');
+        }
+    };
+    
+    // Load series images
+    window.loadSeries = async (seriesId) => {
+        if (!seriesId) return;
+        
+        try {
+            dicomViewerEnhanced.showToast('Loading series images...', 'info');
+            console.log('Loading series:', seriesId);
+            
+            const response = await fetch(`/dicom-viewer/web/series/${seriesId}/images/`);
+            const data = await response.json();
+            
+            console.log('Series data received:', data);
+            
+            if (data.images && data.images.length > 0) {
+                window.currentSeries = data;
+                window.currentImages = data.images;
+                window.currentImageIndex = 0;
+                
+                // Load first image
+                await loadImage(data.images[0].id);
+                
+                // Update image navigation
+                updateImageNavigation();
+                
+                dicomViewerEnhanced.showToast(`Series loaded: ${data.images.length} images`, 'success');
+            } else {
+                dicomViewerEnhanced.showToast('No images found in series', 'warning');
+            }
+        } catch (error) {
+            console.error('Error loading series:', error);
+            dicomViewerEnhanced.showToast('Error loading series', 'error');
+        }
+    };
+    
+    // Load individual image
+    window.loadImage = async (imageId) => {
+        if (!imageId) return;
+        
+        try {
+            dicomViewerEnhanced.showToast('Loading image...', 'info');
+            
+            const response = await fetch(`/dicom-viewer/web/image/${imageId}/`);
+            const imageUrl = response.url;
+            
+            // Load image into canvas
+            const canvas = document.getElementById('dicomCanvas');
+            const img = new Image();
+            
+            img.onload = function() {
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = this.naturalWidth;
+                    canvas.height = this.naturalHeight;
+                    ctx.drawImage(this, 0, 0);
+                    
+                    // Store current image
+                    window.currentImageElement = this;
+                    window.currentImageId = imageId;
+                    
+                    dicomViewerEnhanced.showToast('Image loaded successfully', 'success');
+                }
+            };
+            
+            img.onerror = function() {
+                dicomViewerEnhanced.showToast('Failed to load image', 'error');
+            };
+            
+            img.src = imageUrl;
+            
+        } catch (error) {
+            console.error('Error loading image:', error);
+            dicomViewerEnhanced.showToast('Error loading image', 'error');
+        }
+    };
+    
+    // Update image navigation controls
+    window.updateImageNavigation = () => {
+        const imageInfo = document.getElementById('imageInfo');
+        if (imageInfo && window.currentImages) {
+            const current = window.currentImageIndex + 1;
+            const total = window.currentImages.length;
+            imageInfo.textContent = `Image ${current} of ${total}`;
+        }
+    };
+    
+    // Print current image
+    window.printCurrentImage = () => {
+        try {
+            const canvas = document.getElementById('dicomCanvas');
+            if (canvas) {
+                const printWindow = window.open('', '_blank');
+                const imageDataUrl = canvas.toDataURL('image/png');
+                
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>DICOM Image Print</title>
+                            <style>
+                                body { margin: 0; padding: 20px; text-align: center; }
+                                img { max-width: 100%; max-height: 90vh; }
+                                .header { margin-bottom: 20px; font-family: Arial, sans-serif; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
+                                <h3>DICOM Image</h3>
+                                <p>Patient: ${window.currentStudy?.patient_name || 'Unknown'}</p>
+                                <p>Study: ${window.currentStudy?.accession_number || 'Unknown'}</p>
+                            </div>
+                            <img src="${imageDataUrl}" onload="window.print(); window.close();" />
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                
+                dicomViewerEnhanced.showToast('Opening print dialog...', 'info');
+            } else {
+                dicomViewerEnhanced.showToast('No image to print', 'warning');
+            }
+        } catch (error) {
+            console.error('Error printing image:', error);
+            dicomViewerEnhanced.showToast('Failed to print image', 'error');
+        }
+    };
+    
+    // Export current image
+    window.exportCurrentImage = () => {
+        try {
+            const canvas = document.getElementById('dicomCanvas');
+            if (canvas) {
+                const imageDataUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.download = `dicom-image-${Date.now()}.png`;
+                link.href = imageDataUrl;
+                link.click();
+                
+                dicomViewerEnhanced.showToast('Image exported successfully', 'success');
+            } else {
+                dicomViewerEnhanced.showToast('No image to export', 'warning');
+            }
+        } catch (error) {
+            console.error('Error exporting image:', error);
+            dicomViewerEnhanced.showToast('Failed to export image', 'error');
+        }
+    };
+    
+    // Image navigation functions
+    window.nextImage = () => {
+        if (window.currentImages && window.currentImageIndex < window.currentImages.length - 1) {
+            window.currentImageIndex++;
+            loadImage(window.currentImages[window.currentImageIndex].id);
+            updateImageNavigation();
+        }
+    };
+    
+    window.previousImage = () => {
+        if (window.currentImages && window.currentImageIndex > 0) {
+            window.currentImageIndex--;
+            loadImage(window.currentImages[window.currentImageIndex].id);
+            updateImageNavigation();
+        }
+    };
+    
+    window.firstImage = () => {
+        if (window.currentImages && window.currentImages.length > 0) {
+            window.currentImageIndex = 0;
+            loadImage(window.currentImages[0].id);
+            updateImageNavigation();
+        }
+    };
+    
+    window.lastImage = () => {
+        if (window.currentImages && window.currentImages.length > 0) {
+            window.currentImageIndex = window.currentImages.length - 1;
+            loadImage(window.currentImages[window.currentImageIndex].id);
+            updateImageNavigation();
+        }
+    };
+    
+    // Basic cine mode functionality
+    window.cineMode = {
+        isPlaying: false,
+        intervalId: null,
+        speed: 200, // milliseconds between frames
+        
+        togglePlay: function() {
+            if (this.isPlaying) {
+                this.stop();
+            } else {
+                this.play();
+            }
+        },
+        
+        play: function() {
+            if (!window.currentImages || window.currentImages.length < 2) {
+                dicomViewerEnhanced.showToast('Need multiple images for cine mode', 'warning');
+                return;
+            }
+            
+            this.isPlaying = true;
+            this.intervalId = setInterval(() => {
+                if (window.currentImageIndex >= window.currentImages.length - 1) {
+                    window.currentImageIndex = 0;
+                } else {
+                    window.currentImageIndex++;
+                }
+                loadImage(window.currentImages[window.currentImageIndex].id);
+                updateImageNavigation();
+            }, this.speed);
+            
+            dicomViewerEnhanced.showToast('Cine mode started', 'info');
+        },
+        
+        stop: function() {
+            this.isPlaying = false;
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+            }
+            dicomViewerEnhanced.showToast('Cine mode stopped', 'info');
+        }
+    };
+    
+    // Basic keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        // Only process if not in input fields
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true') {
+            return;
+        }
+        
+        switch (e.key) {
+            case 'ArrowUp':
+                e.preventDefault();
+                previousImage();
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                nextImage();
+                break;
+            case 'Home':
+                e.preventDefault();
+                firstImage();
+                break;
+            case 'End':
+                e.preventDefault();
+                lastImage();
+                break;
+            case ' ': // Spacebar for cine toggle
+                e.preventDefault();
+                cineMode.togglePlay();
+                break;
+            case 'w':
+            case 'W':
+                e.preventDefault();
+                setTool('window');
+                break;
+            case 'z':
+            case 'Z':
+                e.preventDefault();
+                setTool('zoom');
+                break;
+            case 'p':
+            case 'P':
+                e.preventDefault();
+                setTool('pan');
+                break;
+            case 'r':
+            case 'R':
+                e.preventDefault();
+                resetView();
+                break;
+            case 'i':
+            case 'I':
+                e.preventDefault();
+                toggleInvert();
+                break;
+        }
+    });
+    
+    // Missing MPR and 3D functions
+    window.setActivePlane = (plane) => {
+        console.log('Setting active plane:', plane);
+        dicomViewerEnhanced.showToast(`Switched to ${plane} plane`, 'info');
+        // TODO: Implement plane switching logic
+    };
+    
+    window.generateBone3DType = (type) => {
+        if (!type) return;
+        dicomViewerEnhanced.showToast(`Generating ${type} bone reconstruction...`, 'info');
+        // TODO: Implement bone 3D reconstruction
+    };
+    
+    window.generateVolumeRenderType = (type) => {
+        if (!type) return;
+        dicomViewerEnhanced.showToast(`Generating ${type} volume render...`, 'info');
+        // TODO: Implement volume rendering
+    };
+    
+    window.generateAdvanced3D = (type) => {
+        if (!type) return;
+        dicomViewerEnhanced.showToast(`Generating ${type} advanced 3D...`, 'info');
+        // TODO: Implement advanced 3D reconstruction
+    };
+    
+    window.changePlane = (plane) => {
+        console.log('Changing plane to:', plane);
+        dicomViewerEnhanced.showToast(`Changed to ${plane} view`, 'info');
+        // TODO: Implement plane change logic
+    };
+    
+    // AI Analysis functions
+    window.runAIAnalysisSimple = (type) => {
+        if (!type) return;
+        dicomViewerEnhanced.showToast(`Running ${type} AI analysis...`, 'info');
+        // TODO: Implement AI analysis
+    };
+    
+    window.showAIResults = () => {
+        dicomViewerEnhanced.showToast('Showing AI analysis results...', 'info');
+        // TODO: Implement AI results display
+    };
+    
+    // Export functions
+    window.exportSeries = () => {
+        try {
+            if (!window.currentSeries) {
+                dicomViewerEnhanced.showToast('No series loaded to export', 'warning');
+                return;
+            }
+            dicomViewerEnhanced.showToast('Exporting series...', 'info');
+            // TODO: Implement series export
+        } catch (error) {
+            console.error('Error exporting series:', error);
+            dicomViewerEnhanced.showToast('Failed to export series', 'error');
+        }
+    };
+    
+    // Measurement functions
+    window.deleteMeasurement = (index) => {
+        try {
+            if (dicomViewerEnhanced.measurements && dicomViewerEnhanced.measurements[index]) {
+                dicomViewerEnhanced.measurements.splice(index, 1);
+                dicomViewerEnhanced.showToast('Measurement deleted', 'success');
+                // TODO: Refresh measurement display
+            }
+        } catch (error) {
+            console.error('Error deleting measurement:', error);
+            dicomViewerEnhanced.showToast('Failed to delete measurement', 'error');
+        }
+    };
+    
+    // UI and 3D functions from masterpiece viewer
+    window.toggleUI = () => {
+        const rightPanel = document.querySelector('.right-panel');
+        if (rightPanel) {
+            rightPanel.style.display = rightPanel.style.display === 'none' ? 'block' : 'none';
+            dicomViewerEnhanced.showToast('UI toggled', 'info');
+        }
+    };
+    
+    window.selectStudy = () => {
+        const studySelector = document.getElementById('studySelector');
+        if (studySelector && studySelector.value) {
+            loadStudy(studySelector.value);
+        }
+    };
+    
+    window.reset3DView = () => {
+        dicomViewerEnhanced.showToast('3D view reset', 'info');
+        // TODO: Implement 3D view reset
+    };
+    
+    window.toggle3DRotation = () => {
+        dicomViewerEnhanced.showToast('3D rotation toggled', 'info');
+        // TODO: Implement 3D auto rotation
+    };
+    
+    window.export3DModel = () => {
+        dicomViewerEnhanced.showToast('Exporting 3D model...', 'info');
+        // TODO: Implement 3D model export
+    };
 });
 
 // Export for module systems

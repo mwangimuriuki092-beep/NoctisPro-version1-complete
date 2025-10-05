@@ -9,6 +9,8 @@ from .models import AIModel, AIAnalysis
 from .ai_processor import ai_processor
 import threading
 import logging
+from django.db import transaction
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -108,32 +110,50 @@ def check_study_ready_for_analysis(sender, instance, created, **kwargs):
 
 def start_automatic_analysis(analyses):
     """
-    Start automatic AI analysis for the given analyses
+    Start automatic AI analysis for the given analyses with database lock handling
     """
-    try:
-        for analysis in analyses:
-            # Check if analysis is still pending
-            analysis.refresh_from_db()
-            if analysis.status != 'pending':
-                continue
+    for analysis in analyses:
+        try:
+            # Use database transaction with retry logic for SQLite locks
+            max_retries = 3
+            retry_delay = 1.0
             
-            # Check if study has images
-            if analysis.study.get_image_count() == 0:
-                logger.warning(f"Study {analysis.study.accession_number} has no images, skipping analysis")
-                continue
-            
-            logger.info(f"Starting automatic AI analysis for study {analysis.study.accession_number}")
-            
-            # Process the analysis
-            success = ai_processor.process_analysis(analysis)
-            
-            if success:
-                logger.info(f"Automatic AI analysis completed for study {analysis.study.accession_number}")
-            else:
-                logger.error(f"Automatic AI analysis failed for study {analysis.study.accession_number}")
-    
-    except Exception as e:
-        logger.error(f"Error in automatic analysis processing: {e}")
+            for attempt in range(max_retries):
+                try:
+                    with transaction.atomic():
+                        # Check if analysis is still pending
+                        analysis.refresh_from_db()
+                        if analysis.status != 'pending':
+                            continue
+                        
+                        # Check if study has images
+                        if analysis.study.get_image_count() == 0:
+                            logger.warning(f"Study {analysis.study.accession_number} has no images, skipping analysis")
+                            continue
+                        
+                        logger.info(f"Starting automatic AI analysis for study {analysis.study.accession_number}")
+                        
+                        # Process the analysis
+                        success = ai_processor.process_analysis(analysis)
+                        
+                        if success:
+                            logger.info(f"Automatic AI analysis completed for study {analysis.study.accession_number}")
+                        else:
+                            logger.error(f"Automatic AI analysis failed for study {analysis.study.accession_number}")
+                        
+                        break  # Success, exit retry loop
+                        
+                except Exception as db_error:
+                    if "database is locked" in str(db_error).lower() and attempt < max_retries - 1:
+                        logger.warning(f"Database locked, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        raise db_error
+        
+        except Exception as e:
+            logger.error(f"Error in automatic analysis processing for study {analysis.study.accession_number}: {e}")
 
 
 def setup_automatic_ai_models():

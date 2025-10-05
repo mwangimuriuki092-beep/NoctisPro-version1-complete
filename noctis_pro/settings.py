@@ -388,6 +388,12 @@ DATABASES = {
         'PASSWORD': os.environ.get('DB_PASSWORD', ''),
         'HOST': os.environ.get('DB_HOST', ''),
         'PORT': os.environ.get('DB_PORT', ''),
+        'OPTIONS': {
+            'timeout': 30,  # 30 second timeout for SQLite
+            'check_same_thread': False,  # Allow multi-threading
+        } if os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3') == 'django.db.backends.sqlite3' else {},
+        'CONN_MAX_AGE': 60,  # Keep connections alive for 60 seconds
+        'CONN_HEALTH_CHECKS': True,  # Enable connection health checks
     }
 }
 
@@ -461,9 +467,20 @@ LOGGING = {
 os.makedirs(os.path.join(BASE_DIR, 'logs'), exist_ok=True)
 
 # Performance settings for production
+# Database optimizations for both development and production
+if DATABASES['default']['ENGINE'] == 'django.db.backends.sqlite3':
+    # SQLite-specific optimizations
+    DATABASES['default']['OPTIONS'].update({
+        'init_command': '''PRAGMA journal_mode=WAL;
+                          PRAGMA synchronous=NORMAL;
+                          PRAGMA cache_size=1000;
+                          PRAGMA temp_store=MEMORY;
+                          PRAGMA busy_timeout=30000;''',
+    })
+
 if not DEBUG:
     # Database connection pooling
-    DATABASES['default']['CONN_MAX_AGE'] = 60
+    DATABASES['default']['CONN_MAX_AGE'] = 300  # 5 minutes
     
     # Cache static file serving
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
