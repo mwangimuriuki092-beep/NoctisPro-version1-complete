@@ -11,6 +11,7 @@ import threading
 import logging
 from django.db import transaction
 import time
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,19 @@ def start_automatic_analysis(analyses):
     """
     Start automatic AI analysis for the given analyses with database lock handling
     """
+    # Convert to list of IDs to avoid stale object references
+    if not isinstance(analyses, list):
+        analyses = list(analyses)
+    
+    analysis_ids = []
     for analysis in analyses:
+        try:
+            analysis_ids.append(analysis.id if hasattr(analysis, 'id') else analysis)
+        except Exception as e:
+            logger.warning(f"Could not get analysis ID: {e}")
+            continue
+    
+    for analysis_id in analysis_ids:
         try:
             # Use database transaction with retry logic for SQLite locks
             max_retries = 3
@@ -121,25 +134,59 @@ def start_automatic_analysis(analyses):
             for attempt in range(max_retries):
                 try:
                     with transaction.atomic():
-                        # Check if analysis is still pending
-                        analysis.refresh_from_db()
-                        if analysis.status != 'pending':
-                            continue
+                        # Check if this analysis is already being processed by another thread
+                        cache_key = f"processing_analysis_{analysis_id}"
+                        if cache.get(cache_key):
+                            logger.info(f"Analysis {analysis_id} is already being processed by another thread, skipping")
+                            break
                         
-                        # Check if study has images
-                        if analysis.study.get_image_count() == 0:
-                            logger.warning(f"Study {analysis.study.accession_number} has no images, skipping analysis")
-                            continue
+                        # Set processing lock (expires in 10 minutes)
+                        cache.set(cache_key, True, 600)
                         
-                        logger.info(f"Starting automatic AI analysis for study {analysis.study.accession_number}")
-                        
-                        # Process the analysis
-                        success = ai_processor.process_analysis(analysis)
-                        
-                        if success:
-                            logger.info(f"Automatic AI analysis completed for study {analysis.study.accession_number}")
-                        else:
-                            logger.error(f"Automatic AI analysis failed for study {analysis.study.accession_number}")
+                        try:
+                            # Fetch fresh analysis object to avoid stale references
+                            try:
+                                analysis = AIAnalysis.objects.select_related('study', 'study__modality').get(id=analysis_id)
+                            except AIAnalysis.DoesNotExist:
+                                logger.warning(f"Analysis {analysis_id} no longer exists, skipping")
+                                break
+                            
+                            # Check if analysis is still pending
+                            if analysis.status != 'pending':
+                                logger.info(f"Analysis {analysis_id} is no longer pending (status: {analysis.status}), skipping")
+                                break
+                            
+                            # Verify study still exists and has relationship
+                            if not analysis.study:
+                                logger.error(f"Analysis {analysis_id} has no associated study, marking as failed")
+                                analysis.status = 'failed'
+                                analysis.error_message = 'No associated study found'
+                                analysis.save(update_fields=['status', 'error_message'])
+                                break
+                            
+                            # Check if study has images
+                            try:
+                                image_count = analysis.study.get_image_count()
+                                if image_count == 0:
+                                    logger.warning(f"Study {analysis.study.accession_number} has no images, skipping analysis")
+                                    break
+                            except Exception as img_error:
+                                logger.error(f"Error checking image count for study: {img_error}")
+                                break
+                            
+                            logger.info(f"Starting automatic AI analysis for study {analysis.study.accession_number}")
+                            
+                            # Process the analysis
+                            success = ai_processor.process_analysis(analysis)
+                            
+                            if success:
+                                logger.info(f"Automatic AI analysis completed for study {analysis.study.accession_number}")
+                            else:
+                                logger.error(f"Automatic AI analysis failed for study {analysis.study.accession_number}")
+                            
+                        finally:
+                            # Always clear the processing lock
+                            cache.delete(cache_key)
                         
                         break  # Success, exit retry loop
                         
@@ -153,7 +200,17 @@ def start_automatic_analysis(analyses):
                         raise db_error
         
         except Exception as e:
-            logger.error(f"Error in automatic analysis processing for study {analysis.study.accession_number}: {e}")
+            # Safe error logging that handles broken relationships
+            logger.error(f"Error in automatic analysis processing for analysis ID {analysis_id}: {e}")
+            
+            # Try to update analysis status to failed if possible
+            try:
+                analysis = AIAnalysis.objects.get(id=analysis_id)
+                analysis.status = 'failed'
+                analysis.error_message = str(e)
+                analysis.save(update_fields=['status', 'error_message'])
+            except Exception as save_error:
+                logger.error(f"Failed to update analysis status for ID {analysis_id}: {save_error}")
 
 
 def setup_automatic_ai_models():
