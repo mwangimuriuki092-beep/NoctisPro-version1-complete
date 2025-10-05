@@ -2313,9 +2313,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         window.professionalViewer = new ProfessionalDicomViewer();
         
         // Export global functions for template compatibility
-        window.loadStudy = (studyId) => window.professionalViewer.loadStudy(studyId);
-        window.loadSeries = (seriesId) => window.professionalViewer.loadSeries(seriesId);
-        window.loadImage = (imageId) => window.professionalViewer.loadImage(imageId);
+        window.loadStudy = async (studyId) => await window.professionalViewer.loadStudy(studyId);
+        window.loadSeries = async (seriesId) => await window.professionalViewer.loadSeries(seriesId);
+        window.loadImage = async (imageId) => await window.professionalViewer.loadImage(imageId);
         
         window.nextImage = () => window.professionalViewer.nextImage();
         window.previousImage = () => window.professionalViewer.previousImage();
