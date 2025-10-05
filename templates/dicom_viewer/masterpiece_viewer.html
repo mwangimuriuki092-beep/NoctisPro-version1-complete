@@ -280,6 +280,10 @@
             position: relative;
             background: #000;
             overflow: hidden;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .canvas-container {
@@ -994,7 +998,10 @@
             <div class="viewport">
                 <!-- Single View Canvas -->
                 <div class="canvas-container" id="singleView">
-                    <canvas id="dicomCanvas"></canvas>
+                    <canvas id="dicomCanvas" width="800" height="600"></canvas>
+                    <div id="canvasLoadingIndicator" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--accent-color); font-size: 16px; display: none; z-index: 10;">
+                        <i class="fas fa-spinner fa-spin"></i> Initializing viewer...
+                    </div>
                     <div class="overlay-labels" id="overlayLabels">
                         <div>WW: <span id="windowWidth">400</span></div>
                         <div>WL: <span id="windowLevel">40</span></div>
@@ -1425,13 +1432,19 @@
                         }
                         
                         // Ensure canvas has proper dimensions before getting context
-                        if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+                        const rect = canvas.getBoundingClientRect();
+                        if (rect.width === 0 || rect.height === 0 || canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+                            console.warn('⚠️ Canvas has zero dimensions, setting defaults');
                             canvas.width = 800;
                             canvas.height = 600;
+                            canvas.style.width = '100%';
+                            canvas.style.height = '100%';
                         } else {
-                            canvas.width = canvas.clientWidth;
-                            canvas.height = canvas.clientHeight;
-                }
+                            canvas.width = Math.max(rect.width, canvas.clientWidth, 400);
+                            canvas.height = Math.max(rect.height, canvas.clientHeight, 400);
+                        }
+                        
+                        console.log(`✅ Canvas initialized with dimensions: ${canvas.width}x${canvas.height}`);
                 
                         // Enhanced canvas context initialization with multiple fallbacks
                         ctx = canvas.getContext('2d', { 
@@ -1503,6 +1516,9 @@
                         // Initialize MPR canvases after main canvas is ready
                         initializeMPRCanvases();
                         
+                        // Hide canvas loading indicator
+                        showCanvasLoading(false);
+                        
                         // Resolve the promise to indicate successful initialization
                         resolve();
                         
@@ -1569,19 +1585,34 @@
                 // Get container dimensions
                 const rect = container.getBoundingClientRect();
                 
-                // Set canvas size to match container
-                canvas.width = rect.width;
-                canvas.height = rect.height;
+                // Ensure minimum canvas size
+                const minWidth = 400;
+                const minHeight = 400;
+                const canvasWidth = Math.max(rect.width, minWidth);
+                const canvasHeight = Math.max(rect.height, minHeight);
                 
-                // Re-apply canvas settings after resize
-                ctx.imageSmoothingEnabled = false;
-                ctx.mozImageSmoothingEnabled = false;
-                ctx.webkitImageSmoothingEnabled = false;
-                ctx.msImageSmoothingEnabled = false;
-                
-                // Re-render current image if available
-                if (currentImageData && currentImageData.pixel_data) {
-                    renderDicomImage(currentImageData);
+                // Only resize if dimensions actually changed
+                if (canvas.width !== canvasWidth || canvas.height !== canvasHeight) {
+                    console.log(`📐 Resizing canvas: ${canvas.width}x${canvas.height} → ${canvasWidth}x${canvasHeight}`);
+                    
+                    // Set canvas size to match container
+                    canvas.width = canvasWidth;
+                    canvas.height = canvasHeight;
+                    
+                    // Re-apply canvas settings after resize
+                    if (ctx) {
+                        ctx.imageSmoothingEnabled = false;
+                        ctx.mozImageSmoothingEnabled = false;
+                        ctx.webkitImageSmoothingEnabled = false;
+                        ctx.msImageSmoothingEnabled = false;
+                    }
+                    
+                    // Re-render current image if available
+                    if (currentImageData && currentImageData.pixel_data) {
+                        renderDicomImage(currentImageData);
+                    } else if (currentImageData && currentImageData.data_url) {
+                        renderDicomImageFromUrl(currentImageData);
+                    }
                 }
             }
             
@@ -3338,7 +3369,25 @@
         // Utility Functions
         function showLoading(show) {
             const indicator = document.getElementById('loadingIndicator');
-            indicator.style.display = show ? 'flex' : 'none';
+            if (indicator) {
+                indicator.style.display = show ? 'flex' : 'none';
+            }
+            
+            // Also show/hide canvas loading indicator
+            const canvasLoader = document.getElementById('canvasLoadingIndicator');
+            if (canvasLoader) {
+                canvasLoader.style.display = show ? 'block' : 'none';
+            }
+        }
+        
+        function showCanvasLoading(show, message = 'Loading...') {
+            const canvasLoader = document.getElementById('canvasLoadingIndicator');
+            if (canvasLoader) {
+                canvasLoader.style.display = show ? 'block' : 'none';
+                if (show && message) {
+                    canvasLoader.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${message}`;
+                }
+            }
         }
 
         function showToast(message, type = 'info', duration = 3000) {
