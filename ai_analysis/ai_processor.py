@@ -10,8 +10,10 @@ import logging
 from datetime import datetime
 from django.utils import timezone
 from django.conf import settings
+from django.db import transaction
 import os
 from pathlib import Path
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -28,61 +30,78 @@ class AIProcessor:
         }
     
     def process_analysis(self, analysis):
-        """Process an AI analysis request"""
-        try:
-            model_name = analysis.ai_model.model_file_path.replace('builtin://', '')
-            
-            if model_name not in self.processors:
-                raise ValueError(f"Unknown processor: {model_name}")
-            
-            # Update analysis status
-            analysis.status = 'processing'
-            analysis.started_at = timezone.now()
-            analysis.save()
-            
-            # Get DICOM images for the study
-            images = analysis.study.series_set.all().prefetch_related('images')
-            
-            # Process the analysis
-            results = self.processors[model_name](analysis, images)
-            
-            # Update analysis with results
-            analysis.results = results
-            analysis.findings = results.get('findings', '')
-            analysis.abnormalities_detected = results.get('abnormalities', [])
-            analysis.measurements = results.get('measurements', {})
-            analysis.severity_grade = results.get('severity_grade', 'normal')
-            analysis.severity_score = results.get('severity_score', 0.0)
-            analysis.urgent_findings = results.get('urgent_findings', [])
-            analysis.status = 'completed'
-            analysis.completed_at = timezone.now()
-            analysis.confidence_score = results.get('confidence', 0.95)
-            
-            # Calculate processing time
-            if analysis.started_at:
-                processing_time = (analysis.completed_at - analysis.started_at).total_seconds()
-                analysis.processing_time = processing_time
-            
-            analysis.save()
-            
-            # Check for urgent findings and create alerts if needed
-            if analysis.severity_grade in ['severe', 'critical'] or analysis.severity_score >= 0.8:
-                self.create_urgent_alert(analysis)
-            
-            # Generate preliminary report if confidence is high enough
-            if analysis.confidence_score >= 0.7:
-                self.generate_preliminary_report(analysis)
-            
-            logger.info(f"AI analysis completed for study {analysis.study.accession_number}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"AI analysis failed: {str(e)}")
-            analysis.status = 'failed'
-            analysis.error_message = str(e)
-            analysis.completed_at = timezone.now()
-            analysis.save()
-            return False
+        """Process an AI analysis request with database lock handling"""
+        max_retries = 3
+        retry_delay = 1.0
+        
+        for attempt in range(max_retries):
+            try:
+                with transaction.atomic():
+                    model_name = analysis.ai_model.model_file_path.replace('builtin://', '')
+                    
+                    if model_name not in self.processors:
+                        raise ValueError(f"Unknown processor: {model_name}")
+                    
+                    # Update analysis status
+                    analysis.status = 'processing'
+                    analysis.started_at = timezone.now()
+                    analysis.save()
+                    
+                    # Get DICOM images for the study
+                    images = analysis.study.series_set.all().prefetch_related('images')
+                    
+                    # Process the analysis
+                    results = self.processors[model_name](analysis, images)
+                    
+                    # Update analysis with results
+                    analysis.results = results
+                    analysis.findings = results.get('findings', '')
+                    analysis.abnormalities_detected = results.get('abnormalities', [])
+                    analysis.measurements = results.get('measurements', {})
+                    analysis.severity_grade = results.get('severity_grade', 'normal')
+                    analysis.severity_score = results.get('severity_score', 0.0)
+                    analysis.urgent_findings = results.get('urgent_findings', [])
+                    analysis.status = 'completed'
+                    analysis.completed_at = timezone.now()
+                    analysis.confidence_score = results.get('confidence', 0.95)
+                    
+                    # Calculate processing time
+                    if analysis.started_at:
+                        processing_time = (analysis.completed_at - analysis.started_at).total_seconds()
+                        analysis.processing_time = processing_time
+                    
+                    analysis.save()
+                    
+                    # Check for urgent findings and create alerts if needed
+                    if analysis.severity_grade in ['severe', 'critical'] or analysis.severity_score >= 0.8:
+                        self.create_urgent_alert(analysis)
+                    
+                    # Generate preliminary report if confidence is high enough
+                    if analysis.confidence_score >= 0.7:
+                        self.generate_preliminary_report(analysis)
+                    
+                    logger.info(f"AI analysis completed for study {analysis.study.accession_number}")
+                    return True
+                    
+            except Exception as e:
+                if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                    logger.warning(f"Database locked during AI analysis, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                else:
+                    logger.error(f"AI analysis failed: {str(e)}")
+                    try:
+                        with transaction.atomic():
+                            analysis.status = 'failed'
+                            analysis.error_message = str(e)
+                            analysis.completed_at = timezone.now()
+                            analysis.save()
+                    except Exception as save_error:
+                        logger.error(f"Failed to save error state: {save_error}")
+                    return False
+        
+        return False
     
     def analyze_metadata(self, analysis, images):
         """Analyze DICOM metadata for technical parameters and compliance"""

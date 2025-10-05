@@ -1433,29 +1433,60 @@
                             canvas.height = canvas.clientHeight;
                 }
                 
-                        ctx = canvas.getContext('2d');
+                        // Enhanced canvas context initialization with multiple fallbacks
+                        ctx = canvas.getContext('2d', { 
+                            alpha: false,
+                            desynchronized: true,
+                            willReadFrequently: true
+                        });
+                        
                         if (!ctx) {
-                            console.error('Canvas context not available - trying alternative approach');
-                            // Force canvas recreation
-                            const parent = canvas.parentNode;
-                            const newCanvas = document.createElement('canvas');
-                            newCanvas.id = 'dicomCanvas';
-                            newCanvas.width = canvas.width;
-                            newCanvas.height = canvas.height;
-                            newCanvas.style.cssText = canvas.style.cssText;
-                            parent.replaceChild(newCanvas, canvas);
-                            canvas = newCanvas;
-                            ctx = canvas.getContext('2d');
+                            console.warn('Canvas context not available - trying alternative approach');
+                            
+                            // Try different context options
+                            ctx = canvas.getContext('2d', { alpha: false }) || 
+                                  canvas.getContext('2d', {}) || 
+                                  canvas.getContext('2d');
                             
                             if (!ctx) {
-                                console.error('❌ Still cannot get canvas context after recreation');
-                                reject(new Error('Failed to get canvas context'));
-                                return;
+                                // Force canvas recreation with better timing
+                                const parent = canvas.parentNode;
+                                const newCanvas = document.createElement('canvas');
+                                newCanvas.id = 'dicomCanvas';
+                                newCanvas.width = canvas.width || 512;
+                                newCanvas.height = canvas.height || 512;
+                                newCanvas.style.cssText = canvas.style.cssText;
+                                
+                                // Remove old canvas and add new one
+                                parent.removeChild(canvas);
+                                parent.appendChild(newCanvas);
+                                canvas = newCanvas;
+                                
+                                // Wait a frame before getting context
+                                await new Promise(resolve => requestAnimationFrame(resolve));
+                                
+                                ctx = canvas.getContext('2d', { alpha: false }) || 
+                                      canvas.getContext('2d');
+                                
+                                if (!ctx) {
+                                    console.error('❌ Still cannot get canvas context after recreation');
+                                    reject(new Error('Failed to get canvas context'));
+                                    return;
+                                }
+                                console.log('✅ Canvas context obtained after recreation');
                             }
-                            console.log('✅ Canvas context obtained after recreation');
                         }
                         
-                        console.log('✅ Canvas context initialized successfully');
+                        // Verify canvas context is working
+                        try {
+                            ctx.fillStyle = '#000000';
+                            ctx.fillRect(0, 0, 1, 1);
+                            console.log('✅ Canvas context initialized and verified successfully');
+                        } catch (testError) {
+                            console.error('❌ Canvas context test failed:', testError);
+                            reject(new Error('Canvas context not functional'));
+                            return;
+                        }
                         
                         // Disable image smoothing for crisp medical images
                         if (ctx) {
