@@ -1,84 +1,197 @@
 """
-URL configuration for noctis_pro project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+NoctisPro PACS - Main URL Configuration
+Comprehensive URL routing with proper namespacing
 """
+
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.views.generic import RedirectView, TemplateView
 import base64
-from worklist import views as worklist_views  # ENABLED
-from django.views.generic.base import RedirectView
-from . import views
-from . import health as health_views
-from system_status_view import system_status
-from django.shortcuts import render
+
+
+# =============================================================================
+# HELPER VIEWS
+# =============================================================================
 
 def home_redirect(request):
-    """Redirect home page to login for fresh authentication"""
-    # Always redirect to login to ensure fresh authentication after server restart
+    """Redirect home page based on authentication"""
+    if request.user.is_authenticated:
+        return redirect('worklist:dashboard')
     return redirect('accounts:login')
 
+
 def favicon_view(request):
-    """Serve a minimal PNG favicon to avoid 404s across environments"""
-    # 1x1 transparent PNG
-    png_b64 = (
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8zwAAAgEBAHBhFJQAAAAASUVORK5CYII="
-    )
+    """Serve minimal PNG favicon"""
+    png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8zwAAAgEBAHBhFJQAAAAASUVORK5CYII="
     png_bytes = base64.b64decode(png_b64)
     response = HttpResponse(png_bytes, content_type='image/png')
     response['Cache-Control'] = 'public, max-age=86400'
     return response
 
+
+def robots_txt(request):
+    """Robots.txt for search engine control"""
+    content = """User-agent: *
+Disallow: /admin/
+Disallow: /api/
+Disallow: /media/
+Disallow: /static/
+"""
+    return HttpResponse(content, content_type='text/plain')
+
+
+def health_check(request):
+    """Simple health check endpoint"""
+    return JsonResponse({
+        'status': 'healthy',
+        'service': 'NoctisPro PACS',
+        'version': '1.0.0'
+    })
+
+
+# =============================================================================
+# URL PATTERNS
+# =============================================================================
+
 urlpatterns = [
-    # Redirect legacy /admin/ to the worklist dashboard to avoid confusion
-    path('admin/', admin.site.urls),
-    path('favicon.ico', favicon_view, name='favicon'),
+    # =========================================================================
+    # CORE ROUTES
+    # =========================================================================
     path('', home_redirect, name='home'),
-    path('', include('accounts.urls')),
-    # WORKLIST URLS - ENABLED
-    path('worklist/', include('worklist.urls')),  # RESTORED
-    # Alias endpoints expected by the dashboard UI
-    path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # RESTORED
-    # Removed duplicate 'viewer/' include to avoid namespace clash; keep alias via redirect if needed
-    path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),  # RESTORED
-    path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),  # RESTORED
-    path('reports/', include('reports.urls')),
-    path('admin-panel/', include('admin_panel.urls')),
-    path('chat/', include('chat.urls')),
-    path('notifications/', include('notifications.urls')),
-    path('ai/', include('ai_analysis.urls')),
-    path('system-status/', system_status, name='system_status'),
-    path('dicom-test/', lambda request: render(request, 'dicom_viewer_test.html'), name='dicom_test')
+    path('favicon.ico', favicon_view, name='favicon'),
+    path('robots.txt', robots_txt, name='robots'),
+    path('health/', health_check, name='health_check'),
+    
+    # =========================================================================
+    # DJANGO ADMIN
+    # =========================================================================
+    path('django-admin/', admin.site.urls, name='django_admin'),
+    
+    # =========================================================================
+    # AUTHENTICATION & ACCOUNTS
+    # =========================================================================
+    path('', include('accounts.urls', namespace='accounts')),
+    
+    # =========================================================================
+    # WORKLIST (PATIENT & STUDY MANAGEMENT)
+    # =========================================================================
+    path('worklist/', include('worklist.urls', namespace='worklist')),
+    
+    # =========================================================================
+    # DICOM VIEWER
+    # =========================================================================
+    path('dicom-viewer/', include('dicom_viewer.urls', namespace='dicom_viewer')),
+    
+    # Legacy viewer redirect for backwards compatibility
+    path('viewer/', RedirectView.as_view(
+        pattern_name='dicom_viewer:index',
+        permanent=False
+    )),
+    path('viewer/<int:study_id>/', RedirectView.as_view(
+        pattern_name='dicom_viewer:viewer',
+        permanent=False
+    )),
+    
+    # =========================================================================
+    # REPORTS
+    # =========================================================================
+    path('reports/', include('reports.urls', namespace='reports')),
+    
+    # =========================================================================
+    # AI ANALYSIS
+    # =========================================================================
+    path('ai/', include('ai_analysis.urls', namespace='ai_analysis')),
+    
+    # =========================================================================
+    # NOTIFICATIONS
+    # =========================================================================
+    path('notifications/', include('notifications.urls', namespace='notifications')),
+    
+    # =========================================================================
+    # CHAT
+    # =========================================================================
+    path('chat/', include('chat.urls', namespace='chat')),
+    
+    # =========================================================================
+    # ADMIN PANEL
+    # =========================================================================
+    path('admin-panel/', include('admin_panel.urls', namespace='admin_panel')),
+    
+    # Alternative admin route
+    path('admin/', RedirectView.as_view(
+        pattern_name='admin_panel:dashboard',
+        permanent=False
+    )),
 ]
 
-# Serve media files during development and production (for ngrok deployment)
-# Note: In production with a proper web server, this should be handled by nginx/apache
-if settings.DEBUG or getattr(settings, 'SERVE_MEDIA_FILES', False):
+# =============================================================================
+# MEDIA FILES SERVING
+# =============================================================================
+
+if settings.DEBUG or settings.SERVE_MEDIA_FILES:
+    # Serve media files
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    # Use custom static file view for proper MIME type handling
+    
+    # Serve static files in development
+    if settings.DEBUG:
+        urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# =============================================================================
+# API DOCUMENTATION (Optional)
+# =============================================================================
+
+if settings.DEBUG:
     urlpatterns += [
-        re_path(r'^static/(?P<path>.*)$', views.StaticFileView.as_view(), name='static_files'),
+        path('api/docs/', TemplateView.as_view(
+            template_name='api_docs.html'
+        ), name='api_docs'),
     ]
 
-# Health and readiness endpoints
-urlpatterns += [
-    path('health/', health_views.health_check, name='health'),
-    path('health/simple/', health_views.simple_health_check, name='health_simple'),
-    path('health/ready/', health_views.ready_check, name='health_ready'),
-    path('health/live/', health_views.live_check, name='health_live'),
-]
+# =============================================================================
+# ERROR HANDLERS
+# =============================================================================
+
+handler400 = 'noctis_pro.views.bad_request'
+handler403 = 'noctis_pro.views.permission_denied'
+handler404 = 'noctis_pro.views.page_not_found'
+handler500 = 'noctis_pro.views.server_error'
+
+# =============================================================================
+# DEVELOPMENT TOOLS
+# =============================================================================
+
+if settings.DEBUG:
+    # Add debug toolbar if installed
+    try:
+        import debug_toolbar
+        urlpatterns = [
+            path('__debug__/', include(debug_toolbar.urls)),
+        ] + urlpatterns
+    except ImportError:
+        pass
+
+# =============================================================================
+# URL CONFIGURATION SUMMARY
+# =============================================================================
+
+print("=" * 80)
+print("🔗 NoctisPro PACS - URL Configuration Loaded")
+print("=" * 80)
+print(f"📍 Total URL patterns: {len(urlpatterns)}")
+print(f"🔧 Debug mode: {settings.DEBUG}")
+print(f"📁 Media serving: {settings.SERVE_MEDIA_FILES or settings.DEBUG}")
+print("=" * 80)
+print("Available namespaces:")
+print("  • accounts       - Authentication & user management")
+print("  • worklist       - Patient & study management")
+print("  • dicom_viewer   - Medical image viewing")
+print("  • reports        - Report management")
+print("  • ai_analysis    - AI-powered analysis")
+print("  • notifications  - Notification system")
+print("  • chat           - Communication system")
+print("  • admin_panel    - System administration")
+print("=" * 80)
