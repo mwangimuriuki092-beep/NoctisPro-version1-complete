@@ -540,6 +540,12 @@ class AIProcessor:
             
         except Exception as e:
             logger.error(f"Failed to generate preliminary report: {e}")
+            # Mark analysis as having failed preliminary report generation
+            try:
+                analysis.preliminary_report_generated = False
+                analysis.save(update_fields=['preliminary_report_generated'])
+            except Exception as save_error:
+                logger.error(f"Failed to update preliminary_report_generated flag: {save_error}")
     
     def generate_report_content_from_analysis(self, analysis, template):
         """Generate report content from a single analysis"""
@@ -565,21 +571,37 @@ class AIProcessor:
             findings_parts.append("")
             findings_parts.append("ABNORMALITIES DETECTED:")
             for abnormality in analysis.abnormalities_detected:
-                findings_parts.append(f"• {abnormality}")
+                # Ensure abnormality is a string
+                if isinstance(abnormality, (list, tuple)):
+                    abnormality_str = ', '.join(str(item) for item in abnormality)
+                else:
+                    abnormality_str = str(abnormality)
+                findings_parts.append(f"• {abnormality_str}")
         
         # Add measurements if available
         if analysis.measurements:
             findings_parts.append("")
             findings_parts.append("MEASUREMENTS:")
             for key, value in analysis.measurements.items():
-                findings_parts.append(f"• {key}: {value}")
+                # Ensure both key and value are strings
+                key_str = str(key)
+                if isinstance(value, (list, tuple)):
+                    value_str = ', '.join(str(item) for item in value)
+                else:
+                    value_str = str(value)
+                findings_parts.append(f"• {key_str}: {value_str}")
         
         # Add urgent findings if present
         if analysis.urgent_findings:
             findings_parts.append("")
             findings_parts.append("⚠️ URGENT FINDINGS:")
             for finding in analysis.urgent_findings:
-                findings_parts.append(f"• {finding}")
+                # Ensure finding is a string
+                if isinstance(finding, (list, tuple)):
+                    finding_str = ', '.join(str(item) for item in finding)
+                else:
+                    finding_str = str(finding)
+                findings_parts.append(f"• {finding_str}")
         
         # Generate impression based on severity
         impression_parts = []
