@@ -2853,10 +2853,10 @@ def web_study_detail(request, study_id):
             'id': study.id,
             'patient_name': study.patient.full_name,
             'patient_id': study.patient.patient_id,
-            'study_date': study.study_date.isoformat(),
+            'study_date': study.study_date.isoformat() if study.study_date else None,
             'modality': study.modality.code,
         },
-        'series_list': [{
+        'series': [{
             'id': s.id,
             'series_uid': getattr(s, 'series_instance_uid', ''),
             'series_number': s.series_number,
@@ -2871,35 +2871,7 @@ def web_study_detail(request, study_id):
     return JsonResponse(data)
 
 
-@login_required
-def web_series_images(request, series_id):
-    series = get_object_or_404(Series, id=series_id)
-    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    images = series.images.all().order_by('instance_number')
-    data = {
-        'series': {
-            'id': series.id,
-            'series_uid': getattr(series, 'series_instance_uid', ''),
-            'series_number': series.series_number,
-            'series_description': series.series_description,
-            'modality': series.modality,
-            'slice_thickness': series.slice_thickness,
-            'pixel_spacing': series.pixel_spacing,
-            'image_orientation': series.image_orientation,
-        },
-        'images': [{
-            'id': img.id,
-            'sop_instance_uid': img.sop_instance_uid,
-            'instance_number': img.instance_number,
-            'image_position': img.image_position,
-            'rows': None,
-            'columns': None,
-            'window_center': None,
-            'window_width': None,
-        } for img in images],
-    }
-    return JsonResponse(data)
+# Duplicate function removed - using the improved web_series_images function below
 
 
 @login_required
@@ -6440,9 +6412,7 @@ def api_image_data(request, image_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
-def web_study_detail(request, study_id):
-    """Web viewer endpoint to get study details"""
-    return api_study_data(request, study_id)
+# Duplicate function removed - using the first web_study_detail function above
 
 @login_required
 def web_series_images(request, series_id):
@@ -6485,10 +6455,7 @@ def web_series_images(request, series_id):
         logger.error(f"Error in web_series_images: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
-def web_dicom_image(request, image_id):
-    """Web viewer endpoint to get DICOM image data"""
-    return api_image_data(request, image_id)
+# Duplicate function removed - using the complete web_dicom_image function above
 
 @login_required
 def api_studies_redirect(request):

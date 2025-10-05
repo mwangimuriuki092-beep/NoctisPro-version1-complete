@@ -66,6 +66,14 @@ class AIAnalysis(models.Model):
         ('urgent', 'Urgent'),
     ]
 
+    SEVERITY_GRADES = [
+        ('normal', 'Normal - No significant findings'),
+        ('mild', 'Mild - Minor findings, routine follow-up'),
+        ('moderate', 'Moderate - Notable findings, attention needed'),
+        ('severe', 'Severe - Significant findings, urgent review'),
+        ('critical', 'Critical - Life-threatening findings, immediate attention'),
+    ]
+
     study = models.ForeignKey(Study, on_delete=models.CASCADE, related_name='ai_analyses')
     ai_model = models.ForeignKey(AIModel, on_delete=models.CASCADE)
     
@@ -78,6 +86,16 @@ class AIAnalysis(models.Model):
     findings = models.TextField(blank=True)
     abnormalities_detected = models.JSONField(default=list, blank=True)
     measurements = models.JSONField(default=dict, blank=True)
+    
+    # Severity assessment
+    severity_grade = models.CharField(max_length=20, choices=SEVERITY_GRADES, null=True, blank=True)
+    severity_score = models.FloatField(null=True, blank=True)  # 0-1 scale
+    urgent_findings = models.JSONField(default=list, blank=True)  # Critical findings requiring immediate attention
+    
+    # Automatic processing flags
+    auto_generated = models.BooleanField(default=False)  # Was this analysis automatically triggered?
+    preliminary_report_generated = models.BooleanField(default=False)
+    radiologist_notified = models.BooleanField(default=False)  # For urgent cases
     
     # Processing details
     processing_time = models.FloatField(null=True, blank=True)  # seconds
@@ -284,6 +302,109 @@ class AIPerformanceMetric(models.Model):
 
     def __str__(self):
         return f"Performance for {self.ai_model.name} on {self.evaluation_date}"
+
+class UrgentAlert(models.Model):
+    """Urgent alerts for critical findings requiring immediate radiologist attention"""
+    ALERT_TYPES = [
+        ('critical_finding', 'Critical Finding Detected'),
+        ('life_threatening', 'Life-Threatening Condition'),
+        ('immediate_intervention', 'Immediate Intervention Required'),
+        ('contrast_reaction', 'Contrast Reaction'),
+        ('technical_failure', 'Technical Failure'),
+    ]
+    
+    ALERT_STATUS = [
+        ('pending', 'Pending Response'),
+        ('acknowledged', 'Acknowledged'),
+        ('in_review', 'Under Review'),
+        ('resolved', 'Resolved'),
+        ('false_positive', 'False Positive'),
+    ]
+    
+    NOTIFICATION_METHODS = [
+        ('web', 'Web Notification'),
+        ('email', 'Email'),
+        ('sms', 'SMS'),
+        ('phone_call', 'Phone Call'),
+        ('pager', 'Pager'),
+    ]
+
+    ai_analysis = models.ForeignKey(AIAnalysis, on_delete=models.CASCADE, related_name='urgent_alerts')
+    study = models.ForeignKey('worklist.Study', on_delete=models.CASCADE)
+    
+    alert_type = models.CharField(max_length=30, choices=ALERT_TYPES)
+    status = models.CharField(max_length=20, choices=ALERT_STATUS, default='pending')
+    
+    # Alert details
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    critical_findings = models.JSONField(default=list)  # Specific findings that triggered alert
+    recommended_action = models.TextField()
+    
+    # Severity and urgency
+    severity_score = models.FloatField()  # 0-1 scale
+    estimated_time_sensitivity = models.IntegerField(help_text="Minutes until intervention needed")
+    
+    # Notification tracking
+    notification_methods_used = models.JSONField(default=list)  # Track which methods were used
+    first_notification_sent = models.DateTimeField(null=True, blank=True)
+    last_notification_sent = models.DateTimeField(null=True, blank=True)
+    notification_attempts = models.IntegerField(default=0)
+    
+    # Response tracking
+    acknowledged_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='acknowledged_alerts')
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    response_time_minutes = models.IntegerField(null=True, blank=True)
+    
+    # Resolution
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='resolved_alerts')
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolution_notes = models.TextField(blank=True)
+    
+    # Escalation
+    escalated = models.BooleanField(default=False)
+    escalated_at = models.DateTimeField(null=True, blank=True)
+    escalated_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='escalated_alerts')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"URGENT: {self.title} - {self.study.accession_number}"
+    
+    def acknowledge(self, user):
+        """Acknowledge the alert"""
+        if not self.acknowledged_by:
+            self.acknowledged_by = user
+            self.acknowledged_at = timezone.now()
+            self.status = 'acknowledged'
+            
+            # Calculate response time
+            if self.first_notification_sent:
+                response_time = (self.acknowledged_at - self.first_notification_sent).total_seconds() / 60
+                self.response_time_minutes = int(response_time)
+            
+            self.save()
+    
+    def resolve(self, user, notes=''):
+        """Resolve the alert"""
+        self.resolved_by = user
+        self.resolved_at = timezone.now()
+        self.status = 'resolved'
+        self.resolution_notes = notes
+        self.save()
+    
+    def escalate(self, escalate_to_user):
+        """Escalate the alert to another user"""
+        self.escalated = True
+        self.escalated_at = timezone.now()
+        self.escalated_to = escalate_to_user
+        self.save()
 
 class AIFeedback(models.Model):
     """User feedback on AI analysis results"""

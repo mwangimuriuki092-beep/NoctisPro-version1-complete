@@ -9,6 +9,11 @@ urlpatterns = [
     path('study/<int:study_id>/analyze/', views.analyze_study, name='analyze_study'),
     path('models/', views.model_management, name='model_management'),
     
+    # Urgent alerts
+    path('alerts/', views.urgent_alerts_dashboard, name='urgent_alerts_dashboard'),
+    path('alerts/<int:alert_id>/', views.urgent_alert_detail, name='urgent_alert_detail'),
+    path('api/alerts/<int:alert_id>/status/', views.api_urgent_alert_status, name='api_urgent_alert_status'),
+    
     # AI Analysis API endpoints
     path('api/analysis/<int:analysis_id>/status/', views.api_analysis_status, name='api_analysis_status'),
     path('api/analysis/<int:analysis_id>/feedback/', views.api_ai_feedback, name='api_ai_feedback'),
