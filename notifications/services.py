@@ -4,6 +4,7 @@ Notification services for real-time notifications
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from .models import Notification, NotificationType
 import logging
 
@@ -206,6 +207,142 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Error sending AI analysis notification: {str(e)}")
             return []
+    
+    def send_urgent_alert(self, urgent_alert):
+        """
+        Send urgent alert to radiologists with multiple notification methods
+        """
+        try:
+            from accounts.models import User
+            
+            # Get radiologists for the facility
+            radiologists = User.objects.filter(
+                role='radiologist',
+                is_active=True,
+                facility=urgent_alert.study.facility
+            )
+            
+            # If no facility radiologists, get all active radiologists
+            if not radiologists.exists():
+                radiologists = User.objects.filter(
+                    role='radiologist',
+                    is_active=True
+                )
+            
+            notifications_sent = []
+            methods_used = []
+            
+            for radiologist in radiologists:
+                # Send web notification
+                notification = self.send_notification(
+                    radiologist.id,
+                    'urgent_alert',
+                    urgent_alert.title,
+                    urgent_alert.description,
+                    priority='urgent',
+                    action_url=f'/ai/urgent-alert/{urgent_alert.id}/',
+                    data={
+                        'alert_id': urgent_alert.id,
+                        'study_id': urgent_alert.study.id,
+                        'accession_number': urgent_alert.study.accession_number,
+                        'severity_score': urgent_alert.severity_score,
+                        'alert_type': urgent_alert.alert_type,
+                        'critical_findings': urgent_alert.critical_findings,
+                        'time_sensitivity': urgent_alert.estimated_time_sensitivity
+                    }
+                )
+                
+                if notification:
+                    notifications_sent.append(notification)
+                    
+                # Send email notification for urgent cases
+                if urgent_alert.severity_score >= 0.8:
+                    self.send_urgent_email(radiologist, urgent_alert)
+                    methods_used.append('email')
+                
+                # For critical cases, consider SMS/phone call simulation
+                if urgent_alert.alert_type == 'life_threatening':
+                    self.send_urgent_sms(radiologist, urgent_alert)
+                    methods_used.append('sms')
+            
+            # Update alert with notification tracking
+            urgent_alert.notification_methods_used = list(set(methods_used + ['web']))
+            urgent_alert.first_notification_sent = timezone.now()
+            urgent_alert.last_notification_sent = timezone.now()
+            urgent_alert.notification_attempts += 1
+            urgent_alert.save()
+            
+            logger.info(f"Sent urgent alert to {len(notifications_sent)} radiologists")
+            return notifications_sent
+            
+        except Exception as e:
+            logger.error(f"Error sending urgent alert: {str(e)}")
+            return []
+    
+    def send_urgent_email(self, user, urgent_alert):
+        """Send urgent email notification (simulated)"""
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings
+            
+            subject = f"🚨 URGENT ALERT: {urgent_alert.title}"
+            message = f"""
+URGENT MEDICAL ALERT
+
+Patient: {urgent_alert.study.patient.full_name}
+Accession: {urgent_alert.study.accession_number}
+Study: {urgent_alert.study.study_description}
+Alert Type: {urgent_alert.get_alert_type_display()}
+
+CRITICAL FINDINGS:
+{chr(10).join(f"• {finding}" for finding in urgent_alert.critical_findings)}
+
+RECOMMENDED ACTION:
+{urgent_alert.recommended_action}
+
+Time Sensitivity: {urgent_alert.estimated_time_sensitivity} minutes
+
+Please review immediately in the PACS system.
+
+This is an automated alert from NoctisPro AI Analysis System.
+            """
+            
+            # In production, this would send actual emails
+            # For now, we'll log the email content
+            logger.info(f"URGENT EMAIL to {user.email}: {subject}")
+            logger.info(f"Email content: {message}")
+            
+            # Uncomment for actual email sending:
+            # send_mail(
+            #     subject,
+            #     message,
+            #     settings.DEFAULT_FROM_EMAIL,
+            #     [user.email],
+            #     fail_silently=False,
+            # )
+            
+        except Exception as e:
+            logger.error(f"Error sending urgent email: {str(e)}")
+    
+    def send_urgent_sms(self, user, urgent_alert):
+        """Send urgent SMS notification (simulated)"""
+        try:
+            # In production, this would integrate with SMS service like Twilio
+            sms_message = f"🚨 URGENT: {urgent_alert.study.accession_number} - {urgent_alert.alert_type.replace('_', ' ').title()}. Check PACS immediately."
+            
+            logger.info(f"URGENT SMS to {user.phone if hasattr(user, 'phone') else 'N/A'}: {sms_message}")
+            
+            # Uncomment for actual SMS sending:
+            # from twilio.rest import Client
+            # client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+            # client.messages.create(
+            #     body=sms_message,
+            #     from_=settings.TWILIO_PHONE_NUMBER,
+            #     to=user.phone
+            # )
+            
+        except Exception as e:
+            logger.error(f"Error sending urgent SMS: {str(e)}")
     
     def send_system_error_notification(self, error_level, module, message, **kwargs):
         """
