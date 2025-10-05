@@ -97,11 +97,11 @@ class ProfessionalDicomViewer {
             this.showLoading('Loading study data...');
             console.log('Loading study:', studyId);
             
-            // Try the API endpoint first
-            let response = await fetch(`/dicom-viewer/api/study/${studyId}/`);
+            // Try the web endpoint first
+            let response = await fetch(`/dicom-viewer/study/${studyId}/`);
             let data = await response.json();
             
-            // If that fails, try alternate endpoint
+            // If that fails, try API endpoint
             if (!data.study && !data.series) {
                 response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
                 data = await response.json();
@@ -163,15 +163,9 @@ class ProfessionalDicomViewer {
         try {
             this.showLoading('Loading series...');
             
-            // Try the web endpoint first (used by the HTML)
-            let response = await fetch(`/dicom-viewer/web/series/${seriesId}/images/`);
+            // Get series images from web endpoint
+            let response = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
             let data = await response.json();
-            
-            // If that fails, try the API endpoint
-            if (!data.images || data.images.length === 0) {
-                response = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
-                data = await response.json();
-            }
             
             if (data.series && data.images && data.images.length > 0) {
                 this.currentSeries = data.series;
