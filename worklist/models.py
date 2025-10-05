@@ -587,6 +587,17 @@ class StudyAttachment(models.Model):
         """Get file extension"""
         return os.path.splitext(self.file.name)[1].lower()
     
+    def is_dicom_file(self):
+        """Check if attachment is a DICOM file"""
+        return self.file_type == 'dicom_study' or self.get_file_extension() == '.dcm'
+    
+    def is_viewable_in_browser(self):
+        """Check if attachment can be viewed in browser"""
+        viewable_types = ['pdf_document', 'image']
+        viewable_extensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.bmp']
+        return (self.file_type in viewable_types or 
+                self.get_file_extension() in viewable_extensions)
+    
     def increment_access_count(self):
         """Increment access counter"""
         self.access_count += 1
@@ -638,3 +649,52 @@ class StudyNote(models.Model):
 
     def __str__(self):
         return f"Note by {self.user.username} on {self.study.accession_number}"
+
+
+class AttachmentComment(models.Model):
+    """Comments on study attachments"""
+    
+    attachment = models.ForeignKey(
+        StudyAttachment,
+        on_delete=models.CASCADE,
+        related_name='comments',
+        db_index=True
+    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['attachment', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"Comment by {self.user.username} on {self.attachment.name}"
+
+
+class AttachmentVersion(models.Model):
+    """Version history for study attachments"""
+    
+    attachment = models.ForeignKey(
+        StudyAttachment,
+        on_delete=models.CASCADE,
+        related_name='versions',
+        db_index=True
+    )
+    version_number = models.CharField(max_length=20)
+    file = models.FileField(upload_to='attachment_versions/')
+    change_description = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = [('attachment', 'version_number')]
+        indexes = [
+            models.Index(fields=['attachment', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.attachment.name} - Version {self.version_number}"
