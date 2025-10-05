@@ -257,7 +257,7 @@ class DicomLoadingFix {
 
     getImageUrl(imageId) {
         // Try to find the image URL from various sources
-        return `/dicom-viewer/image/${imageId}/`;
+        return `/dicom-viewer/web/image/${imageId}/`;
     }
 
     handleLoadError(imageId, error) {

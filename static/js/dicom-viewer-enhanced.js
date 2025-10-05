@@ -1118,7 +1118,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dicomViewerEnhanced.showToast('Loading series images...', 'info');
             console.log('Loading series:', seriesId);
             
-            const response = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
+            const response = await fetch(`/dicom-viewer/web/series/${seriesId}/images/`);
             const data = await response.json();
             
             console.log('Series data received:', data);
@@ -1151,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             dicomViewerEnhanced.showToast('Loading image...', 'info');
             
-            const response = await fetch(`/dicom-viewer/image/${imageId}/`);
+            const response = await fetch(`/dicom-viewer/web/image/${imageId}/`);
             const imageUrl = response.url;
             
             // Load image into canvas
