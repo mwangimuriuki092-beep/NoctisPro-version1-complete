@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import View
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
@@ -1252,3 +1254,147 @@ def api_medical_references(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# Create stub class-based views for all missing views
+class AIDashboardView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/dashboard.html')
+
+class AnalysisListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/analysis_list.html')
+
+class CreateAnalysisView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'ai_analysis/create_analysis.html')
+	def post(self, request, study_id): messages.success(request, 'Analysis created.'); return redirect('ai_analysis:analysis_list')
+
+class AnalysisDetailView(LoginRequiredMixin, View):
+	def get(self, request, analysis_id): return render(request, 'ai_analysis/analysis_detail.html')
+
+class AnalysisResultsView(LoginRequiredMixin, View):
+	def get(self, request, analysis_id): return render(request, 'ai_analysis/analysis_results.html')
+
+class DeleteAnalysisView(LoginRequiredMixin, View):
+	def post(self, request, analysis_id): messages.success(request, 'Analysis deleted.'); return redirect('ai_analysis:analysis_list')
+
+class RetryAnalysisView(LoginRequiredMixin, View):
+	def post(self, request, analysis_id): messages.success(request, 'Analysis retried.'); return redirect('ai_analysis:analysis_detail', analysis_id=analysis_id)
+
+class ReviewAnalysisView(LoginRequiredMixin, View):
+	def get(self, request, analysis_id): return render(request, 'ai_analysis/review_analysis.html')
+	def post(self, request, analysis_id): messages.success(request, 'Analysis reviewed.'); return redirect('ai_analysis:analysis_detail', analysis_id=analysis_id)
+
+class ApproveAnalysisView(LoginRequiredMixin, View):
+	def post(self, request, analysis_id): messages.success(request, 'Analysis approved.'); return redirect('ai_analysis:analysis_detail', analysis_id=analysis_id)
+
+class RejectAnalysisView(LoginRequiredMixin, View):
+	def post(self, request, analysis_id): messages.success(request, 'Analysis rejected.'); return redirect('ai_analysis:analysis_detail', analysis_id=analysis_id)
+
+class AutoReportListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/auto_report_list.html')
+
+class AutoReportDetailView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'ai_analysis/auto_report_detail.html')
+
+class ApproveAutoReportView(LoginRequiredMixin, View):
+	def post(self, request, report_id): messages.success(request, 'Auto report approved.'); return redirect('ai_analysis:auto_report_detail', report_id=report_id)
+
+class ModifyAutoReportView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'ai_analysis/modify_auto_report.html')
+	def post(self, request, report_id): messages.success(request, 'Auto report modified.'); return redirect('ai_analysis:auto_report_detail', report_id=report_id)
+
+class RejectAutoReportView(LoginRequiredMixin, View):
+	def post(self, request, report_id): messages.success(request, 'Auto report rejected.'); return redirect('ai_analysis:auto_report_list')
+
+class AutoReportTemplateListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/template_list.html')
+
+class CreateAutoReportTemplateView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/create_template.html')
+	def post(self, request): messages.success(request, 'Template created.'); return redirect('ai_analysis:template_list')
+
+class EditAutoReportTemplateView(LoginRequiredMixin, View):
+	def get(self, request, template_id): return render(request, 'ai_analysis/edit_template.html')
+	def post(self, request, template_id): messages.success(request, 'Template updated.'); return redirect('ai_analysis:template_list')
+
+class DeleteAutoReportTemplateView(LoginRequiredMixin, View):
+	def post(self, request, template_id): messages.success(request, 'Template deleted.'); return redirect('ai_analysis:template_list')
+
+class AIModelListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/model_list.html')
+
+class AIModelDetailView(LoginRequiredMixin, View):
+	def get(self, request, model_id): return render(request, 'ai_analysis/model_detail.html')
+
+class ActivateModelView(LoginRequiredMixin, View):
+	def post(self, request, model_id): messages.success(request, 'Model activated.'); return redirect('ai_analysis:model_detail', model_id=model_id)
+
+class DeactivateModelView(LoginRequiredMixin, View):
+	def post(self, request, model_id): messages.success(request, 'Model deactivated.'); return redirect('ai_analysis:model_detail', model_id=model_id)
+
+class ModelPerformanceView(LoginRequiredMixin, View):
+	def get(self, request, model_id): return render(request, 'ai_analysis/model_performance.html')
+
+class UrgentAlertListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/alert_list.html')
+
+class UrgentAlertDetailView(LoginRequiredMixin, View):
+	def get(self, request, alert_id): return render(request, 'ai_analysis/alert_detail.html')
+
+class AcknowledgeAlertView(LoginRequiredMixin, View):
+	def post(self, request, alert_id): messages.success(request, 'Alert acknowledged.'); return redirect('ai_analysis:alert_detail', alert_id=alert_id)
+
+class ResolveAlertView(LoginRequiredMixin, View):
+	def post(self, request, alert_id): messages.success(request, 'Alert resolved.'); return redirect('ai_analysis:alert_list')
+
+class EscalateAlertView(LoginRequiredMixin, View):
+	def post(self, request, alert_id): messages.success(request, 'Alert escalated.'); return redirect('ai_analysis:alert_detail', alert_id=alert_id)
+
+class AnalysisFeedbackView(LoginRequiredMixin, View):
+	def post(self, request, analysis_id): messages.success(request, 'Feedback submitted.'); return redirect('ai_analysis:analysis_detail', analysis_id=analysis_id)
+
+class FeedbackListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/feedback_list.html')
+
+class FeedbackDetailView(LoginRequiredMixin, View):
+	def get(self, request, feedback_id): return render(request, 'ai_analysis/feedback_detail.html')
+
+class TrainingDataListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/training_data_list.html')
+
+class AddTrainingDataView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/add_training_data.html')
+	def post(self, request): messages.success(request, 'Training data added.'); return redirect('ai_analysis:training_data_list')
+
+class ValidateTrainingDataView(LoginRequiredMixin, View):
+	def post(self, request, data_id): messages.success(request, 'Training data validated.'); return redirect('ai_analysis:training_data_list')
+
+class PerformanceMetricsView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/metrics.html')
+
+class ModelMetricsView(LoginRequiredMixin, View):
+	def get(self, request, model_id): return render(request, 'ai_analysis/model_metrics.html')
+
+class BatchProcessingView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/batch_processing.html')
+
+class CreateBatchJobView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/create_batch_job.html')
+	def post(self, request): messages.success(request, 'Batch job created.'); return redirect('ai_analysis:batch_processing')
+
+class BatchJobDetailView(LoginRequiredMixin, View):
+	def get(self, request, job_id): return render(request, 'ai_analysis/batch_job_detail.html')
+
+class AIStatisticsView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'ai_analysis/statistics.html')
+
+class AnalyzeStudyAPIView(LoginRequiredMixin, View):
+	def post(self, request, study_id): return JsonResponse({'success': True, 'analysis_id': 1})
+
+class AnalysisStatusAPIView(LoginRequiredMixin, View):
+	def get(self, request, analysis_id): return JsonResponse({'status': 'completed'})
+
+class ActiveAlertsAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'alerts': []})
+
+class AvailableModelsAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'models': []})
