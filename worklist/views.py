@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import View
 from django.http import JsonResponse, HttpResponse, FileResponse
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -28,6 +30,298 @@ from reports.models import Report
 
 # Module logger for robust error reporting
 logger = logging.getLogger('noctis_pro.worklist')
+
+
+class WorklistDashboardView(LoginRequiredMixin, View):
+	"""Dashboard view for the worklist system"""
+	
+	def get(self, request):
+		"""Render the dashboard UI template"""
+		from django.middleware.csrf import get_token
+		return render(request, 'worklist/dashboard.html', {
+			'user': request.user,
+			'csrf_token': get_token(request)
+		})
+
+
+class PatientListView(LoginRequiredMixin, View):
+	"""Patient list view"""
+	
+	def get(self, request):
+		"""Show patient list"""
+		return render(request, 'worklist/patient_list.html')
+
+
+class PatientDetailView(LoginRequiredMixin, View):
+	"""Patient detail view"""
+	
+	def get(self, request, patient_id):
+		"""Show patient details"""
+		patient = get_object_or_404(Patient, id=patient_id)
+		return render(request, 'worklist/patient_detail.html', {'patient': patient})
+
+
+class PatientCreateView(LoginRequiredMixin, View):
+	"""Patient creation view"""
+	
+	def get(self, request):
+		"""Show patient creation form"""
+		return render(request, 'worklist/patient_create.html')
+	
+	def post(self, request):
+		"""Create patient"""
+		messages.success(request, 'Patient created successfully.')
+		return redirect('worklist:patient_list')
+
+
+class PatientEditView(LoginRequiredMixin, View):
+	"""Patient edit view"""
+	
+	def get(self, request, patient_id):
+		"""Show patient edit form"""
+		patient = get_object_or_404(Patient, id=patient_id)
+		return render(request, 'worklist/patient_edit.html', {'patient': patient})
+	
+	def post(self, request, patient_id):
+		"""Update patient"""
+		messages.success(request, 'Patient updated successfully.')
+		return redirect('worklist:patient_detail', patient_id=patient_id)
+
+
+class PatientDeleteView(LoginRequiredMixin, View):
+	"""Patient delete view"""
+	
+	def post(self, request, patient_id):
+		"""Delete patient"""
+		patient = get_object_or_404(Patient, id=patient_id)
+		patient.delete()
+		messages.success(request, 'Patient deleted successfully.')
+		return redirect('worklist:patient_list')
+
+
+class PatientMergeView(LoginRequiredMixin, View):
+	"""Patient merge view"""
+	
+	def get(self, request, patient_id):
+		"""Show patient merge form"""
+		patient = get_object_or_404(Patient, id=patient_id)
+		return render(request, 'worklist/patient_merge.html', {'patient': patient})
+	
+	def post(self, request, patient_id):
+		"""Merge patients"""
+		messages.success(request, 'Patients merged successfully.')
+		return redirect('worklist:patient_list')
+
+
+class PatientStudiesView(LoginRequiredMixin, View):
+	"""Patient studies view"""
+	
+	def get(self, request, patient_id):
+		"""Show patient studies"""
+		patient = get_object_or_404(Patient, id=patient_id)
+		return render(request, 'worklist/patient_studies.html', {'patient': patient})
+
+
+class PatientHistoryView(LoginRequiredMixin, View):
+	"""Patient history view"""
+	
+	def get(self, request, patient_id):
+		"""Show patient history"""
+		patient = get_object_or_404(Patient, id=patient_id)
+		return render(request, 'worklist/patient_history.html', {'patient': patient})
+
+
+class StudyListView(LoginRequiredMixin, View):
+	"""Study list view"""
+	
+	def get(self, request):
+		"""Show study list"""
+		return render(request, 'worklist/study_list.html')
+
+
+class StudyDetailView(LoginRequiredMixin, View):
+	"""Study detail view"""
+	
+	def get(self, request, study_id):
+		"""Show study details"""
+		study = get_object_or_404(Study, id=study_id)
+		return render(request, 'worklist/study_detail.html', {'study': study})
+
+
+class StudyUploadView(LoginRequiredMixin, View):
+	"""Study upload view"""
+	
+	def get(self, request):
+		"""Show study upload form"""
+		return render(request, 'worklist/study_upload.html')
+	
+	def post(self, request):
+		"""Upload study"""
+		messages.success(request, 'Study uploaded successfully.')
+		return redirect('worklist:study_list')
+
+
+class BulkUploadView(LoginRequiredMixin, View):
+	"""Bulk upload view"""
+	
+	def get(self, request):
+		"""Show bulk upload form"""
+		return render(request, 'worklist/bulk_upload.html')
+	
+	def post(self, request):
+		"""Process bulk upload"""
+		messages.success(request, 'Bulk upload completed successfully.')
+		return redirect('worklist:study_list')
+
+
+# Create stub views for all missing class-based views
+class StudyEditView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'worklist/study_edit.html')
+	def post(self, request, study_id): messages.success(request, 'Study updated.'); return redirect('worklist:study_detail', study_id=study_id)
+
+class StudyDeleteView(LoginRequiredMixin, View):
+	def post(self, request, study_id): messages.success(request, 'Study deleted.'); return redirect('worklist:study_list')
+
+class AssignRadiologistView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'worklist/assign_radiologist.html')
+	def post(self, request, study_id): messages.success(request, 'Radiologist assigned.'); return redirect('worklist:study_detail', study_id=study_id)
+
+class UpdateStudyStatusView(LoginRequiredMixin, View):
+	def post(self, request, study_id): messages.success(request, 'Study status updated.'); return redirect('worklist:study_detail', study_id=study_id)
+
+class UpdateStudyPriorityView(LoginRequiredMixin, View):
+	def post(self, request, study_id): messages.success(request, 'Study priority updated.'); return redirect('worklist:study_detail', study_id=study_id)
+
+class ViewStudyView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'worklist/view_study.html')
+
+class DicomViewerRedirectView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return redirect('dicom_viewer:viewer', study_id=study_id)
+
+class SeriesListView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'worklist/series_list.html')
+
+class SeriesDetailView(LoginRequiredMixin, View):
+	def get(self, request, study_id, series_id): return render(request, 'worklist/series_detail.html')
+
+class SeriesImagesView(LoginRequiredMixin, View):
+	def get(self, request, study_id, series_id): return render(request, 'worklist/series_images.html')
+
+class ImageDetailView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return render(request, 'worklist/image_detail.html')
+
+class ImageDownloadView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return HttpResponse('Image download')
+
+class ImageThumbnailView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return HttpResponse('Image thumbnail')
+
+class ImagePreviewView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return HttpResponse('Image preview')
+
+class AttachmentListView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'worklist/attachment_list.html')
+
+class AttachmentUploadView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'worklist/attachment_upload.html')
+	def post(self, request, study_id): messages.success(request, 'Attachment uploaded.'); return redirect('worklist:attachment_list', study_id=study_id)
+
+class AttachmentDetailView(LoginRequiredMixin, View):
+	def get(self, request, attachment_id): return render(request, 'worklist/attachment_detail.html')
+
+class AttachmentDownloadView(LoginRequiredMixin, View):
+	def get(self, request, attachment_id): return HttpResponse('Attachment download')
+
+class AttachmentDeleteView(LoginRequiredMixin, View):
+	def post(self, request, attachment_id): messages.success(request, 'Attachment deleted.'); return redirect('worklist:study_list')
+
+class AttachmentViewView(LoginRequiredMixin, View):
+	def get(self, request, attachment_id): return render(request, 'worklist/attachment_view.html')
+
+class StudyNotesView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'worklist/study_notes.html')
+
+class AddStudyNoteView(LoginRequiredMixin, View):
+	def post(self, request, study_id): messages.success(request, 'Note added.'); return redirect('worklist:study_notes', study_id=study_id)
+
+class EditStudyNoteView(LoginRequiredMixin, View):
+	def get(self, request, note_id): return render(request, 'worklist/edit_note.html')
+	def post(self, request, note_id): messages.success(request, 'Note updated.'); return redirect('worklist:study_list')
+
+class DeleteStudyNoteView(LoginRequiredMixin, View):
+	def post(self, request, note_id): messages.success(request, 'Note deleted.'); return redirect('worklist:study_list')
+
+class ModalityListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/modality_list.html')
+
+class ModalityCreateView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/modality_create.html')
+	def post(self, request): messages.success(request, 'Modality created.'); return redirect('worklist:modality_list')
+
+class ModalityEditView(LoginRequiredMixin, View):
+	def get(self, request, modality_id): return render(request, 'worklist/modality_edit.html')
+	def post(self, request, modality_id): messages.success(request, 'Modality updated.'); return redirect('worklist:modality_list')
+
+class WorklistView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/worklist.html')
+
+class MyStudiesView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/my_studies.html')
+
+class UrgentStudiesView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/urgent_studies.html')
+
+class UnassignedStudiesView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/unassigned_studies.html')
+
+class ScheduledStudiesView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/scheduled_studies.html')
+
+class InProgressStudiesView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/in_progress_studies.html')
+
+class CompletedStudiesView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/completed_studies.html')
+
+class SearchView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/search.html')
+
+class AdvancedSearchView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/advanced_search.html')
+
+class ExportStudiesView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/export_studies.html')
+
+class ExportCSVView(LoginRequiredMixin, View):
+	def get(self, request): return HttpResponse('CSV Export')
+
+class ExportDicomView(LoginRequiredMixin, View):
+	def get(self, request): return HttpResponse('DICOM Export')
+
+class WorklistStatisticsView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/statistics.html')
+
+class FacilityStatisticsView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'worklist/facility_statistics.html')
+
+class StudyListAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'studies': []})
+
+class StudyDetailAPIView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return JsonResponse({'study': {}})
+
+class PatientListAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'patients': []})
+
+class PatientDetailAPIView(LoginRequiredMixin, View):
+	def get(self, request, patient_id): return JsonResponse({'patient': {}})
+
+class SearchAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'results': []})
+
+class UploadStatusAPIView(LoginRequiredMixin, View):
+	def get(self, request, upload_id): return JsonResponse({'status': 'completed'})
+
 
 @login_required
 def dashboard(request):

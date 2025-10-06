@@ -9,6 +9,9 @@ from django.utils import timezone
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
 import re
+import secrets
+import hashlib
+from datetime import timedelta
 
 
 class Facility(models.Model):
@@ -536,3 +539,70 @@ class PasswordResetToken(models.Model):
         self.is_used = True
         self.used_at = timezone.now()
         self.save(update_fields=['is_used', 'used_at'])
+
+
+class PasswordResetToken(models.Model):
+    """Password reset token model"""
+    
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='password_reset_tokens'
+    )
+    token = models.CharField(max_length=128, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    
+    class Meta:
+        db_table = 'accounts_password_reset_token'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['expires_at']),
+        ]
+    
+    def __str__(self):
+        return f"Password reset token for {self.user.email}"
+    
+    @classmethod
+    def generate_token(cls, user, request=None):
+        """Generate a new password reset token"""
+        # Invalidate existing tokens
+        cls.objects.filter(user=user, is_used=False).update(is_used=True, used_at=timezone.now())
+        
+        # Generate secure token
+        token = secrets.token_urlsafe(64)
+        
+        # Create token record
+        reset_token = cls.objects.create(
+            user=user,
+            token=token,
+            expires_at=timezone.now() + timedelta(hours=24),
+            ip_address=request.META.get('REMOTE_ADDR') if request else None,
+            user_agent=request.META.get('HTTP_USER_AGENT', '') if request else ''
+        )
+        
+        return reset_token
+    
+    def is_valid(self):
+        """Check if token is still valid"""
+        return not self.is_used and timezone.now() < self.expires_at
+    
+    def mark_used(self):
+        """Mark token as used"""
+        self.is_used = True
+        self.used_at = timezone.now()
+        self.save(update_fields=['is_used', 'used_at'])
+    
+    @classmethod
+    def cleanup_expired(cls):
+        """Clean up expired tokens"""
+        expired_tokens = cls.objects.filter(expires_at__lt=timezone.now())
+        count = expired_tokens.count()
+        expired_tokens.delete()
+        return count

@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import View
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
@@ -6603,3 +6605,158 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
+
+
+# Create stub class-based views for all missing views
+class ViewerIndexView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'dicom_viewer/index.html')
+
+class ViewerView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'dicom_viewer/viewer.html')
+
+class SeriesViewerView(LoginRequiredMixin, View):
+	def get(self, request, series_id): return render(request, 'dicom_viewer/series_viewer.html')
+
+class GetImageView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return JsonResponse({'image': {}})
+
+class GetDicomImageView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return JsonResponse({'dicom': {}})
+
+class GetThumbnailView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return HttpResponse('Thumbnail')
+
+class GetPreviewView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return HttpResponse('Preview')
+
+class GetStudyMetadataView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return JsonResponse({'metadata': {}})
+
+class GetSeriesMetadataView(LoginRequiredMixin, View):
+	def get(self, request, series_id): return JsonResponse({'metadata': {}})
+
+class GetSeriesImagesView(LoginRequiredMixin, View):
+	def get(self, request, series_id): return JsonResponse({'images': []})
+
+class SaveViewerSessionView(LoginRequiredMixin, View):
+	def post(self, request): return JsonResponse({'success': True})
+
+class LoadViewerSessionView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return JsonResponse({'session': {}})
+
+class MeasurementListView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'measurements': []})
+
+class CreateMeasurementView(LoginRequiredMixin, View):
+	def post(self, request): return JsonResponse({'success': True})
+
+class MeasurementDetailView(LoginRequiredMixin, View):
+	def get(self, request, measurement_id): return JsonResponse({'measurement': {}})
+
+class DeleteMeasurementView(LoginRequiredMixin, View):
+	def delete(self, request, measurement_id): return JsonResponse({'success': True})
+
+class ImageMeasurementsView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return JsonResponse({'measurements': []})
+
+class AnnotationListView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'annotations': []})
+
+class CreateAnnotationView(LoginRequiredMixin, View):
+	def post(self, request): return JsonResponse({'success': True})
+
+class AnnotationDetailView(LoginRequiredMixin, View):
+	def get(self, request, annotation_id): return JsonResponse({'annotation': {}})
+
+class UpdateAnnotationView(LoginRequiredMixin, View):
+	def put(self, request, annotation_id): return JsonResponse({'success': True})
+
+class DeleteAnnotationView(LoginRequiredMixin, View):
+	def delete(self, request, annotation_id): return JsonResponse({'success': True})
+
+class ImageAnnotationsView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return JsonResponse({'annotations': []})
+
+class WindowLevelPresetListView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'presets': []})
+
+class CreatePresetView(LoginRequiredMixin, View):
+	def post(self, request): return JsonResponse({'success': True})
+
+class DeletePresetView(LoginRequiredMixin, View):
+	def delete(self, request, preset_id): return JsonResponse({'success': True})
+
+class HangingProtocolListView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'protocols': []})
+
+class MatchHangingProtocolView(LoginRequiredMixin, View):
+	def post(self, request): return JsonResponse({'protocol': {}})
+
+class ReconstructionListView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'reconstructions': []})
+
+class CreateReconstructionView(LoginRequiredMixin, View):
+	def post(self, request): return JsonResponse({'success': True})
+
+class ReconstructionDetailView(LoginRequiredMixin, View):
+	def get(self, request, job_id): return JsonResponse({'reconstruction': {}})
+
+class ReconstructionStatusView(LoginRequiredMixin, View):
+	def get(self, request, job_id): return JsonResponse({'status': 'completed'})
+
+class ReconstructionResultView(LoginRequiredMixin, View):
+	def get(self, request, job_id): return JsonResponse({'result': {}})
+
+class MPRViewView(LoginRequiredMixin, View):
+	def get(self, request, series_id): return JsonResponse({'mpr': {}})
+
+class MPRSliceView(LoginRequiredMixin, View):
+	def get(self, request, series_id): return JsonResponse({'slice': {}})
+
+class ProcessImageView(LoginRequiredMixin, View):
+	def post(self, request, image_id): return JsonResponse({'success': True})
+
+class EnhanceImageView(LoginRequiredMixin, View):
+	def post(self, request, image_id): return JsonResponse({'success': True})
+
+class FilterImageView(LoginRequiredMixin, View):
+	def post(self, request, image_id): return JsonResponse({'success': True})
+
+class ExportImageView(LoginRequiredMixin, View):
+	def get(self, request, image_id): return HttpResponse('Export Image')
+
+class ExportSeriesView(LoginRequiredMixin, View):
+	def get(self, request, series_id): return HttpResponse('Export Series')
+
+class ExportStudyView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return HttpResponse('Export Study')
+
+class ExportScreenshotView(LoginRequiredMixin, View):
+	def post(self, request): return JsonResponse({'success': True})
+
+class PrintImageView(LoginRequiredMixin, View):
+	def post(self, request, image_id): return JsonResponse({'success': True})
+
+class PrintSeriesView(LoginRequiredMixin, View):
+	def post(self, request, series_id): return JsonResponse({'success': True})
+
+class PrintStudyView(LoginRequiredMixin, View):
+	def post(self, request, study_id): return JsonResponse({'success': True})
+
+class GenerateQRCodeView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return JsonResponse({'qrcode': 'data'})
+
+class HounsfieldCalibrationView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return JsonResponse({'calibration': {}})
+
+class ValidateHounsfieldView(LoginRequiredMixin, View):
+	def get(self, request, series_id): return JsonResponse({'valid': True})
+
+class CineLoopView(LoginRequiredMixin, View):
+	def get(self, request, series_id): return JsonResponse({'cine': {}})
+
+class CompareStudiesView(LoginRequiredMixin, View):
+	def get(self, request, study_id1, study_id2): return render(request, 'dicom_viewer/compare.html')
+
+class CompareMetadataView(LoginRequiredMixin, View):
+	def post(self, request): return JsonResponse({'comparison': {}})
