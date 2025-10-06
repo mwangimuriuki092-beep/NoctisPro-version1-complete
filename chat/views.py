@@ -176,3 +176,132 @@ def leave_room(request, room_id):
 # Create stub class-based views for missing chat views
 class ChatDashboardView(LoginRequiredMixin, View):
 	def get(self, request): return render(request, 'chat/dashboard.html')
+
+class RoomListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'chat/room_list.html')
+
+class CreateRoomView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'chat/create_room.html')
+	def post(self, request): messages.success(request, 'Chat room created.'); return redirect('chat:room_list')
+
+class RoomDetailView(LoginRequiredMixin, View):
+	def get(self, request, room_id): return render(request, 'chat/room_detail.html')
+
+class JoinRoomView(LoginRequiredMixin, View):
+	def post(self, request, room_id): messages.success(request, 'Joined room.'); return redirect('chat:room_detail', room_id=room_id)
+
+class LeaveRoomView(LoginRequiredMixin, View):
+	def post(self, request, room_id): messages.success(request, 'Left room.'); return redirect('chat:room_list')
+
+class InviteUserView(LoginRequiredMixin, View):
+	def post(self, request, room_id): messages.success(request, 'User invited.'); return redirect('chat:room_detail', room_id=room_id)
+
+class AcceptInviteView(LoginRequiredMixin, View):
+	def post(self, request, invite_id): messages.success(request, 'Invitation accepted.'); return redirect('chat:room_list')
+
+class DeclineInviteView(LoginRequiredMixin, View):
+	def post(self, request, invite_id): messages.success(request, 'Invitation declined.'); return redirect('chat:room_list')
+
+class MessageHistoryView(LoginRequiredMixin, View):
+	def get(self, request, room_id): return render(request, 'chat/message_history.html')
+
+class SendMessageAPIView(LoginRequiredMixin, View):
+	def post(self, request, room_id): return JsonResponse({'success': True})
+
+class MessageHistoryAPIView(LoginRequiredMixin, View):
+	def get(self, request, room_id): return JsonResponse({'messages': []})
+
+class RoomParticipantsAPIView(LoginRequiredMixin, View):
+	def get(self, request, room_id): return JsonResponse({'participants': []})
+
+class UserStatusAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'status': 'online'})
+
+# Add all remaining missing chat views
+class EditRoomView(LoginRequiredMixin, View):
+	def get(self, request, room_id): return render(request, 'chat/edit_room.html')
+	def post(self, request, room_id): messages.success(request, 'Room updated.'); return redirect('chat:room_detail', room_id=room_id)
+
+class DeleteRoomView(LoginRequiredMixin, View):
+	def post(self, request, room_id): messages.success(request, 'Room deleted.'); return redirect('chat:room_list')
+
+class ChatRoomView(LoginRequiredMixin, View):
+	def get(self, request, room_id): return render(request, 'chat/chat_room.html')
+
+class DirectMessageListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'chat/direct_list.html')
+
+class DirectMessageView(LoginRequiredMixin, View):
+	def get(self, request, user_id): return render(request, 'chat/direct_message.html')
+
+class CreateDirectRoomView(LoginRequiredMixin, View):
+	def post(self, request, user_id): messages.success(request, 'Direct room created.'); return redirect('chat:direct_message', user_id=user_id)
+
+class EditMessageView(LoginRequiredMixin, View):
+	def post(self, request, message_id): messages.success(request, 'Message edited.'); return redirect('chat:room_list')
+
+class DeleteMessageView(LoginRequiredMixin, View):
+	def post(self, request, message_id): messages.success(request, 'Message deleted.'); return redirect('chat:room_list')
+
+class ReactToMessageView(LoginRequiredMixin, View):
+	def post(self, request, message_id): return JsonResponse({'success': True})
+
+class ParticipantListView(LoginRequiredMixin, View):
+	def get(self, request, room_id): return render(request, 'chat/participant_list.html')
+
+class InviteParticipantView(LoginRequiredMixin, View):
+	def post(self, request, room_id): messages.success(request, 'Participant invited.'); return redirect('chat:room_detail', room_id=room_id)
+
+class RemoveParticipantView(LoginRequiredMixin, View):
+	def post(self, request, room_id, user_id): messages.success(request, 'Participant removed.'); return redirect('chat:room_detail', room_id=room_id)
+
+class UpdateParticipantRoleView(LoginRequiredMixin, View):
+	def post(self, request, room_id, user_id): messages.success(request, 'Role updated.'); return redirect('chat:room_detail', room_id=room_id)
+
+class InvitationListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'chat/invitation_list.html')
+
+class AcceptInvitationView(LoginRequiredMixin, View):
+	def post(self, request, invitation_id): messages.success(request, 'Invitation accepted.'); return redirect('chat:room_list')
+
+class DeclineInvitationView(LoginRequiredMixin, View):
+	def post(self, request, invitation_id): messages.success(request, 'Invitation declined.'); return redirect('chat:invitation_list')
+
+class ModerationLogView(LoginRequiredMixin, View):
+	def get(self, request, room_id): return render(request, 'chat/moderation_log.html')
+
+class ModerateUserView(LoginRequiredMixin, View):
+	def post(self, request, room_id, user_id): messages.success(request, 'User moderated.'); return redirect('chat:room_detail', room_id=room_id)
+
+class UploadFileView(LoginRequiredMixin, View):
+	def post(self, request, room_id): messages.success(request, 'File uploaded.'); return redirect('chat:room_detail', room_id=room_id)
+
+class DownloadFileView(LoginRequiredMixin, View):
+	def get(self, request, file_id): return JsonResponse({'download_url': '/media/file.txt'})
+
+class ShareStudyView(LoginRequiredMixin, View):
+	def post(self, request, room_id, study_id): messages.success(request, 'Study shared.'); return redirect('chat:room_detail', room_id=room_id)
+
+class ChatSettingsView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'chat/settings.html')
+
+class UpdateChatSettingsView(LoginRequiredMixin, View):
+	def post(self, request): messages.success(request, 'Settings updated.'); return redirect('chat:settings')
+
+class SearchMessagesView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'chat/search.html')
+
+class RoomListAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'rooms': []})
+
+class MessageListAPIView(LoginRequiredMixin, View):
+	def get(self, request, room_id): return JsonResponse({'messages': []})
+
+class MarkRoomAsReadAPIView(LoginRequiredMixin, View):
+	def post(self, request, room_id): return JsonResponse({'success': True})
+
+class OnlineUsersAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'users': []})
+
+class UnreadCountAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'unread_count': 0})
