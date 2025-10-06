@@ -508,28 +508,82 @@ class ReportListView(LoginRequiredMixin, View):
 	def get(self, request): return render(request, 'reports/report_list.html')
 
 class CreateReportView(LoginRequiredMixin, View):
-	def get(self, request, study_id): return render(request, 'reports/create_report.html')
-	def post(self, request, study_id): messages.success(request, 'Report created.'); return redirect('reports:report_list')
+	def get(self, request, study_id):
+		# Only radiologists and admins can create reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can create reports.')
+			return redirect('worklist:study_detail', study_id=study_id)
+		return render(request, 'reports/create_report.html')
+	
+	def post(self, request, study_id):
+		# Only radiologists and admins can create reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can create reports.')
+			return redirect('worklist:study_detail', study_id=study_id)
+		messages.success(request, 'Report created.'); 
+		return redirect('reports:report_list')
 
 class ReportDetailView(LoginRequiredMixin, View):
 	def get(self, request, report_id): return render(request, 'reports/report_detail.html')
 
 class EditReportView(LoginRequiredMixin, View):
-	def get(self, request, report_id): return render(request, 'reports/edit_report.html')
-	def post(self, request, report_id): messages.success(request, 'Report updated.'); return redirect('reports:report_detail', report_id=report_id)
+	def get(self, request, report_id):
+		# Only radiologists and admins can edit reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can edit reports.')
+			return redirect('reports:report_detail', report_id=report_id)
+		return render(request, 'reports/edit_report.html')
+	
+	def post(self, request, report_id):
+		# Only radiologists and admins can edit reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can edit reports.')
+			return redirect('reports:report_detail', report_id=report_id)
+		messages.success(request, 'Report updated.'); 
+		return redirect('reports:report_detail', report_id=report_id)
 
 class DeleteReportView(LoginRequiredMixin, View):
-	def post(self, request, report_id): messages.success(request, 'Report deleted.'); return redirect('reports:report_list')
+	def post(self, request, report_id):
+		# Only admins can delete reports
+		if not request.user.is_admin():
+			messages.error(request, 'Only administrators can delete reports.')
+			return redirect('reports:report_detail', report_id=report_id)
+		messages.success(request, 'Report deleted.'); 
+		return redirect('reports:report_list')
 
 class SignReportView(LoginRequiredMixin, View):
-	def post(self, request, report_id): messages.success(request, 'Report signed.'); return redirect('reports:report_detail', report_id=report_id)
+	def post(self, request, report_id):
+		# Only radiologists and admins can sign reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can sign reports.')
+			return redirect('reports:report_detail', report_id=report_id)
+		messages.success(request, 'Report signed and verified by Dr. ' + request.user.get_full_name()); 
+		return redirect('reports:report_detail', report_id=report_id)
 
 class ApproveReportView(LoginRequiredMixin, View):
-	def post(self, request, report_id): messages.success(request, 'Report approved.'); return redirect('reports:report_detail', report_id=report_id)
+	def post(self, request, report_id):
+		# Only radiologists and admins can approve reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can approve reports.')
+			return redirect('reports:report_detail', report_id=report_id)
+		messages.success(request, 'AI preliminary report approved and verified by Dr. ' + request.user.get_full_name()); 
+		return redirect('reports:report_detail', report_id=report_id)
 
 class AmendReportView(LoginRequiredMixin, View):
-	def get(self, request, report_id): return render(request, 'reports/amend_report.html')
-	def post(self, request, report_id): messages.success(request, 'Report amended.'); return redirect('reports:report_detail', report_id=report_id)
+	def get(self, request, report_id):
+		# Only radiologists and admins can amend reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can amend reports.')
+			return redirect('reports:report_detail', report_id=report_id)
+		return render(request, 'reports/amend_report.html')
+	
+	def post(self, request, report_id):
+		# Only radiologists and admins can amend reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can amend reports.')
+			return redirect('reports:report_detail', report_id=report_id)
+		messages.success(request, 'Report amended by Dr. ' + request.user.get_full_name()); 
+		return redirect('reports:report_detail', report_id=report_id)
 
 class CancelReportView(LoginRequiredMixin, View):
 	def post(self, request, report_id): messages.success(request, 'Report cancelled.'); return redirect('reports:report_detail', report_id=report_id)

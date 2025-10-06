@@ -1296,14 +1296,38 @@ class AutoReportDetailView(LoginRequiredMixin, View):
 	def get(self, request, report_id): return render(request, 'ai_analysis/auto_report_detail.html')
 
 class ApproveAutoReportView(LoginRequiredMixin, View):
-	def post(self, request, report_id): messages.success(request, 'Auto report approved.'); return redirect('ai_analysis:auto_report_detail', report_id=report_id)
+	def post(self, request, report_id):
+		# Only radiologists and admins can approve AI auto reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can approve AI reports.')
+			return redirect('ai_analysis:auto_report_detail', report_id=report_id)
+		messages.success(request, 'AI preliminary report approved and verified by Dr. ' + request.user.get_full_name()); 
+		return redirect('ai_analysis:auto_report_detail', report_id=report_id)
 
 class ModifyAutoReportView(LoginRequiredMixin, View):
-	def get(self, request, report_id): return render(request, 'ai_analysis/modify_auto_report.html')
-	def post(self, request, report_id): messages.success(request, 'Auto report modified.'); return redirect('ai_analysis:auto_report_detail', report_id=report_id)
+	def get(self, request, report_id):
+		# Only radiologists and admins can modify AI auto reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can modify AI reports.')
+			return redirect('ai_analysis:auto_report_detail', report_id=report_id)
+		return render(request, 'ai_analysis/modify_auto_report.html')
+	
+	def post(self, request, report_id):
+		# Only radiologists and admins can modify AI auto reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can modify AI reports.')
+			return redirect('ai_analysis:auto_report_detail', report_id=report_id)
+		messages.success(request, 'AI preliminary report modified and verified by Dr. ' + request.user.get_full_name()); 
+		return redirect('ai_analysis:auto_report_detail', report_id=report_id)
 
 class RejectAutoReportView(LoginRequiredMixin, View):
-	def post(self, request, report_id): messages.success(request, 'Auto report rejected.'); return redirect('ai_analysis:auto_report_list')
+	def post(self, request, report_id):
+		# Only radiologists and admins can reject AI auto reports
+		if not (request.user.is_radiologist() or request.user.is_admin()):
+			messages.error(request, 'Only radiologists and administrators can reject AI reports.')
+			return redirect('ai_analysis:auto_report_detail', report_id=report_id)
+		messages.success(request, 'AI preliminary report rejected by Dr. ' + request.user.get_full_name() + '. New report required.'); 
+		return redirect('ai_analysis:auto_report_list')
 
 class AutoReportTemplateListView(LoginRequiredMixin, View):
 	def get(self, request): return render(request, 'ai_analysis/template_list.html')
