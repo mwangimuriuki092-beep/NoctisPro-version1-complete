@@ -663,9 +663,15 @@ class UserListView(LoginRequiredMixin, ListView):
         """Filter users based on permissions"""
         queryset = User.objects.all()
         
-        if not self.request.user.is_admin():
-            # Facility managers see only their facility
+        if self.request.user.is_admin():
+            # Admins can see all users
+            pass  # queryset already includes all users
+        elif self.request.user.is_manager():
+            # Managers can see users in their facility
             queryset = queryset.filter(facility=self.request.user.facility)
+        else:
+            # Regular users can only see themselves
+            queryset = queryset.filter(id=self.request.user.id)
         
         # Search filter
         search = self.request.GET.get('search')
@@ -705,8 +711,8 @@ class UserCreateView(LoginRequiredMixin, View):
     
     def get(self, request):
         """Show user creation form"""
-        if not request.user.can_manage_users():
-            messages.error(request, 'You do not have permission to create users.')
+        if not request.user.is_admin():
+            messages.error(request, 'Only administrators can create users.')
             return redirect('accounts:user_list')
         
         facilities = Facility.objects.filter(is_active=True)
@@ -714,8 +720,8 @@ class UserCreateView(LoginRequiredMixin, View):
     
     def post(self, request):
         """Create user"""
-        if not request.user.can_manage_users():
-            messages.error(request, 'You do not have permission to create users.')
+        if not request.user.is_admin():
+            messages.error(request, 'Only administrators can create users.')
             return redirect('accounts:user_list')
         
         # Get form data
@@ -838,8 +844,9 @@ class UserEditView(LoginRequiredMixin, View):
         """Update user"""
         user = get_object_or_404(User, id=user_id)
         
-        if not request.user.can_manage_users():
-            messages.error(request, 'You do not have permission to edit users.')
+        # Allow users to edit their own profile, but only admins can edit other users
+        if user != request.user and not request.user.is_admin():
+            messages.error(request, 'Only administrators can edit other users.')
             return redirect('accounts:user_list')
         
         # Get form data
@@ -983,10 +990,11 @@ class UserDeleteView(LoginRequiredMixin, View):
         """Delete user"""
         user = get_object_or_404(User, id=user_id)
         
-        if not request.user.can_manage_users():
-            messages.error(request, 'You do not have permission to delete users.')
+        if not request.user.is_admin():
+            messages.error(request, 'Only administrators can delete users.')
             return redirect('accounts:user_list')
         
+        # Prevent admin from deleting themselves
         if user == request.user:
             messages.error(request, 'You cannot delete your own account.')
             return redirect('accounts:user_list')
