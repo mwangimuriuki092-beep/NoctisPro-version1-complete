@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import View
 from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
 from django.db.models import Q, Count, Max
@@ -169,3 +171,8 @@ def leave_room(request, room_id):
         messages.error(request, "You're not a member of this room.")
     
     return redirect('chat:chat_rooms')
+
+
+# Create stub class-based views for missing chat views
+class ChatDashboardView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'chat/dashboard.html')

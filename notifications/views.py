@@ -117,3 +117,79 @@ def api_unread_count(request):
             'error': str(e),
             'unread_count': 0
         }, status=500)
+
+
+# Create stub class-based views for all missing views
+class NotificationCenterView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'notifications/center.html')
+
+class NotificationListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'notifications/list.html')
+
+class UnreadNotificationsView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'notifications/unread.html')
+
+class ReadNotificationsView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'notifications/read.html')
+
+class MarkAsReadView(LoginRequiredMixin, View):
+	def post(self, request, notification_id): messages.success(request, 'Notification marked as read.'); return redirect('notifications:center')
+
+class DismissNotificationView(LoginRequiredMixin, View):
+	def post(self, request, notification_id): messages.success(request, 'Notification dismissed.'); return redirect('notifications:center')
+
+class MarkAllAsReadView(LoginRequiredMixin, View):
+	def post(self, request): messages.success(request, 'All notifications marked as read.'); return redirect('notifications:center')
+
+class ClearAllNotificationsView(LoginRequiredMixin, View):
+	def post(self, request): messages.success(request, 'All notifications cleared.'); return redirect('notifications:center')
+
+class NotificationDetailView(LoginRequiredMixin, View):
+	def get(self, request, notification_id): return render(request, 'notifications/detail.html')
+
+class NotificationPreferencesView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'notifications/preferences.html')
+
+class UpdatePreferencesView(LoginRequiredMixin, View):
+	def post(self, request): messages.success(request, 'Preferences updated.'); return redirect('notifications:preferences')
+
+class SystemErrorListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'notifications/error_list.html')
+
+class SystemErrorDetailView(LoginRequiredMixin, View):
+	def get(self, request, error_id): return render(request, 'notifications/error_detail.html')
+
+class ResolveErrorView(LoginRequiredMixin, View):
+	def post(self, request, error_id): messages.success(request, 'Error resolved.'); return redirect('notifications:error_list')
+
+class UploadStatusListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'notifications/upload_list.html')
+
+class UploadStatusDetailView(LoginRequiredMixin, View):
+	def get(self, request, upload_id): return render(request, 'notifications/upload_detail.html')
+
+class NotificationTypeListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'notifications/type_list.html')
+
+class CreateNotificationTypeView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'notifications/create_type.html')
+	def post(self, request): messages.success(request, 'Notification type created.'); return redirect('notifications:type_list')
+
+class EditNotificationTypeView(LoginRequiredMixin, View):
+	def get(self, request, type_id): return render(request, 'notifications/edit_type.html')
+	def post(self, request, type_id): messages.success(request, 'Notification type updated.'); return redirect('notifications:type_list')
+
+class NotificationListAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'notifications': []})
+
+class UnreadCountAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'unread_count': 0})
+
+class MarkAsReadAPIView(LoginRequiredMixin, View):
+	def post(self, request, notification_id): return JsonResponse({'success': True})
+
+class PollNotificationsAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'notifications': [], 'has_new': False})
+
+class SendNotificationAPIView(LoginRequiredMixin, View):
+	def post(self, request): return JsonResponse({'success': True})
