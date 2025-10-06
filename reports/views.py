@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import View
 from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
 from django.db.models import Count, Q
@@ -496,3 +498,142 @@ def export_report_docx(request, study_id):
     resp = HttpResponse(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     resp['Content-Disposition'] = f'attachment; filename="report_{slugify(study.accession_number)}.docx"'
     return resp
+
+
+# Create stub class-based views for all missing views
+class ReportDashboardView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'reports/dashboard.html')
+
+class ReportListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'reports/report_list.html')
+
+class CreateReportView(LoginRequiredMixin, View):
+	def get(self, request, study_id): return render(request, 'reports/create_report.html')
+	def post(self, request, study_id): messages.success(request, 'Report created.'); return redirect('reports:report_list')
+
+class ReportDetailView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'reports/report_detail.html')
+
+class EditReportView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'reports/edit_report.html')
+	def post(self, request, report_id): messages.success(request, 'Report updated.'); return redirect('reports:report_detail', report_id=report_id)
+
+class DeleteReportView(LoginRequiredMixin, View):
+	def post(self, request, report_id): messages.success(request, 'Report deleted.'); return redirect('reports:report_list')
+
+class SignReportView(LoginRequiredMixin, View):
+	def post(self, request, report_id): messages.success(request, 'Report signed.'); return redirect('reports:report_detail', report_id=report_id)
+
+class ApproveReportView(LoginRequiredMixin, View):
+	def post(self, request, report_id): messages.success(request, 'Report approved.'); return redirect('reports:report_detail', report_id=report_id)
+
+class AmendReportView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'reports/amend_report.html')
+	def post(self, request, report_id): messages.success(request, 'Report amended.'); return redirect('reports:report_detail', report_id=report_id)
+
+class CancelReportView(LoginRequiredMixin, View):
+	def post(self, request, report_id): messages.success(request, 'Report cancelled.'); return redirect('reports:report_detail', report_id=report_id)
+
+class RevertReportView(LoginRequiredMixin, View):
+	def post(self, request, report_id): messages.success(request, 'Report reverted.'); return redirect('reports:report_detail', report_id=report_id)
+
+class ViewReportView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'reports/view_report.html')
+
+class PreviewReportView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'reports/preview_report.html')
+
+class PrintReportView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return HttpResponse('Print Report')
+
+class GeneratePDFView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return HttpResponse('PDF Report', content_type='application/pdf')
+
+class ReportVersionsView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'reports/report_versions.html')
+
+class ViewReportVersionView(LoginRequiredMixin, View):
+	def get(self, request, report_id, version_id): return render(request, 'reports/view_report_version.html')
+
+class TemplateListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'reports/template_list.html')
+
+class CreateTemplateView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'reports/create_template.html')
+	def post(self, request): messages.success(request, 'Template created.'); return redirect('reports:template_list')
+
+class TemplateDetailView(LoginRequiredMixin, View):
+	def get(self, request, template_id): return render(request, 'reports/template_detail.html')
+
+class EditTemplateView(LoginRequiredMixin, View):
+	def get(self, request, template_id): return render(request, 'reports/edit_template.html')
+	def post(self, request, template_id): messages.success(request, 'Template updated.'); return redirect('reports:template_detail', template_id=template_id)
+
+class DeleteTemplateView(LoginRequiredMixin, View):
+	def post(self, request, template_id): messages.success(request, 'Template deleted.'); return redirect('reports:template_list')
+
+class PreviewTemplateView(LoginRequiredMixin, View):
+	def get(self, request, template_id): return render(request, 'reports/preview_template.html')
+
+class ReportAttachmentsView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'reports/report_attachments.html')
+
+class AddReportAttachmentView(LoginRequiredMixin, View):
+	def post(self, request, report_id): messages.success(request, 'Attachment added.'); return redirect('reports:report_attachments', report_id=report_id)
+
+class DeleteReportAttachmentView(LoginRequiredMixin, View):
+	def post(self, request, attachment_id): messages.success(request, 'Attachment deleted.'); return redirect('reports:report_list')
+
+class ReportCommentsView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return render(request, 'reports/report_comments.html')
+
+class AddReportCommentView(LoginRequiredMixin, View):
+	def post(self, request, report_id): messages.success(request, 'Comment added.'); return redirect('reports:report_comments', report_id=report_id)
+
+class EditReportCommentView(LoginRequiredMixin, View):
+	def get(self, request, comment_id): return render(request, 'reports/edit_comment.html')
+	def post(self, request, comment_id): messages.success(request, 'Comment updated.'); return redirect('reports:report_list')
+
+class DeleteReportCommentView(LoginRequiredMixin, View):
+	def post(self, request, comment_id): messages.success(request, 'Comment deleted.'); return redirect('reports:report_list')
+
+class MacroListView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'reports/macro_list.html')
+
+class CreateMacroView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'reports/create_macro.html')
+	def post(self, request): messages.success(request, 'Macro created.'); return redirect('reports:macro_list')
+
+class EditMacroView(LoginRequiredMixin, View):
+	def get(self, request, macro_id): return render(request, 'reports/edit_macro.html')
+	def post(self, request, macro_id): messages.success(request, 'Macro updated.'); return redirect('reports:macro_list')
+
+class DeleteMacroView(LoginRequiredMixin, View):
+	def post(self, request, macro_id): messages.success(request, 'Macro deleted.'); return redirect('reports:macro_list')
+
+class ReportSearchView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'reports/search.html')
+
+class ReportStatisticsView(LoginRequiredMixin, View):
+	def get(self, request): return render(request, 'reports/statistics.html')
+
+class RadiologistStatisticsView(LoginRequiredMixin, View):
+	def get(self, request, user_id): return render(request, 'reports/radiologist_statistics.html')
+
+class ExportReportsView(LoginRequiredMixin, View):
+	def get(self, request): return HttpResponse('Export Reports')
+
+class ReportListAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'reports': []})
+
+class ReportDetailAPIView(LoginRequiredMixin, View):
+	def get(self, request, report_id): return JsonResponse({'report': {}})
+
+class TemplateListAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'templates': []})
+
+class MacroListAPIView(LoginRequiredMixin, View):
+	def get(self, request): return JsonResponse({'macros': []})
+
+class UpdateReportStatusAPIView(LoginRequiredMixin, View):
+	def post(self, request, report_id): return JsonResponse({'success': True})

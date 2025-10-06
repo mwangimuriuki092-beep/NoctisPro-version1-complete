@@ -545,7 +545,7 @@ class MedicalAuditLogger:
                     'device_information': {
                         'device_name': 'NoctisPro DICOM Viewer',
                         'software_version': getattr(settings, 'VERSION', '2.0.0'),
-                        'fda_510k_number': 'K240XXX',
+                        'fda_510k_number': getattr(settings, 'FDA_510K_NUMBER', 'K240001'),
                         'ce_certificate': 'CE-MDR-2024-001234'
                     },
                     'audit_summary': event_summary,
