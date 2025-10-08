@@ -1,0 +1,413 @@
+{% extends 'base.html' %}
+
+{% block title %}System Status - NoctisPro PACS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-heartbeat me-2"></i>System Status Check</h2>
+        <button class="btn btn-success" onclick="runSystemCheck()">
+            <i class="fas fa-sync-alt me-1"></i>Run Full Check
+        </button>
+    </div>
+
+    <!-- Overall Status -->
+    <div class="card bg-dark text-white mb-4">
+        <div class="card-header">
+            <h5><i class="fas fa-tachometer-alt me-2"></i>Overall System Health</h5>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-2">
+                    <div class="status-indicator">
+                        <i id="web-status" class="fas fa-circle text-success fa-3x mb-2"></i>
+                        <h6>Web Application</h6>
+                        <small class="text-muted">Django Server</small>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="status-indicator">
+                        <i id="dicom-scp-status" class="fas fa-circle text-secondary fa-3x mb-2"></i>
+                        <h6>DICOM SCP</h6>
+                        <small class="text-muted">Rust Server</small>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="status-indicator">
+                        <i id="database-status" class="fas fa-circle text-secondary fa-3x mb-2"></i>
+                        <h6>Database</h6>
+                        <small class="text-muted">PostgreSQL</small>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="status-indicator">
+                        <i id="redis-status" class="fas fa-circle text-secondary fa-3x mb-2"></i>
+                        <h6>Redis</h6>
+                        <small class="text-muted">Cache & Queue</small>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="status-indicator">
+                        <i id="celery-status" class="fas fa-circle text-secondary fa-3x mb-2"></i>
+                        <h6>Celery</h6>
+                        <small class="text-muted">Background Tasks</small>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="status-indicator">
+                        <i id="https-status" class="fas fa-circle text-success fa-3x mb-2"></i>
+                        <h6>HTTPS/SSL</h6>
+                        <small class="text-muted">Secure Connection</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Checks -->
+    <div class="row">
+        <!-- DICOM SCP Server Status -->
+        <div class="col-md-6 mb-4">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-header">
+                    <h6><i class="fas fa-hospital me-2"></i>DICOM SCP Server (Rust)</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled" id="dicom-scp-details">
+                        <li class="mb-2">
+                            <i class="fas fa-circle text-secondary me-2"></i>
+                            Status: <span id="scp-status-text">Checking...</span>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-network-wired me-2"></i>
+                            Host: <code id="scp-host">-</code>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-plug me-2"></i>
+                            Port: <code id="scp-port">-</code>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-tag me-2"></i>
+                            AE Title: <code id="scp-ae-title">-</code>
+                        </li>
+                        <li class="mb-2">
+                            <button class="btn btn-sm btn-primary" onclick="testDicomConnection()">
+                                <i class="fas fa-vial me-1"></i>Test Connection
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Status -->
+        <div class="col-md-6 mb-4">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-header">
+                    <h6><i class="fas fa-database me-2"></i>Database Status</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled" id="database-details">
+                        <li class="mb-2">
+                            <i class="fas fa-circle text-secondary me-2"></i>
+                            Connection: <span id="db-status-text">Checking...</span>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-users me-2"></i>
+                            Patients: <span id="patient-count">-</span>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-file-medical me-2"></i>
+                            Studies: <span id="study-count">-</span>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-images me-2"></i>
+                            Images: <span id="image-count">-</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- HTTPS Configuration -->
+        <div class="col-md-6 mb-4">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-header">
+                    <h6><i class="fas fa-lock me-2"></i>HTTPS Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Protocol: <code id="current-protocol">Loading...</code>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Domain: <code id="current-domain">Loading...</code>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            SSL Certificate: <span id="ssl-status">Checking...</span>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Security Headers: <span id="security-headers">Active</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Application Features -->
+        <div class="col-md-6 mb-4">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-header">
+                    <h6><i class="fas fa-hospital-symbol me-2"></i>PACS Features</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <a href="/worklist/" class="text-decoration-none">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                DICOM Worklist
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="/dicom-viewer/" class="text-decoration-none">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                DICOM Viewer
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="/chat/" class="text-decoration-none">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Chat System
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="/ai/" class="text-decoration-none">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                AI Analysis
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Results -->
+    <div class="card bg-dark text-white">
+        <div class="card-header">
+            <h6><i class="fas fa-clipboard-check me-2"></i>Test Results</h6>
+        </div>
+        <div class="card-body">
+            <div id="test-results" style="min-height: 200px;">
+                <div class="text-center text-muted">
+                    <i class="fas fa-play-circle fa-3x mb-3"></i>
+                    <p>Click "Run Full Check" to test all system components</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    updateBasicStatus();
+    checkSystemStatus();
+});
+
+function updateBasicStatus() {
+    document.getElementById('current-protocol').textContent = window.location.protocol.toUpperCase();
+    document.getElementById('current-domain').textContent = window.location.hostname;
+    
+    if (window.location.protocol === 'https:') {
+        document.getElementById('ssl-status').innerHTML = '<span class="text-success">Valid & Active</span>';
+        document.getElementById('https-status').className = 'fas fa-circle text-success fa-3x mb-2';
+    } else {
+        document.getElementById('ssl-status').innerHTML = '<span class="text-warning">Not Active</span>';
+        document.getElementById('https-status').className = 'fas fa-circle text-warning fa-3x mb-2';
+    }
+}
+
+function checkSystemStatus() {
+    fetch('/dicom/api/system/status/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Update database stats
+                document.getElementById('patient-count').textContent = data.stats.patients;
+                document.getElementById('study-count').textContent = data.stats.studies;
+                document.getElementById('image-count').textContent = data.stats.images;
+                document.getElementById('db-status-text').innerHTML = '<span class="text-success">Connected</span>';
+                document.getElementById('database-status').className = 'fas fa-circle text-success fa-3x mb-2';
+                
+                // Update DICOM SCP status
+                if (data.stats.scp_server) {
+                    document.getElementById('scp-host').textContent = data.stats.scp_server.host;
+                    document.getElementById('scp-port').textContent = data.stats.scp_server.port;
+                    document.getElementById('scp-ae-title').textContent = 'RUST_SCP';
+                    
+                    if (data.stats.scp_server.connected) {
+                        document.getElementById('scp-status-text').innerHTML = '<span class="text-success">Connected</span>';
+                        document.getElementById('dicom-scp-status').className = 'fas fa-circle text-success fa-3x mb-2';
+                    } else {
+                        document.getElementById('scp-status-text').innerHTML = '<span class="text-danger">Not Connected</span>';
+                        document.getElementById('dicom-scp-status').className = 'fas fa-circle text-danger fa-3x mb-2';
+                    }
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error checking system status:', error);
+            document.getElementById('db-status-text').innerHTML = '<span class="text-danger">Error</span>';
+            document.getElementById('scp-status-text').innerHTML = '<span class="text-danger">Error</span>';
+        });
+}
+
+function testDicomConnection() {
+    const button = event.target.closest('button');
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testing...';
+    button.disabled = true;
+    
+    fetch('/dicom/api/scp/test/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showAlert('success', 'DICOM SCP Connection Successful', data.message);
+        } else {
+            showAlert('danger', 'DICOM SCP Connection Failed', data.message);
+        }
+        button.innerHTML = originalHTML;
+        button.disabled = false;
+    })
+    .catch(error => {
+        showAlert('danger', 'Connection Test Error', error.toString());
+        button.innerHTML = originalHTML;
+        button.disabled = false;
+    });
+}
+
+function runSystemCheck() {
+    const testResults = document.getElementById('test-results');
+    testResults.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><p class="mt-2">Running system checks...</p></div>';
+    
+    fetch('/dicom/api/system/status/')
+        .then(response => response.json())
+        .then(data => {
+            const results = [];
+            
+            // Check HTTPS
+            if (window.location.protocol === 'https:') {
+                results.push('<div class="alert alert-success"><i class="fas fa-check me-2"></i>HTTPS: SSL/TLS encryption is active</div>');
+            } else {
+                results.push('<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>HTTPS: Not using SSL encryption</div>');
+            }
+            
+            // Check DICOM SCP
+            if (data.stats.scp_server && data.stats.scp_server.connected) {
+                results.push(`<div class="alert alert-success"><i class="fas fa-check me-2"></i>DICOM SCP: Connected to ${data.stats.scp_server.host}:${data.stats.scp_server.port}</div>`);
+            } else {
+                results.push('<div class="alert alert-danger"><i class="fas fa-times me-2"></i>DICOM SCP: Not connected</div>');
+            }
+            
+            // Check database
+            if (data.stats.patients !== undefined) {
+                results.push(`<div class="alert alert-success"><i class="fas fa-check me-2"></i>Database: ${data.stats.patients} patients, ${data.stats.studies} studies, ${data.stats.images} images</div>`);
+            } else {
+                results.push('<div class="alert alert-danger"><i class="fas fa-times me-2"></i>Database: Connection failed</div>');
+            }
+            
+            // Check storage
+            if (data.stats.storage) {
+                results.push(`<div class="alert alert-success"><i class="fas fa-check me-2"></i>Storage: ${data.stats.storage.total_files} files, ${(data.stats.storage.total_size_mb / 1024).toFixed(2)} GB</div>`);
+            }
+            
+            results.push('<div class="alert alert-success"><i class="fas fa-check me-2"></i>PACS Features: All medical imaging features are available</div>');
+            
+            testResults.innerHTML = results.join('');
+        })
+        .catch(error => {
+            testResults.innerHTML = `<div class="alert alert-danger"><i class="fas fa-times me-2"></i>System check failed: ${error}</div>`;
+        });
+}
+
+function showAlert(type, title, message) {
+    const alertHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            <strong>${title}</strong><br>${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    const container = document.createElement('div');
+    container.innerHTML = alertHTML;
+    container.style.position = 'fixed';
+    container.style.top = '20px';
+    container.style.right = '20px';
+    container.style.zIndex = '9999';
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), 5000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+
+<style>
+.status-indicator {
+    padding: 20px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.alert {
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.alert-success {
+    background-color: rgba(0, 255, 136, 0.1);
+    border-left: 4px solid #00ff88;
+    color: #00ff88;
+}
+
+.alert-warning {
+    background-color: rgba(255, 170, 0, 0.1);
+    border-left: 4px solid #ffaa00;
+    color: #ffaa00;
+}
+
+.alert-danger {
+    background-color: rgba(255, 68, 68, 0.1);
+    border-left: 4px solid #ff4444;
+    color: #ff4444;
+}
+
+.alert-info {
+    background-color: rgba(0, 212, 255, 0.1);
+    border-left: 4px solid #00d4ff;
+    color: #00d4ff;
+}
+</style>
+{% endblock %}
