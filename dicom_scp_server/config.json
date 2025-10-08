@@ -1,0 +1,17 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 11112,
+    "ae_title": "RUST_SCP",
+    "max_pdu_length": 16384
+  },
+  "database": {
+    "url": "postgresql://postgres:postgres@localhost:5432/noctis_pro",
+    "max_connections": 10
+  },
+  "storage": {
+    "base_path": "/workspace/media/dicom_files",
+    "organize_by_patient": true,
+    "organize_by_study": true
+  }
+}

@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: noctispro_postgres_dev
+    environment:
+      POSTGRES_DB: noctis_pro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - noctispro_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: noctispro_redis_dev
+    ports:
+      - "6379:6379"
+    networks:
+      - noctispro_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  dicom_scp:
+    build:
+      context: ./dicom_scp_server
+      dockerfile: Dockerfile
+    container_name: noctispro_dicom_scp_dev
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/noctis_pro
+      DICOM_STORAGE_PATH: /app/media/dicom_files
+      RUST_LOG: info,dicom_scp_server=debug
+    volumes:
+      - media_data_dev:/app/media
+      - ./dicom_scp_server/config.json:/app/config.json:ro
+    ports:
+      - "11112:11112"
+    networks:
+      - noctispro_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  django:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: noctispro_django_dev
+    command: >
+      sh -c "
+        python manage.py migrate --noinput &&
+        python manage.py collectstatic --noinput &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    environment:
+      DEBUG: "true"
+      SECRET_KEY: dev-secret-key-change-in-production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/noctis_pro
+      REDIS_URL: redis://redis:6379/0
+      ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0
+      DICOM_SCP_HOST: dicom_scp
+      DICOM_SCP_PORT: 11112
+      DICOM_SCP_AE_TITLE: RUST_SCP
+      DICOM_SCU_AE_TITLE: DJANGO_SCU
+    volumes:
+      - .:/app
+      - media_data_dev:/app/media
+      - static_data_dev:/app/staticfiles
+    ports:
+      - "8000:8000"
+    networks:
+      - noctispro_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      dicom_scp:
+        condition: service_started
+    restart: unless-stopped
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: noctispro_celery_dev
+    command: celery -A noctis_pro worker -l info
+    environment:
+      DEBUG: "true"
+      SECRET_KEY: dev-secret-key-change-in-production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/noctis_pro
+      REDIS_URL: redis://redis:6379/0
+      DICOM_SCP_HOST: dicom_scp
+      DICOM_SCP_PORT: 11112
+    volumes:
+      - .:/app
+      - media_data_dev:/app/media
+    networks:
+      - noctispro_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: noctispro_celery_beat_dev
+    command: celery -A noctis_pro beat -l info
+    environment:
+      DEBUG: "true"
+      SECRET_KEY: dev-secret-key-change-in-production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/noctis_pro
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    networks:
+      - noctispro_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data_dev:
+  media_data_dev:
+  static_data_dev:
+
+networks:
+  noctispro_network:
+    driver: bridge
