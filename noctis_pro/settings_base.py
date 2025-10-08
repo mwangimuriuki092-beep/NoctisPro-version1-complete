@@ -227,6 +227,16 @@ USE_I18N = True
 USE_TZ = True
 
 # =============================================================================
+# DICOM SCP/SCU CONFIGURATION
+# =============================================================================
+
+# DICOM SCP Server (Rust) connection settings
+DICOM_SCP_HOST = os.environ.get('DICOM_SCP_HOST', 'localhost')
+DICOM_SCP_PORT = int(os.environ.get('DICOM_SCP_PORT', '11112'))
+DICOM_SCP_AE_TITLE = os.environ.get('DICOM_SCP_AE_TITLE', 'RUST_SCP')
+DICOM_SCU_AE_TITLE = os.environ.get('DICOM_SCU_AE_TITLE', 'DJANGO_SCU')
+
+# =============================================================================
 # STATIC FILES CONFIGURATION
 # =============================================================================
 
