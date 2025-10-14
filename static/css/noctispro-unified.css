@@ -387,8 +387,12 @@ body {
 
 /* Quick Action Buttons */
 .quick-action-btn {
-    width: 100%;
-    margin-bottom: var(--spacing-sm);
+    margin: var(--spacing-xs);
+}
+
+/* Flex gap utility */
+.gap-2 {
+    gap: 0.5rem;
 }
 
 /* Unified Table Styles */
