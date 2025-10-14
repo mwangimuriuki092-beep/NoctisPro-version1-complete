@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,7 +8,7 @@
     <title>{% block title %}NoctisPro PACS{% endblock %}</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{% url 'favicon' %}">
+    <link rel="icon" type="image/png" href="{% url 'favicon' %}"
     
     <!-- CSS -->
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
@@ -211,4 +212,3 @@
     
 </body>
 </html>
-{% load static %}
