@@ -1,6 +1,8 @@
 """
 DICOM Processing Endpoints
 High-performance DICOM parsing and processing
+
+PRODUCTION VERSION - Includes all production endpoints from dicom_production.py
 """
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
@@ -21,8 +23,14 @@ from fastapi_app.models.schemas import (
 from fastapi_app.dependencies import get_current_user
 from fastapi_app.config import settings
 
+# Import production endpoints
+from fastapi_app.routers import dicom_production
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Include production DICOM viewer endpoints
+router.include_router(dicom_production.router, tags=["dicom-viewer"])
 
 @router.post("/upload", response_model=DicomUploadResponse)
 async def upload_dicom(
