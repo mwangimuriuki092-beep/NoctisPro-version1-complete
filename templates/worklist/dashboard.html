@@ -66,7 +66,7 @@
                         <i class="fas fa-exclamation-circle"></i> <span id="urgent-count">-</span>
                     </div>
                     <div class="stat-label">Urgent Studies</div>
-                    <a href="{% url 'worklist:urgent_studies' %}" class="btn btn-sm btn-outline-danger mt-2">
+                    <a href="{% url 'worklist:urgent_studies' %}" class="btn-azin btn-azin-outline-danger btn-azin-sm mt-2">
                         View All
                     </a>
                 </div>
@@ -80,7 +80,7 @@
                         <i class="fas fa-clock"></i> <span id="in-progress-count">-</span>
                     </div>
                     <div class="stat-label">In Progress</div>
-                    <a href="{% url 'worklist:in_progress_studies' %}" class="btn btn-sm btn-outline-warning mt-2">
+                    <a href="{% url 'worklist:in_progress_studies' %}" class="btn-azin btn-azin-outline-warning btn-azin-sm mt-2">
                         View All
                     </a>
                 </div>
@@ -94,7 +94,7 @@
                         <i class="fas fa-check-circle"></i> <span id="completed-count">-</span>
                     </div>
                     <div class="stat-label">Completed Today</div>
-                    <a href="{% url 'worklist:completed_studies' %}" class="btn btn-sm btn-outline-success mt-2">
+                    <a href="{% url 'worklist:completed_studies' %}" class="btn-azin btn-azin-outline-success btn-azin-sm mt-2">
                         View All
                     </a>
                 </div>
@@ -108,7 +108,7 @@
                         <i class="fas fa-database"></i> <span id="total-count">-</span>
                     </div>
                     <div class="stat-label">Total Studies</div>
-                    <a href="{% url 'worklist:study_list' %}" class="btn btn-sm btn-outline-primary mt-2">
+                    <a href="{% url 'worklist:study_list' %}" class="btn-azin btn-azin-outline-primary btn-azin-sm mt-2">
                         View All
                     </a>
                 </div>
@@ -122,7 +122,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-list"></i> Recent Studies</h5>
-                    <a href="{% url 'worklist:study_list' %}" class="btn btn-sm btn-outline-primary">
+                    <a href="{% url 'worklist:study_list' %}" class="btn-azin btn-azin-outline-primary btn-azin-sm">
                         View All
                     </a>
                 </div>
@@ -162,27 +162,27 @@
                 </div>
                 <div class="card-body">
                     {% if user.can_upload_studies %}
-                    <a href="{% url 'worklist:study_upload' %}" class="btn btn-primary quick-action-btn">
+                    <a href="{% url 'worklist:study_upload' %}" class="btn-azin btn-azin-primary quick-action-btn">
                         <i class="fas fa-upload"></i> Upload Study
                     </a>
                     {% endif %}
                     
-                    <a href="{% url 'worklist:patient_create' %}" class="btn btn-success quick-action-btn">
+                    <a href="{% url 'worklist:patient_create' %}" class="btn-azin btn-azin-success quick-action-btn">
                         <i class="fas fa-user-plus"></i> New Patient
                     </a>
                     
-                    <a href="{% url 'worklist:search' %}" class="btn btn-info quick-action-btn">
+                    <a href="{% url 'worklist:search' %}" class="btn-azin btn-azin-info quick-action-btn">
                         <i class="fas fa-search"></i> Search
                     </a>
                     
                     {% if user.can_edit_reports %}
-                    <a href="{% url 'reports:dashboard' %}" class="btn btn-secondary quick-action-btn">
+                    <a href="{% url 'reports:dashboard' %}" class="btn-azin btn-azin-secondary quick-action-btn">
                         <i class="fas fa-file-medical"></i> Reports
                     </a>
                     {% endif %}
                     
                     {% if user.is_admin %}
-                    <a href="{% url 'admin_panel:dashboard' %}" class="btn btn-dark quick-action-btn">
+                    <a href="{% url 'admin_panel:dashboard' %}" class="btn-azin btn-azin-dark quick-action-btn">
                         <i class="fas fa-cog"></i> Admin Panel
                     </a>
                     {% endif %}
@@ -211,7 +211,7 @@
                         <span>AI Analysis</span>
                         <span class="badge bg-success">Active</span>
                     </div>
-                    <a href="/health/" target="_blank" class="btn btn-sm btn-outline-info mt-3 w-100">
+                    <a href="/health/" target="_blank" class="btn-azin btn-azin-outline-info btn-azin-sm mt-3 w-100">
                         <i class="fas fa-info-circle"></i> Detailed Status
                     </a>
                 </div>
@@ -273,7 +273,7 @@ $(document).ready(function() {
                             <td>${new Date(study.study_date).toLocaleDateString()}</td>
                             <td><span class="badge bg-${statusClass}">${study.status_display}</span></td>
                             <td>
-                                <a href="/dicom-viewer/viewer/${study.id}/" class="btn btn-sm btn-primary" title="View">
+                                <a href="/dicom-viewer/viewer/?study=${study.id}" class="btn-azin btn-azin-primary btn-azin-sm" title="View">
                                     <i class="fas fa-eye"></i>
                                 </a>
                             </td>

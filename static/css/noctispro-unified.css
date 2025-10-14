@@ -1,0 +1,553 @@
+/**
+ * NoctisPro PACS - Unified UI Stylesheet
+ * Professional Medical Imaging Interface
+ * Consistent design system across all pages
+ */
+
+:root {
+    /* Primary Color Palette - Medical Professional */
+    --primary-color: #667eea;
+    --primary-dark: #4c63c9;
+    --primary-light: #8598f0;
+    
+    /* Status Colors */
+    --urgent-color: #dc3545;
+    --warning-color: #ffc107;
+    --success-color: #28a745;
+    --info-color: #17a2b8;
+    --secondary-color: #6c757d;
+    
+    /* UI Colors */
+    --background: #f8f9fa;
+    --card-bg: #ffffff;
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --text-muted: #adb5bd;
+    --border-color: #dee2e6;
+    
+    /* Spacing */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    
+    /* Shadows */
+    --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+    
+    /* Border Radius */
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 1rem;
+}
+
+/* Global Styles */
+body {
+    background-color: var(--background);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--text-primary);
+}
+
+/* Unified Page Header */
+.page-header {
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.page-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.page-header h1 i {
+    color: var(--primary-color);
+    margin-right: var(--spacing-sm);
+}
+
+.page-header .subtitle {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+/* Unified Cards */
+.noctis-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--spacing-lg);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.noctis-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.noctis-card-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.noctis-card-header h5 {
+    margin: 0;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.noctis-card-header h5 i {
+    color: var(--primary-color);
+    margin-right: var(--spacing-sm);
+}
+
+.noctis-card-body {
+    padding: var(--spacing-lg);
+}
+
+/* Unified Statistics Cards */
+.stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    opacity: 0.05;
+    font-family: 'Font Awesome 5 Free';
+    font-size: 80px;
+    font-weight: 900;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+}
+
+.stat-card.urgent {
+    border-left-color: var(--urgent-color);
+}
+
+.stat-card.urgent::before {
+    content: '\f06a';
+    color: var(--urgent-color);
+}
+
+.stat-card.warning,
+.stat-card.in-progress {
+    border-left-color: var(--warning-color);
+}
+
+.stat-card.warning::before,
+.stat-card.in-progress::before {
+    content: '\f017';
+    color: var(--warning-color);
+}
+
+.stat-card.success,
+.stat-card.completed {
+    border-left-color: var(--success-color);
+}
+
+.stat-card.success::before,
+.stat-card.completed::before {
+    content: '\f058';
+    color: var(--success-color);
+}
+
+.stat-card.primary,
+.stat-card.total {
+    border-left-color: var(--primary-color);
+}
+
+.stat-card.primary::before,
+.stat-card.total::before {
+    content: '\f1c0';
+    color: var(--primary-color);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: var(--spacing-sm);
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Unified Button System - AZIN Style */
+.btn-azin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.5;
+    border-radius: var(--radius-md);
+    border: 2px solid transparent;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    text-decoration: none;
+    gap: var(--spacing-sm);
+}
+
+.btn-azin:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-azin:active {
+    transform: translateY(0);
+}
+
+.btn-azin i {
+    font-size: 1.1em;
+}
+
+/* Azin Primary Button */
+.btn-azin-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: #ffffff;
+    border-color: var(--primary-color);
+}
+
+.btn-azin-primary:hover {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+}
+
+/* Azin Success Button */
+.btn-azin-success {
+    background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+    color: #ffffff;
+    border-color: #28a745;
+}
+
+.btn-azin-success:hover {
+    background: linear-gradient(135deg, #218838 0%, #28a745 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(40, 167, 69, 0.4);
+}
+
+/* Azin Danger Button */
+.btn-azin-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: #ffffff;
+    border-color: #dc3545;
+}
+
+.btn-azin-danger:hover {
+    background: linear-gradient(135deg, #c82333 0%, #dc3545 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(220, 53, 69, 0.4);
+}
+
+/* Azin Warning Button */
+.btn-azin-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+    border-color: #ffc107;
+}
+
+.btn-azin-warning:hover {
+    background: linear-gradient(135deg, #e0a800 0%, #ffc107 100%);
+    color: #212529;
+    box-shadow: 0 4px 16px rgba(255, 193, 7, 0.4);
+}
+
+/* Azin Info Button */
+.btn-azin-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: #ffffff;
+    border-color: #17a2b8;
+}
+
+.btn-azin-info:hover {
+    background: linear-gradient(135deg, #138496 0%, #17a2b8 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(23, 162, 184, 0.4);
+}
+
+/* Azin Secondary Button */
+.btn-azin-secondary {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+    color: #ffffff;
+    border-color: #6c757d;
+}
+
+.btn-azin-secondary:hover {
+    background: linear-gradient(135deg, #5a6268 0%, #6c757d 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(108, 117, 125, 0.4);
+}
+
+/* Azin Dark Button */
+.btn-azin-dark {
+    background: linear-gradient(135deg, #343a40 0%, #23272b 100%);
+    color: #ffffff;
+    border-color: #343a40;
+}
+
+.btn-azin-dark:hover {
+    background: linear-gradient(135deg, #23272b 0%, #343a40 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(52, 58, 64, 0.4);
+}
+
+/* Azin Outline Buttons */
+.btn-azin-outline-primary {
+    background: transparent;
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-azin-outline-primary:hover {
+    background: var(--primary-color);
+    color: #ffffff;
+}
+
+.btn-azin-outline-success {
+    background: transparent;
+    color: #28a745;
+    border-color: #28a745;
+}
+
+.btn-azin-outline-success:hover {
+    background: #28a745;
+    color: #ffffff;
+}
+
+.btn-azin-outline-danger {
+    background: transparent;
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-azin-outline-danger:hover {
+    background: #dc3545;
+    color: #ffffff;
+}
+
+.btn-azin-outline-warning {
+    background: transparent;
+    color: #ffc107;
+    border-color: #ffc107;
+}
+
+.btn-azin-outline-warning:hover {
+    background: #ffc107;
+    color: #212529;
+}
+
+.btn-azin-outline-info {
+    background: transparent;
+    color: #17a2b8;
+    border-color: #17a2b8;
+}
+
+.btn-azin-outline-info:hover {
+    background: #17a2b8;
+    color: #ffffff;
+}
+
+/* Button Sizes */
+.btn-azin-sm {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+.btn-azin-lg {
+    padding: 0.875rem 1.75rem;
+    font-size: 1.125rem;
+}
+
+/* Quick Action Buttons */
+.quick-action-btn {
+    width: 100%;
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Unified Table Styles */
+.noctis-table {
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.noctis-table thead th {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    color: var(--text-primary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    padding: var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.noctis-table tbody tr {
+    transition: background-color 0.2s;
+}
+
+.noctis-table tbody tr:hover {
+    background-color: rgba(102, 126, 234, 0.05);
+}
+
+.noctis-table tbody td {
+    padding: var(--spacing-md);
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Unified Badges */
+.badge-azin {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35em 0.75em;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: var(--radius-md);
+    gap: 0.35em;
+}
+
+.badge-azin-urgent {
+    background: var(--urgent-color);
+    color: #ffffff;
+}
+
+.badge-azin-warning {
+    background: var(--warning-color);
+    color: #212529;
+}
+
+.badge-azin-success {
+    background: var(--success-color);
+    color: #ffffff;
+}
+
+.badge-azin-info {
+    background: var(--info-color);
+    color: #ffffff;
+}
+
+.badge-azin-secondary {
+    background: var(--secondary-color);
+    color: #ffffff;
+}
+
+.badge-azin-primary {
+    background: var(--primary-color);
+    color: #ffffff;
+}
+
+/* Unified Forms */
+.form-azin {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-azin label {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+    display: block;
+}
+
+.form-azin input,
+.form-azin select,
+.form-azin textarea {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.95rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    transition: all 0.2s;
+}
+
+.form-azin input:focus,
+.form-azin select:focus,
+.form-azin textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--text-muted);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.3;
+}
+
+.empty-state h3 {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Loading State */
+.loading-state {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--text-secondary);
+}
+
+.loading-state i {
+    font-size: 2rem;
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Responsive Utilities */
+@media (max-width: 768px) {
+    .stat-value {
+        font-size: 2rem;
+    }
+    
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .quick-action-btn {
+        font-size: 0.9rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .btn-azin,
+    .quick-action-btn {
+        display: none;
+    }
+    
+    .noctis-card {
+        break-inside: avoid;
+    }
+}

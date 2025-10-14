@@ -3,35 +3,221 @@
 
 {% block title %}Worklist - NoctisPro PACS{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/worklist.css' %}">
-{% endblock %}
-
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-3">
-        <div class="col-md-12">
-            <h2><i class="fas fa-list"></i> Worklist</h2>
-            <p class="text-muted">View and manage patient studies</p>
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1><i class="fas fa-list"></i> Worklist</h1>
+        <p class="subtitle">View and manage patient studies</p>
+    </div>
+    
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card urgent">
+                <div class="card-body">
+                    <div class="stat-value text-danger">
+                        <i class="fas fa-exclamation-circle"></i> <span id="urgent-count">0</span>
+                    </div>
+                    <div class="stat-label">Urgent Studies</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card in-progress">
+                <div class="card-body">
+                    <div class="stat-value text-warning">
+                        <i class="fas fa-hourglass-half"></i> <span id="pending-count">0</span>
+                    </div>
+                    <div class="stat-label">Pending Review</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card completed">
+                <div class="card-body">
+                    <div class="stat-value text-success">
+                        <i class="fas fa-check-circle"></i> <span id="completed-count">0</span>
+                    </div>
+                    <div class="stat-label">Completed</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card total">
+                <div class="card-body">
+                    <div class="stat-value text-primary">
+                        <i class="fas fa-folder-open"></i> <span id="total-count">0</span>
+                    </div>
+                    <div class="stat-label">Total Studies</div>
+                </div>
+            </div>
         </div>
     </div>
     
+    <!-- Main Content -->
     <div class="row">
         <div class="col-md-12">
-            <div class="card">
-                <div class="card-body">
-                    <p>The worklist page displays all available studies for review.</p>
-                    <p>
-                        <a href="{% url 'worklist:study_list' %}" class="btn btn-primary">
-                            <i class="fas fa-table"></i> View Study List
+            <div class="noctis-card">
+                <div class="noctis-card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-table"></i> Study List</h5>
+                    <div>
+                        <a href="{% url 'worklist:study_upload' %}" class="btn-azin btn-azin-success btn-azin-sm">
+                            <i class="fas fa-upload"></i> Upload Study
                         </a>
-                        <a href="{% url 'worklist:dashboard' %}" class="btn btn-secondary">
-                            <i class="fas fa-th-large"></i> View Dashboard
+                        <a href="{% url 'worklist:patient_create' %}" class="btn-azin btn-azin-primary btn-azin-sm">
+                            <i class="fas fa-user-plus"></i> New Patient
                         </a>
-                    </p>
+                    </div>
+                </div>
+                <div class="noctis-card-body">
+                    <div class="table-responsive">
+                        <table class="noctis-table">
+                            <thead>
+                                <tr>
+                                    <th>Accession</th>
+                                    <th>Patient</th>
+                                    <th>Modality</th>
+                                    <th>Description</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="worklist-tbody">
+                                <tr>
+                                    <td colspan="7" class="loading-state">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <p>Loading studies...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions Sidebar -->
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="noctis-card">
+                <div class="noctis-card-header">
+                    <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
+                </div>
+                <div class="noctis-card-body">
+                    <a href="{% url 'worklist:dashboard' %}" class="btn-azin btn-azin-primary quick-action-btn">
+                        <i class="fas fa-th-large"></i> Dashboard
+                    </a>
+                    <a href="{% url 'worklist:study_list' %}" class="btn-azin btn-azin-info quick-action-btn">
+                        <i class="fas fa-list"></i> All Studies
+                    </a>
+                    <a href="{% url 'worklist:urgent_studies' %}" class="btn-azin btn-azin-danger quick-action-btn">
+                        <i class="fas fa-exclamation-triangle"></i> Urgent Studies
+                    </a>
+                    <a href="{% url 'worklist:search' %}" class="btn-azin btn-azin-secondary quick-action-btn">
+                        <i class="fas fa-search"></i> Advanced Search
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="noctis-card">
+                <div class="noctis-card-header">
+                    <h5><i class="fas fa-info-circle"></i> Worklist Overview</h5>
+                </div>
+                <div class="noctis-card-body">
+                    <p>The worklist displays all medical imaging studies available for review and interpretation.</p>
+                    <ul>
+                        <li>Click on any study to view detailed information</li>
+                        <li>Use the <strong>DICOM Viewer</strong> button to examine images</li>
+                        <li>Filter studies by status, priority, or modality</li>
+                        <li>Upload new DICOM studies using the upload button</li>
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Load worklist data
+    function loadWorklist() {
+        $.get('{% url "worklist:api_study_list" %}', { limit: 50 }, function(data) {
+            const tbody = $('#worklist-tbody');
+            tbody.empty();
+            
+            if (data.results && data.results.length > 0) {
+                // Update counts
+                $('#total-count').text(data.count || data.results.length);
+                $('#urgent-count').text(data.results.filter(s => s.priority === 'urgent').length);
+                $('#pending-count').text(data.results.filter(s => s.status === 'in_progress').length);
+                $('#completed-count').text(data.results.filter(s => s.status === 'completed').length);
+                
+                data.results.forEach(function(study) {
+                    const statusClass = {
+                        'urgent': 'urgent',
+                        'in_progress': 'warning',
+                        'completed': 'success',
+                        'scheduled': 'info'
+                    }[study.status] || 'secondary';
+                    
+                    const row = `
+                        <tr>
+                            <td><strong>${study.accession_number}</strong></td>
+                            <td>${study.patient_name || 'Unknown'}</td>
+                            <td><span class="badge-azin badge-azin-secondary">${study.modality_code || 'N/A'}</span></td>
+                            <td>${study.study_description || 'No description'}</td>
+                            <td>${new Date(study.study_date).toLocaleDateString()}</td>
+                            <td><span class="badge-azin badge-azin-${statusClass}">${study.status_display || study.status}</span></td>
+                            <td>
+                                <a href="/worklist/studies/${study.id}/" class="btn-azin btn-azin-info btn-azin-sm" title="View Details">
+                                    <i class="fas fa-info-circle"></i>
+                                </a>
+                                <a href="/dicom-viewer/viewer/?study=${study.id}" class="btn-azin btn-azin-primary btn-azin-sm" title="View Images">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                });
+            } else {
+                tbody.html(`
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            <i class="fas fa-folder-open"></i>
+                            <h3>No Studies Found</h3>
+                            <p>Upload DICOM studies to get started</p>
+                            <a href="{% url 'worklist:study_upload' %}" class="btn-azin btn-azin-primary">
+                                <i class="fas fa-upload"></i> Upload Study
+                            </a>
+                        </td>
+                    </tr>
+                `);
+            }
+        }).fail(function() {
+            $('#worklist-tbody').html(`
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>Error Loading Studies</h3>
+                        <p>Please try refreshing the page</p>
+                    </td>
+                </tr>
+            `);
+        });
+    }
+    
+    // Initial load
+    loadWorklist();
+    
+    // Refresh every 30 seconds
+    setInterval(loadWorklist, 30000);
+});
+</script>
 {% endblock %}
