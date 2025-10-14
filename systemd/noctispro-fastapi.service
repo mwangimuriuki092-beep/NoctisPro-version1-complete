@@ -1,0 +1,45 @@
+[Unit]
+Description=NoctisPro FastAPI - Production PACS API Server
+After=network.target postgresql.service redis.service
+Requires=redis.service
+
+[Service]
+Type=notify
+User=noctispro
+Group=noctispro
+WorkingDirectory=/workspace
+
+# Load environment
+EnvironmentFile=/workspace/.env.production
+
+# Start FastAPI with production settings
+ExecStart=/workspace/venv/bin/uvicorn fastapi_app.main:app \
+    --host 0.0.0.0 \
+    --port 8001 \
+    --workers 4 \
+    --loop uvloop \
+    --http httptools \
+    --log-level info \
+    --access-log \
+    --proxy-headers \
+    --forwarded-allow-ips='*'
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctispro-fastapi
+
+[Install]
+WantedBy=multi-user.target

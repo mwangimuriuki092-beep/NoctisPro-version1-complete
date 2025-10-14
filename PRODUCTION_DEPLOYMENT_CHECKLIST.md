@@ -1,229 +1,344 @@
-# DICOM Viewer Production Deployment Checklist
+# 📋 Production Deployment Checklist
 
-## ✅ Code Changes Complete
+Complete this checklist before deploying FastAPI to production.
 
-### Backend (Python/Django)
-- ✅ Modified `/workspace/dicom_viewer/views.py`
-  - Function: `api_image_data()` (lines 6336-6435)
-  - Returns raw `pixel_data` array for client-side rendering
-  - Properly handles window/level metadata from DICOM files
-  - No syntax errors detected
+## ✅ Pre-Deployment
 
-### Frontend (HTML/JavaScript)
-- ✅ Modified `/workspace/templates/dicom_viewer/viewer.html`
-  - Immediate pixel data rendering (lines 1893-1910)
-  - Proper window/level initialization (lines 1873-1883)
-  - Correct windowing usage (lines 2651-2653)
-  - Enhanced error handling (lines 2624-2634)
-  - No syntax errors detected
+### System Requirements
 
-### URL Routing
-- ✅ No changes needed
-  - Route already configured: `/dicom-viewer/api/image/<int:image_id>/data/`
-  - Maps to: `views.api_image_data`
+- [ ] Ubuntu 22.04+ or similar Linux distribution
+- [ ] Python 3.10+
+- [ ] PostgreSQL 13+
+- [ ] Redis 6+
+- [ ] Nginx (for reverse proxy)
+- [ ] 4GB+ RAM available
+- [ ] 20GB+ disk space
 
-## 🚀 Ready for Production
+### Dependencies Installed
 
-### No Additional Steps Required
-The changes are ready to deploy. The modifications:
-1. ✅ Are backward compatible (fallback rendering still works)
-2. ✅ Don't require database migrations
-3. ✅ Don't require new dependencies
-4. ✅ Don't modify existing API contracts (only enhance response)
-5. ✅ Are thoroughly integrated with existing code
-
-### What Changed (Summary)
-**Before:** API returned base64 PNG → slow, no interactive windowing
-**After:** API returns raw pixel array → fast, full interactive windowing
-
-### Files Modified
-1. `dicom_viewer/views.py` - Enhanced API response
-2. `templates/dicom_viewer/viewer.html` - Direct canvas rendering
-
-## 🔍 Production Readiness Checklist
-
-### Before Deployment
-- [ ] Backup current database
-- [ ] Backup current code (git commit/push)
-- [ ] Note current Django version
-- [ ] Document current environment variables
-
-### Deployment Steps
-
-#### Option 1: Standard Deployment
 ```bash
-# 1. Pull latest code
-git pull origin main
-
-# 2. No migrations needed (no model changes)
-
-# 3. Collect static files (if using static file serving)
-python manage.py collectstatic --noinput
-
-# 4. Restart application server
-# For Gunicorn:
-systemctl restart gunicorn
-
-# For Docker:
-docker-compose restart
-
-# For runserver (dev only):
-# Kill and restart manage.py runserver
+# Verify installations
+- [ ] python3 --version  # Should be 3.10+
+- [ ] psql --version     # PostgreSQL client
+- [ ] redis-cli --version
+- [ ] nginx -v
 ```
 
-#### Option 2: Docker Deployment
+### Python Packages
+
 ```bash
-# 1. Rebuild container
-docker-compose build
-
-# 2. Restart services
-docker-compose down
-docker-compose up -d
-
-# 3. Verify logs
-docker-compose logs -f web
+# Install all requirements
+- [ ] pip install -r requirements.txt
+- [ ] Verify: python -c "import fastapi; print(fastapi.__version__)"
+- [ ] Verify: python -c "import redis; print(redis.__version__)"
+- [ ] Verify: python -c "import pydicom; print(pydicom.__version__)"
 ```
 
-#### Option 3: Zero-Downtime Deployment
+## ✅ Configuration
+
+### Environment Setup
+
+- [ ] Copy `.env.production.example` to `.env.production`
+- [ ] Set `ENVIRONMENT=production`
+- [ ] Set `DEBUG=False`
+- [ ] Configure `DATABASE_URL` with production credentials
+- [ ] Configure `REDIS_URL`
+- [ ] Set secure `DJANGO_SECRET_KEY`
+- [ ] Set secure `JWT_SECRET_KEY`
+- [ ] Update `ALLOWED_ORIGINS` for your domain
+
+### Redis Configuration
+
+- [ ] Redis installed and running
+- [ ] Test: `redis-cli ping` returns `PONG`
+- [ ] Configure `/etc/redis/redis.conf`:
+  - [ ] Set `maxmemory 4gb` (adjust for your needs)
+  - [ ] Set `maxmemory-policy allkeys-lru`
+  - [ ] Enable persistence if needed
+- [ ] Restart Redis: `sudo systemctl restart redis-server`
+
+### PostgreSQL Setup
+
+- [ ] PostgreSQL running
+- [ ] Database created
+- [ ] User has necessary permissions
+- [ ] Django migrations applied: `python manage.py migrate`
+- [ ] Test connection from FastAPI
+
+### File Permissions
+
 ```bash
-# 1. Deploy to staging first
-# 2. Test on staging environment
-# 3. Deploy to production with rolling restart
-# 4. Monitor error logs
+# Set correct permissions
+- [ ] mkdir -p /workspace/media/dicom_files
+- [ ] chown -R noctispro:noctispro /workspace/media
+- [ ] chmod 755 /workspace/media
+- [ ] chmod 755 /workspace/media/dicom_files
 ```
 
-### After Deployment
-- [ ] Verify DICOM viewer page loads (no 500 errors)
-- [ ] Check browser console for JavaScript errors
-- [ ] Test loading one DICOM study
-- [ ] Verify images display on canvas
-- [ ] Test window/level sliders work
-- [ ] Check server logs for Python errors
+## ✅ FastAPI Service
 
-### Rollback Plan (if needed)
+### Systemd Service
+
 ```bash
-# Revert to previous commit
-git revert HEAD
-# Or restore from backup
-# Then restart application server
+# Install service
+- [ ] sudo cp systemd/noctispro-fastapi.service /etc/systemd/system/
+- [ ] sudo systemctl daemon-reload
+- [ ] sudo systemctl enable noctispro-fastapi
+- [ ] sudo systemctl start noctispro-fastapi
+- [ ] sudo systemctl status noctispro-fastapi  # Should be "active (running)"
 ```
 
-## 📊 Monitoring
+### Service Verification
 
-### Key Metrics to Watch
-1. **API Response Time**
-   - Endpoint: `/dicom-viewer/api/image/<id>/data/`
-   - Expected: < 2 seconds for typical CT slice
-   - Alert if: > 5 seconds
-
-2. **Memory Usage**
-   - Watch for memory spikes when loading large images
-   - Pixel data serialization may use more memory temporarily
-
-3. **Error Rate**
-   - Monitor for 500 errors on image data endpoint
-   - Check for DICOM file read errors in logs
-
-### Log Monitoring
 ```bash
-# Watch for errors
-tail -f /var/log/django/error.log | grep -i "dicom\|pixel_data\|api_image_data"
-
-# Watch for API calls
-tail -f /var/log/django/access.log | grep "api/image/.*/data"
+# Test service
+- [ ] curl http://localhost:8001/api/v1/health
+- [ ] Should return: {"status": "healthy", ...}
+- [ ] Check logs: sudo journalctl -u noctispro-fastapi -n 50
+- [ ] No ERROR messages in logs
 ```
 
-## 🐛 Known Issues & Solutions
+## ✅ Nginx Configuration
 
-### Issue: Large Images May Take Longer
-**Cause:** Serializing 512x512 pixel array to JSON
-**Solution:** Already implemented - data is flattened efficiently
-**Impact:** Minimal (< 1 second for typical images)
+### Install & Configure
 
-### Issue: Very Large Series (>1000 images)
-**Cause:** Browser memory with large pixel data arrays
-**Solution:** Already handled - only current image pixel data kept in memory
-**Impact:** None
+```bash
+# Nginx setup
+- [ ] sudo apt-get install nginx
+- [ ] Copy nginx config to /etc/nginx/sites-available/noctispro
+- [ ] sudo ln -s /etc/nginx/sites-available/noctispro /etc/nginx/sites-enabled/
+- [ ] sudo nginx -t  # Should pass
+- [ ] sudo systemctl reload nginx
+```
 
-### Issue: Compressed DICOM Files
-**Cause:** pydicom may need additional codecs
-**Solution:** Install pydicom with all extras: `pip install pydicom[all]`
-**Impact:** Some compressed formats won't display
+### Test Nginx Routing
 
-## 🔐 Security Considerations
+```bash
+# Via Nginx
+- [ ] curl http://localhost/api/v1/health
+- [ ] Should return same as direct FastAPI connection
+```
 
-### Already Implemented
-✅ Permission checks (facility-based access control)
-✅ CSRF token validation
-✅ File path validation
-✅ Error handling (no sensitive data in error messages)
+### HTTPS (Production Only)
 
-### No Additional Security Changes Needed
-The modifications don't introduce new security concerns because:
-- Still uses existing authentication/authorization
-- No new user input processing
-- No new file system operations
-- Same API endpoints (just enhanced response)
+```bash
+# If deploying to internet
+- [ ] Install certbot: sudo apt-get install certbot python3-certbot-nginx
+- [ ] sudo certbot --nginx -d pacs.yourdomain.com
+- [ ] Test HTTPS: curl https://pacs.yourdomain.com/api/v1/health
+- [ ] Setup auto-renewal: sudo certbot renew --dry-run
+```
 
-## 📈 Performance Considerations
+## ✅ Security
 
-### Expected Performance
-- **First Load:** Slightly slower (1-2 seconds) due to pixel data transfer
-- **Window/Level Changes:** Much faster (instant) - now client-side
-- **Slice Navigation:** Same speed or faster
-- **Overall:** Better user experience due to smooth windowing
+### Firewall Configuration
 
-### Optimization Already Applied
-✅ Pixel data normalized to uint8 (1 byte per pixel)
-✅ Efficient array flattening
-✅ Single API call gets all needed data
-✅ Canvas rendering optimized with transformations
+```bash
+# UFW firewall
+- [ ] sudo ufw allow 22/tcp   # SSH
+- [ ] sudo ufw allow 80/tcp   # HTTP
+- [ ] sudo ufw allow 443/tcp  # HTTPS
+- [ ] sudo ufw enable
+- [ ] sudo ufw status
+```
 
-## 📱 Browser Compatibility
+### Service Security
 
-### Supported Browsers
-✅ Chrome 90+ (recommended)
-✅ Firefox 88+
-✅ Edge 90+
-✅ Safari 14+
+- [ ] FastAPI not accessible directly (only through Nginx)
+- [ ] Redis bind to 127.0.0.1 only
+- [ ] PostgreSQL bind to 127.0.0.1 only (if local)
+- [ ] Environment variables not exposed
+- [ ] `.env.production` has correct permissions (600)
 
-### Required Browser Features
-✅ Canvas API (supported in all modern browsers)
-✅ Fetch API (supported in all modern browsers)
-✅ ES6 JavaScript (supported in all modern browsers)
+### Application Security
 
-## ✅ Final Checklist
+- [ ] Rate limiting enabled: `ENABLE_RATE_LIMITING=True`
+- [ ] CORS configured with production domains only
+- [ ] Authentication enabled if required
+- [ ] Error messages don't leak sensitive info (`DEBUG=False`)
 
-Before marking deployment complete:
-- [ ] All modified files deployed
-- [ ] Application server restarted
-- [ ] No errors in logs
-- [ ] DICOM viewer accessible
-- [ ] Images display correctly
-- [ ] Window/level controls work
-- [ ] Team notified of changes
-- [ ] Documentation updated
+## ✅ Performance
+
+### Resource Allocation
+
+- [ ] Worker count set appropriately: `WORKERS=4` (adjust for CPU cores)
+- [ ] Redis max memory configured
+- [ ] PostgreSQL connections pool sized correctly
+- [ ] Disk space monitored
+
+### Caching
+
+- [ ] Redis caching enabled: `CACHE_ENABLED=True`
+- [ ] Cache TTL configured appropriately
+- [ ] Test cache: Make same request twice, second should be faster
+
+### Performance Test
+
+```bash
+# Run performance test
+- [ ] python test_production_fastapi.py
+- [ ] All tests should PASS
+- [ ] Response times < 200ms for DICOM images
+- [ ] Cached response times < 50ms
+```
+
+## ✅ Monitoring
+
+### Logging
+
+```bash
+# Verify logging
+- [ ] Logs writing to journald
+- [ ] sudo journalctl -u noctispro-fastapi -f  # Follow logs
+- [ ] Log rotation configured
+```
+
+### Metrics
+
+```bash
+# Test metrics endpoint
+- [ ] curl http://localhost:8001/api/v1/metrics
+- [ ] Should return request stats, response times, etc.
+```
+
+### Health Checks
+
+```bash
+# Setup health monitoring
+- [ ] Create health check script
+- [ ] Setup cron job for periodic checks
+- [ ] Configure alerting (email/SMS) for failures
+```
+
+## ✅ Testing
+
+### Functional Tests
+
+```bash
+# Run test suite
+- [ ] python test_production_fastapi.py
+- [ ] All tests pass
+```
+
+### Django Issue Verification
+
+- [ ] DICOM images load in < 200ms (not 3-6s)
+- [ ] Images returned as Base64 PNG (not raw pixel data)
+- [ ] Payload size ~50KB (not 2.5MB)
+- [ ] No 404 errors on DICOM endpoints
+- [ ] 'series' key in response (not 'series_list')
+- [ ] Proper error messages (not generic failures)
+- [ ] Cached responses very fast (< 50ms)
+
+### Load Testing
+
+```bash
+# Optional but recommended
+- [ ] Install Apache Bench: sudo apt-get install apache2-utils
+- [ ] ab -n 1000 -c 10 http://localhost:8001/api/v1/health
+- [ ] Should handle >500 requests/second
+- [ ] No errors under load
+```
+
+## ✅ Backup & Recovery
+
+### Backup Setup
+
+```bash
+# Database backups
+- [ ] PostgreSQL backup script in place
+- [ ] Scheduled via cron
+- [ ] Test restore procedure
+
+# DICOM files
+- [ ] File backup strategy defined
+- [ ] Backup location configured
+- [ ] Test restore procedure
+```
+
+### Disaster Recovery
+
+- [ ] Recovery plan documented
+- [ ] Backup restore tested
+- [ ] Service restart procedure documented
+
+## ✅ Documentation
+
+- [ ] API documentation accessible at `/api/v1/docs`
+- [ ] Production deployment guide reviewed
+- [ ] Service restart procedures documented
+- [ ] Troubleshooting guide prepared
+- [ ] Contact information for support updated
+
+## ✅ Go-Live
+
+### Final Verification
+
+```bash
+# Final checks before go-live
+- [ ] All services running: sudo systemctl status noctispro-fastapi
+- [ ] Health check passing: curl https://pacs.yourdomain.com/api/v1/health
+- [ ] HTTPS working (if applicable)
+- [ ] DNS configured correctly
+- [ ] Firewall rules correct
+- [ ] Monitoring active
+- [ ] Backups configured
+```
+
+### Post-Deployment
+
+```bash
+# After deployment
+- [ ] Monitor logs for first 24 hours
+- [ ] Watch metrics dashboard
+- [ ] Verify no errors
+- [ ] Check performance
+- [ ] User acceptance testing
+```
+
+### Rollback Plan
+
+- [ ] Previous version backup available
+- [ ] Rollback procedure documented
+- [ ] Tested rollback in staging
+
+## 📊 Success Criteria
+
+After deployment, verify:
+
+- [ ] ✅ DICOM images load in < 200ms
+- [ ] ✅ No 404 errors
+- [ ] ✅ Payload sizes ~50KB
+- [ ] ✅ Success rate > 99%
+- [ ] ✅ Response times < 100ms average
+- [ ] ✅ No critical errors in logs
+- [ ] ✅ All health checks passing
+
+## 🎉 Deployment Complete!
+
+Once all items are checked:
+
+```bash
+# Confirm deployment
+echo "FastAPI Production Deployment Complete: $(date)" >> /var/log/noctispro-deployment.log
+```
+
+Your FastAPI service is now production-ready! 🚀
+
+---
 
 ## 📞 Support
 
 If issues arise:
-1. Check browser console (F12 → Console)
-2. Check Django logs for errors
-3. Verify API response structure at `/dicom-viewer/api/image/<id>/data/`
-4. Review `DICOM_VIEWER_FIX_SUMMARY.md` for troubleshooting
 
-## 🎉 Success Criteria
+1. Check logs: `sudo journalctl -u noctispro-fastapi -n 100`
+2. Check service: `sudo systemctl status noctispro-fastapi`
+3. For DICOM issues: Check `PRODUCTION_READY_SUMMARY.md`
+4. For deployment: Check `PRODUCTION_FASTAPI_DEPLOYMENT.md`
 
-Deployment is successful when:
-✅ Images appear immediately when loading a study
-✅ Window/Level sliders work smoothly in real-time
-✅ No console errors
-✅ No 500 errors in server logs
-✅ All measurement tools still work
-✅ User reports improved performance
+## 📚 Reference Documents
 
----
-
-**Status: READY FOR PRODUCTION DEPLOYMENT**
-**Risk Level: LOW** (Backward compatible changes only)
-**Rollback Complexity: LOW** (Simple git revert if needed)
+- `PRODUCTION_READY_SUMMARY.md` - Overview of fixes
+- `PRODUCTION_FASTAPI_DEPLOYMENT.md` - Detailed deployment guide
+- `FASTAPI_INTEGRATION_SUMMARY.md` - Integration details
+- `INTEGRATION_EXAMPLES.md` - Code examples
