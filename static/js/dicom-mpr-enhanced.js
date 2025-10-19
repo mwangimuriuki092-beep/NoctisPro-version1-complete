@@ -66,6 +66,69 @@ class DicomMPREnhanced {
         });
     }
 
+    // Individual MPR view access methods
+    axialView(sliceIndex = 0) {
+        const cacheData = Array.from(this.mprCache.values())[0];
+        if (cacheData && cacheData.axial && cacheData.axial[sliceIndex]) {
+            return cacheData.axial[sliceIndex];
+        }
+        return null;
+    }
+    
+    sagittalView(sliceIndex = 0) {
+        const cacheData = Array.from(this.mprCache.values())[0];
+        if (cacheData && cacheData.sagittal && cacheData.sagittal[sliceIndex]) {
+            return cacheData.sagittal[sliceIndex];
+        }
+        return null;
+    }
+    
+    coronalView(sliceIndex = 0) {
+        const cacheData = Array.from(this.mprCache.values())[0];
+        if (cacheData && cacheData.coronal && cacheData.coronal[sliceIndex]) {
+            return cacheData.coronal[sliceIndex];
+        }
+        return null;
+    }
+    
+    updateMPR(seriesId, options = {}) {
+        // Force regeneration of MPR views
+        const cacheKey = `mpr_${seriesId}_${JSON.stringify(options)}`;
+        this.mprCache.delete(cacheKey);
+        return this.generateMPRViews(seriesId, options);
+    }
+    
+    renderMPR(viewType, sliceIndex, canvas) {
+        let viewData = null;
+        
+        switch(viewType.toLowerCase()) {
+            case 'axial':
+                viewData = this.axialView(sliceIndex);
+                break;
+            case 'sagittal':
+                viewData = this.sagittalView(sliceIndex);
+                break;
+            case 'coronal':
+                viewData = this.coronalView(sliceIndex);
+                break;
+        }
+        
+        if (viewData && canvas) {
+            const ctx = canvas.getContext('2d');
+            // Render the view data to canvas
+            if (viewData.imageData) {
+                ctx.putImageData(viewData.imageData, 0, 0);
+            } else if (viewData.dataUrl) {
+                const img = new Image();
+                img.onload = () => ctx.drawImage(img, 0, 0);
+                img.src = viewData.dataUrl;
+            }
+            return true;
+        }
+        
+        return false;
+    }
+
     async generateMPRViews(seriesId, options = {}) {
         const cacheKey = `mpr_${seriesId}_${JSON.stringify(options)}`;
         
