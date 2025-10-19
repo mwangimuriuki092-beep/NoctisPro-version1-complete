@@ -1,0 +1,144 @@
+# Promtail configuration for collecting logs from NoctisPro PACS
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Application logs
+  - job_name: noctispro_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: noctispro
+          __path__: /var/log/noctispro/*/*.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^\[\d{4}-\d{2}-\d{2}'
+          max_lines: 128
+      - regex:
+          expression: '^\[(?P<timestamp>\S+)\] \[(?P<level>\S+)\] (?P<message>.*)'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05'
+
+  # Gunicorn access logs
+  - job_name: gunicorn_access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: gunicorn
+          log_type: access
+          __path__: /var/log/noctispro/gunicorn-access.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>[\w\.]+) - - \[(?P<time_local>.*?)\] "(?P<request>.*?)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>.*?)" "(?P<http_user_agent>.*?)"'
+      - labels:
+          status:
+      - timestamp:
+          source: time_local
+          format: '02/Jan/2006:15:04:05 -0700'
+
+  # Gunicorn error logs
+  - job_name: gunicorn_error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: gunicorn
+          log_type: error
+          __path__: /var/log/noctispro/gunicorn-error.log
+    pipeline_stages:
+      - regex:
+          expression: '^\[(?P<timestamp>\S+ \S+)\] \[(?P<level>\S+)\] (?P<message>.*)'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05'
+
+  # Celery logs
+  - job_name: celery
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: celery
+          __path__: /var/log/noctispro/celery/*.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^\[\d{4}-\d{2}-\d{2}'
+      - regex:
+          expression: '^\[(?P<timestamp>\S+ \S+)\] \[(?P<level>\S+)\] (?P<message>.*)'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05'
+
+  # Nginx access logs
+  - job_name: nginx_access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          log_type: access
+          __path__: /var/log/noctispro/nginx/access.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>[\w\.]+) - (?P<remote_user>[\w-]+) \[(?P<time_local>.*?)\] "(?P<request>.*?)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>.*?)" "(?P<http_user_agent>.*?)"'
+      - labels:
+          status:
+      - timestamp:
+          source: time_local
+          format: '02/Jan/2006:15:04:05 -0700'
+
+  # Nginx error logs
+  - job_name: nginx_error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          log_type: error
+          __path__: /var/log/noctispro/nginx/error.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<message>.*)'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: '2006/01/02 15:04:05'
+
+  # Docker container logs
+  - job_name: docker_containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["noctispro_*"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+    pipeline_stages:
+      - docker: {}
+      - multiline:
+          firstline: '^\[\d{4}-\d{2}-\d{2}'
+          max_lines: 128
