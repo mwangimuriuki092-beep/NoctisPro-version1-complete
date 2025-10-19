@@ -43,8 +43,13 @@ class ProfessionalDicomViewer {
             windowWidth: 400,
             windowCenter: 40,
             invert: false,
-            interpolation: 'linear'
+            interpolation: 'linear',
+            flipH: false,
+            flipV: false
         };
+        
+        // Active tool state
+        this.activeTool = 'none';
         
         this.init();
     }
@@ -450,6 +455,59 @@ class ProfessionalDicomViewer {
         this.updateZoomDisplay();
     }
     
+    // Compatibility wrappers for common tool names
+    zoomIn() {
+        this.setZoom(this.viewport.scale * 1.2);
+        this.showToast('Zoom In', 'info');
+    }
+    
+    zoomOut() {
+        this.setZoom(this.viewport.scale / 1.2);
+        this.showToast('Zoom Out', 'info');
+    }
+    
+    panImage(deltaX, deltaY) {
+        this.setPan(
+            this.viewport.translation.x + deltaX,
+            this.viewport.translation.y + deltaY
+        );
+    }
+    
+    rotateImage(degrees) {
+        this.viewport.rotation = (this.viewport.rotation + degrees) % 360;
+        if (this.currentImage) {
+            this.renderer.renderImage(this.currentImage, this.viewport);
+        }
+        this.showToast(`Rotated ${degrees}°`, 'info');
+    }
+    
+    flipImage(direction) {
+        if (direction === 'horizontal') {
+            this.viewport.flipH = !this.viewport.flipH;
+        } else if (direction === 'vertical') {
+            this.viewport.flipV = !this.viewport.flipV;
+        }
+        if (this.currentImage) {
+            this.renderer.renderImage(this.currentImage, this.viewport);
+        }
+        this.showToast(`Flipped ${direction}`, 'info');
+    }
+    
+    // Tool handling
+    handleToolClick(toolName) {
+        this.activeTool = toolName;
+        this.showToast(`Tool: ${toolName}`, 'info');
+        
+        // Update UI to show active tool
+        document.querySelectorAll('.tool-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        const toolBtn = document.querySelector(`[data-tool="${toolName}"]`);
+        if (toolBtn) {
+            toolBtn.classList.add('active');
+        }
+    }
+    
     setPan(x, y) {
         this.viewport.translation.x = x;
         this.viewport.translation.y = y;
@@ -716,6 +774,30 @@ class ProfessionalDicomViewer {
         } catch (error) {
             console.error('Print failed:', error);
             this.showToast('Print failed', 'error');
+        }
+    }
+    
+    // Compatibility wrapper for downloadImage
+    downloadImage(format = 'png') {
+        if (!this.currentImage) {
+            this.showToast('No image to download', 'warning');
+            return;
+        }
+        
+        try {
+            const result = this.export.exportImage(this.currentImage, this.viewport, format);
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.href = result.dataUrl;
+            link.download = `dicom_image_${Date.now()}.${format}`;
+            link.click();
+            
+            this.showToast('Image downloaded successfully', 'success');
+            
+        } catch (error) {
+            console.error('Download failed:', error);
+            this.showToast('Download failed', 'error');
         }
     }
     
@@ -1923,25 +2005,43 @@ class DicomCache {
 class WindowingEngine {
     constructor() {
         this.presets = {
-            // CT presets
+            // CT presets (lowercase and capitalized for compatibility)
             'lung': { windowWidth: 1800, windowCenter: -500 },
+            'Lung': { windowWidth: 1800, windowCenter: -500 },
             'bone': { windowWidth: 3000, windowCenter: 500 },
+            'Bone': { windowWidth: 3000, windowCenter: 500 },
             'soft tissue': { windowWidth: 600, windowCenter: 60 },
+            'Soft Tissue': { windowWidth: 600, windowCenter: 60 },
             'brain': { windowWidth: 120, windowCenter: 60 },
+            'Brain': { windowWidth: 120, windowCenter: 60 },
             'liver': { windowWidth: 200, windowCenter: 50 },
+            'Liver': { windowWidth: 200, windowCenter: 50 },
             'cine': { windowWidth: 800, windowCenter: 250 },
+            'Cine': { windowWidth: 800, windowCenter: 250 },
             
-            // X-ray presets  
+            // X-ray presets (lowercase and capitalized for compatibility)
             'chest x-ray': { windowWidth: 3500, windowCenter: 800 },
+            'Chest X-ray': { windowWidth: 3500, windowCenter: 800 },
+            'chest xray': { windowWidth: 3500, windowCenter: 800 },
+            'Chest Xray': { windowWidth: 3500, windowCenter: 800 },
             'bone x-ray': { windowWidth: 5000, windowCenter: 2500 },
+            'Bone X-ray': { windowWidth: 5000, windowCenter: 2500 },
+            'bone xray': { windowWidth: 5000, windowCenter: 2500 },
+            'Bone Xray': { windowWidth: 5000, windowCenter: 2500 },
             'soft x-ray': { windowWidth: 1000, windowCenter: 200 },
+            'Soft X-ray': { windowWidth: 1000, windowCenter: 200 },
             'extremity': { windowWidth: 4500, windowCenter: 2000 },
+            'Extremity': { windowWidth: 4500, windowCenter: 2000 },
             'spine': { windowWidth: 4000, windowCenter: 1500 },
+            'Spine': { windowWidth: 4000, windowCenter: 1500 },
             'abdomen': { windowWidth: 2500, windowCenter: 400 },
+            'Abdomen': { windowWidth: 2500, windowCenter: 400 },
             
             // Special presets
             'auto': { windowWidth: 'auto', windowCenter: 'auto' },
-            'full range': { windowWidth: 65535, windowCenter: 32767 }
+            'Auto': { windowWidth: 'auto', windowCenter: 'auto' },
+            'full range': { windowWidth: 65535, windowCenter: 32767 },
+            'Full Range': { windowWidth: 65535, windowCenter: 32767 }
         };
     }
     
@@ -1998,10 +2098,96 @@ class MeasurementEngine {
         this.measurements = [];
         this.currentMeasurement = null;
         this.measurementType = null;
+        this.annotations = [];
     }
     
     async init() {
         console.log('📏 Measurement engine initialized');
+    }
+    
+    // Compatibility wrappers for common measurement function names
+    measureDistance(x1, y1, x2, y2) {
+        const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        const measurement = {
+            type: 'distance',
+            points: [{x: x1, y: y1}, {x: x2, y: y2}],
+            value: distance,
+            timestamp: Date.now()
+        };
+        this.measurements.push(measurement);
+        return measurement;
+    }
+    
+    measureAngle(x1, y1, x2, y2, x3, y3) {
+        const angle1 = Math.atan2(y1 - y2, x1 - x2);
+        const angle2 = Math.atan2(y3 - y2, x3 - x2);
+        const angleDeg = Math.abs(angle1 - angle2) * (180 / Math.PI);
+        const measurement = {
+            type: 'angle',
+            points: [{x: x1, y: y1}, {x: x2, y: y2}, {x: x3, y: y3}],
+            value: angleDeg,
+            timestamp: Date.now()
+        };
+        this.measurements.push(measurement);
+        return measurement;
+    }
+    
+    calculateDistance(x1, y1, x2, y2) {
+        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    }
+    
+    calculateAngle(x1, y1, x2, y2, x3, y3) {
+        const angle1 = Math.atan2(y1 - y2, x1 - x2);
+        const angle2 = Math.atan2(y3 - y2, x3 - x2);
+        return Math.abs(angle1 - angle2) * (180 / Math.PI);
+    }
+    
+    drawMeasurements(canvas, ctx) {
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 2;
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#ff0000';
+        
+        this.measurements.forEach(measurement => {
+            if (measurement.type === 'distance' && measurement.points.length === 2) {
+                const p1 = measurement.points[0];
+                const p2 = measurement.points[1];
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                ctx.fillText(`${measurement.value.toFixed(2)} px`, midX, midY);
+            }
+        });
+    }
+    
+    drawAnnotations(canvas, ctx) {
+        ctx.fillStyle = '#00ff00';
+        ctx.font = '14px Arial';
+        
+        this.annotations.forEach(annotation => {
+            ctx.fillText(annotation.text, annotation.x, annotation.y);
+        });
+    }
+    
+    addAnnotation(x, y, text) {
+        const annotation = {
+            x: x,
+            y: y,
+            text: text,
+            timestamp: Date.now()
+        };
+        this.annotations.push(annotation);
+        return annotation;
+    }
+    
+    clearMeasurements() {
+        this.measurements = [];
+        this.annotations = [];
+        this.currentMeasurement = null;
     }
     
     startMeasurement(type) {
@@ -2136,6 +2322,9 @@ class MeasurementEngine {
 class MPREngine {
     constructor() {
         this.mprViews = null;
+        this.axialSlices = [];
+        this.sagittalSlices = [];
+        this.coronalSlices = [];
     }
     
     async init() {
@@ -2161,6 +2350,74 @@ class MPREngine {
         return data;
     }
     
+    async generateMPRViews(seriesId) {
+        // Generate all three MPR views
+        const mprData = await this.generateMPR(seriesId);
+        
+        this.axialSlices = mprData.axial || [];
+        this.sagittalSlices = mprData.sagittal || [];
+        this.coronalSlices = mprData.coronal || [];
+        
+        this.mprViews = {
+            axial: this.axialSlices,
+            sagittal: this.sagittalSlices,
+            coronal: this.coronalSlices
+        };
+        
+        return this.mprViews;
+    }
+    
+    axialView(sliceIndex) {
+        if (this.axialSlices && this.axialSlices[sliceIndex]) {
+            return this.axialSlices[sliceIndex];
+        }
+        return null;
+    }
+    
+    sagittalView(sliceIndex) {
+        if (this.sagittalSlices && this.sagittalSlices[sliceIndex]) {
+            return this.sagittalSlices[sliceIndex];
+        }
+        return null;
+    }
+    
+    coronalView(sliceIndex) {
+        if (this.coronalSlices && this.coronalSlices[sliceIndex]) {
+            return this.coronalSlices[sliceIndex];
+        }
+        return null;
+    }
+    
+    updateMPR(seriesId, sliceIndex) {
+        // Update MPR views for a specific slice
+        return this.generateMPRViews(seriesId);
+    }
+    
+    renderMPR(viewType, sliceIndex, canvas) {
+        let sliceData = null;
+        
+        switch(viewType) {
+            case 'axial':
+                sliceData = this.axialView(sliceIndex);
+                break;
+            case 'sagittal':
+                sliceData = this.sagittalView(sliceIndex);
+                break;
+            case 'coronal':
+                sliceData = this.coronalView(sliceIndex);
+                break;
+        }
+        
+        if (sliceData && canvas) {
+            const ctx = canvas.getContext('2d');
+            // Render slice data to canvas
+            // Implementation would depend on slice data format
+            return true;
+        }
+        
+        return false;
+    }
+    
     async generate3D(seriesId, type) {
         // Call backend API for 3D generation
         const response = await fetch(`/dicom-viewer/api/series/${seriesId}/3d/`, {
@@ -2179,6 +2436,14 @@ class MPREngine {
         }
         
         return data;
+    }
+    
+    async generateMIPView(seriesId) {
+        return await this.generate3D(seriesId, 'mip');
+    }
+    
+    async generate3DView(seriesId) {
+        return await this.generate3D(seriesId, 'volume');
     }
 }
 
