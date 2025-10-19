@@ -2,158 +2,144 @@
 
 A comprehensive Django-based Picture Archiving and Communication System (PACS) for medical imaging with AI analysis capabilities.
 
-## 🚀 Deployment Options
+---
 
-NoctisPro PACS offers multiple deployment configurations to suit different needs:
+## 🚀 Quick Start - Production Deployment
 
-### 1. 🌐 Internet Access with HTTPS (Recommended for Production)
-**Best for**: Production environments, multi-location access, DICOM device integration
+### Docker on Ubuntu Server 22.04 (Recommended)
+
+The fastest and most reliable way to deploy in production:
+
+```bash
+# Clone repository
+git clone <repository-url> /opt/noctispro
+cd /opt/noctispro
+
+# Deploy with Docker
+sudo chmod +x deploy_production_docker.sh
+sudo ./deploy_production_docker.sh
+```
+
+**Access the system at**: `http://your-server-ip`
+- **Username**: admin
+- **Password**: admin123 (⚠️ change immediately!)
+
+📚 **Full Documentation**: See [DOCKER_DEPLOYMENT_UBUNTU_22.04.md](./DOCKER_DEPLOYMENT_UBUNTU_22.04.md)
+
+---
+
+## 🎯 Deployment Options
+
+### 1. 🐳 Docker Production (Recommended)
+**Best for**: Production environments, scalability, easy management
+
+```bash
+sudo ./deploy_production_docker.sh
+```
+
+- ✅ PostgreSQL database
+- ✅ Redis caching
+- ✅ Automated backups
+- ✅ AI processing worker
+- ✅ Health monitoring
+- ✅ Easy updates and maintenance
+
+**Full Guide**: [DOCKER_DEPLOYMENT_UBUNTU_22.04.md](./DOCKER_DEPLOYMENT_UBUNTU_22.04.md)
+
+### 2. 🌐 Internet HTTPS Access
+**Best for**: Public access, multi-location teams
+
 ```bash
 export DOMAIN_NAME="pacs.yourdomain.com"
 export ADMIN_EMAIL="admin@yourdomain.com"
-./deploy_internet_https.sh
+sudo ./deploy_internet_https.sh
 ```
-- ✅ Public internet access via HTTPS
-- ✅ Let's Encrypt SSL certificates
-- ✅ Production-grade security
-- ✅ DICOM device connectivity
-- ✅ Multi-user access from anywhere
 
-### 2. 🔒 Private Network via Tailscale
-**Best for**: Secure private networks, remote teams, VPN-like access
+- ✅ Let's Encrypt SSL certificates
+- ✅ Public internet access
+- ✅ DICOM device connectivity
+- ✅ Production security
+
+### 3. 🔒 Tailscale Private Network
+**Best for**: Secure private networks, VPN-like access
+
 ```bash
-export TAILSCALE_AUTH_KEY="your-tailscale-key"
+export TAILSCALE_AUTH_KEY="your-key"
 export TAILNET_HOSTNAME="noctispro"
-./deploy_docker_tailscale.sh
+sudo ./deploy_docker_tailscale.sh
 ```
-- ✅ Zero-trust network access
+
+- ✅ Zero-trust networking
 - ✅ End-to-end encryption
-- ✅ No public IP required
-- ✅ Easy multi-device access
+- ✅ No public IP needed
 - ✅ Built-in authentication
 
-### 3. 🏠 Local Development
-**Best for**: Development, testing, single-machine setups
+### 4. 🏠 Local Development
+**Best for**: Development, testing, single-machine
+
 ```bash
 ./deploy_noctispro.sh
 ```
-- ✅ Quick local setup
+
+- ✅ Quick setup
+- ✅ No Docker required
 - ✅ Development-friendly
-- ✅ No external dependencies
-- ✅ Ideal for testing
 
-## Quick Deployment (Ubuntu Server 24.04)
+---
 
-### Internet HTTPS Deployment
+## 📋 System Requirements
+
+- **OS**: Ubuntu Server 22.04 LTS (recommended) or 24.04
+- **RAM**: 4GB minimum, 8GB+ recommended
+- **Storage**: 20GB minimum, 100GB+ for production
+- **CPU**: 2+ cores recommended
+
+---
+
+## 🛠️ Management Commands
+
+### Docker Deployment
+
 ```bash
-# Set your domain and email
-export DOMAIN_NAME="pacs.yourdomain.com"
-export ADMIN_EMAIL="admin@yourdomain.com"
+# Start/stop services
+docker compose -f docker-compose.production.yml up -d
+docker compose -f docker-compose.production.yml down
 
-# Deploy with HTTPS
-./deploy_internet_https.sh
+# View logs
+docker compose -f docker-compose.production.yml logs -f
+
+# Run Django commands
+docker exec -it noctispro-web python manage.py <command>
+
+# Create backup
+docker exec -it noctispro-web python manage.py create_medical_backup --type manual
 ```
 
-### Tailscale Private Network Deployment
+### Native Deployment
+
 ```bash
-# With Tailscale auth key for automated setup
-TAILSCALE_AUTH_KEY=your_auth_key TAILNET_HOSTNAME=noctispro ./deploy_docker_tailscale.sh
-
-# Or manual Docker deployment
-cp .env.docker .env
-# Edit .env with your Tailscale auth key
-docker-compose up -d
-```
-
-The deployment script will automatically:
-- ✅ Install all system dependencies
-- ✅ Set up Python virtual environment
-- ✅ Install Python requirements (handling problematic packages)
-- ✅ Configure secure Tailscale network access (Tailnet)
-- ✅ Set up Django database and migrations
-- ✅ Collect static files
-- ✅ Create admin superuser (admin/admin123)
-- ✅ Create systemd services
-- ✅ Start the application
-
-### Access Information
-
-#### Tailnet Access (Secure Private Network via Tailscale):
-- **Application URL**: http://noctispro:8080 (or via Tailscale IP)
-- **Admin Login**: admin / admin123
-- **Admin Panel**: http://noctispro:8080/admin/
-- **Worklist**: http://noctispro:8080/worklist/
-- **AI Dashboard**: http://noctispro:8080/ai/
-- **DICOM Viewer**: http://noctispro:8080/dicom-viewer/
-
-### Management Commands
-
-#### Native Deployment:
-```bash
-# Use the management script
-./manage_noctispro.sh start     # Start services
-./manage_noctispro.sh stop      # Stop services
-./manage_noctispro.sh restart   # Restart services
-./manage_noctispro.sh status    # Check status
-./manage_noctispro.sh logs      # View logs
-
-# Or use systemctl directly
+# Service management
 sudo systemctl start noctispro
 sudo systemctl stop noctispro
-sudo systemctl restart noctispro
+sudo systemctl status noctispro
+
+# View logs
 sudo journalctl -f -u noctispro
-
-# Tailscale management
-tailscale status
-tailscale ip -4
 ```
 
-#### Docker Deployment:
-```bash
-# Container management
-docker-compose up -d           # Start all services
-docker-compose down            # Stop all services
-docker-compose restart         # Restart services
-docker-compose logs -f         # View logs
-docker-compose ps              # Check status
+---
 
-# Tailscale management in Docker
-docker exec noctis_tailscale tailscale status
-docker exec noctis_tailscale tailscale ip -4
-docker exec -it noctis_tailscale tailscale up --hostname=noctispro
+## 🤖 AI Analysis Features
 
-# Application management
-docker exec noctis_web python manage.py migrate
-docker exec noctis_web python manage.py collectstatic --noinput
-docker exec noctis_web python manage.py setup_working_ai_models
-```
+The system includes built-in AI analysis capabilities:
 
-### AI Analysis Setup
+- **Automatic Analysis**: Analyzes all uploaded DICOM studies
+- **Real-time Processing**: Background AI processing
+- **Quality Assessment**: Technical parameter validation
+- **Report Generation**: Automated preliminary reports
+- **Dashboard**: View results at `/ai/` endpoint
 
-#### Native Deployment:
-```bash
-# Setup AI models and start processing
-python setup_ai_system.py
-
-# Or manually:
-python manage.py setup_working_ai_models
-python manage.py process_ai_analyses --continuous
-```
-
-#### Docker Deployment:
-```bash
-# AI setup is automatic in Docker
-# AI processor runs as a separate container
-# Check AI status:
-docker-compose logs ai_processor
-```
-
-**AI Features:**
-- **Automatic Analysis**: AI analyzes all uploaded DICOM studies
-- **Real-time Processing**: Background processing of pending analyses
-- **Quality Assessment**: Technical parameter validation and image quality metrics
-- **Report Generation**: Automated preliminary reports with confidence scores
-- **Dashboard**: View AI results at `/ai/` endpoint
+AI processing runs automatically in Docker deployments via the `ai-worker` container.
 
 ## Features
 - 🏥 **Medical Imaging**: DICOM viewer with support for CT, MR, CR, DX, US, XA
@@ -195,18 +181,76 @@ docker-compose logs ai_processor
 └── noctis_pro/        # Django project settings
 ```
 
-## Requirements
-- Ubuntu Server 24.04 (recommended)
-- Python 3.12+
-- 4GB+ RAM
-- 10GB+ storage
-- Internet connection for ngrok tunnel
+## 📖 Documentation
 
-## Support
-For issues or questions, check the logs:
+- **[Docker Deployment Guide](./DOCKER_DEPLOYMENT_UBUNTU_22.04.md)** - Complete production deployment guide
+- **[Ubuntu 22.04 Deployment](./UBUNTU_22_04_DEPLOYMENT.md)** - Native installation guide
+- **[Advanced Guides](./docs/)** - Additional documentation and guides
+
+---
+
+## 🆘 Support & Troubleshooting
+
+### Check System Health
+
 ```bash
-sudo journalctl -f -u noctispro -u noctispro-ngrok
+# Docker deployment
+docker compose -f docker-compose.production.yml ps
+docker compose -f docker-compose.production.yml logs -f
+
+# Native deployment
+sudo systemctl status noctispro
+sudo journalctl -f -u noctispro
 ```
 
-## License
-This is a medical imaging system. Please ensure compliance with local healthcare regulations and data protection laws.
+### Common Issues
+
+1. **Services won't start**: Check logs and ensure ports 80, 443 are available
+2. **Database errors**: Run migrations with `python manage.py migrate`
+3. **Static files not loading**: Run `python manage.py collectstatic --noinput`
+4. **AI analysis not working**: Check ai-worker logs or restart the service
+
+See [DOCKER_DEPLOYMENT_UBUNTU_22.04.md](./DOCKER_DEPLOYMENT_UBUNTU_22.04.md) for detailed troubleshooting.
+
+---
+
+## ⚖️ License & Compliance
+
+This is a medical imaging system. Ensure compliance with:
+
+- HIPAA (if in US)
+- GDPR (if handling EU patient data)  
+- Local healthcare regulations
+- Data protection laws
+
+**⚠️ IMPORTANT**: This system is for healthcare professionals. Ensure proper training and certification before clinical use.
+
+---
+
+## 🎓 Quick Reference
+
+### First Time Setup
+
+1. Deploy using one of the methods above
+2. Access web interface at `http://your-server-ip`
+3. Login with admin/admin123
+4. **Change the admin password immediately**
+5. Create additional users via Admin Panel
+6. Upload sample DICOM files to test
+
+### Production Checklist
+
+- [ ] Changed default passwords
+- [ ] Configured SSL/TLS certificates
+- [ ] Set up firewall rules
+- [ ] Configured automated backups
+- [ ] Created non-admin users
+- [ ] Tested DICOM upload and viewing
+- [ ] Tested AI analysis
+- [ ] Set up monitoring
+
+See [DOCKER_DEPLOYMENT_UBUNTU_22.04.md](./DOCKER_DEPLOYMENT_UBUNTU_22.04.md) for complete production checklist.
+
+---
+
+**Ready to deploy?** Start with [DOCKER_DEPLOYMENT_UBUNTU_22.04.md](./DOCKER_DEPLOYMENT_UBUNTU_22.04.md) 🚀
