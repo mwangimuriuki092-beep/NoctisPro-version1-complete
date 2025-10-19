@@ -1,0 +1,93 @@
+# Production environment files - DO NOT COMMIT
+.env
+.env.production
+.env.local
+
+# Production data directories
+data/
+backups/
+logs/
+
+# SSL certificates
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+
+# Docker volumes data
+postgres_data/
+redis_data/
+media_data/
+static_data/
+grafana_data/
+prometheus_data/
+
+# Sensitive configuration
+config/secrets/
+deployment/nginx/ssl/
+
+# Logs
+*.log
+logs/
+
+# Backups
+*.sql
+*.sql.gz
+*.tar.gz
+backups/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Django
+*.pot
+db.sqlite3
+db.sqlite3-journal
+/media
+/staticfiles
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+docker-compose.override.yml
+
+# Local development
+*.local
+local/
+tmp/
+temp/
